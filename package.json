@@ -3,11 +3,12 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve",
+    "start": "ng serve --ssl --ssl-cert ssl/cert.pem --ssl-key ssl/key.pem",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "serve:ssr:user_interface": "node dist/user_interface/server/server.mjs"
+    "serve:ssr:user_interface": "node dist/user_interface/server/server.mjs",
+    "dev": "nodemon server.js"
   },
   "private": true,
   "dependencies": {
@@ -24,8 +25,11 @@
     "dotenv": "^16.5.0",
     "express": "^4.21.2",
     "mongodb": "^6.16.0",
+    "mongoose": "^8.15.1",
+    "multer": "^2.0.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
+    "ws": "^8.18.2",
     "zone.js": "~0.15.0"
   },
   "devDependencies": {
@@ -42,6 +46,7 @@
     "karma-coverage": "~2.2.0",
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.1.0",
+    "nodemon": "^3.1.10",
     "ts-node": "^10.9.2",
     "typescript": "~5.7.2"
   }

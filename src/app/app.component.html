@@ -1,13 +1,35 @@
 <div>
-  <h1>{{title}} - Storage Test</h1>
-  
-  <div class="test-section">
-    <h2>Storage Node Test</h2>
-    <button (click)="testStorageNode()">Test Storage Node Connection</button>
+  <h1>{{title}} - Node Status Checker</h1>
+    <div>
+      <input 
+        type="text" 
+        [(ngModel)]="nodeId" 
+      >
+      <button 
+        (click)="checkNodeStatus()" 
+        [disabled]="!nodeId || isChecking"
+      >
+        {{isChecking ? 'Checking...' : 'Check Status'}}
+      </button>
+    
+    <div *ngIf="nodeStatusMessage">
+      {{nodeStatusMessage}}
+    </div>
+    
+    <div *ngIf="nodeStatusResult">
+      <h3>Node Status Details</h3>
+      <div>
+        <p><strong>Node ID:</strong> {{nodeStatusResult.node_id}}</p>
+        <p><strong>Status:</strong> <span>{{nodeStatusResult.node_status.status}}</span></p>
+        <p><strong>Message:</strong> {{nodeStatusResult.node_status.message}}</p>
+        <p *ngIf="nodeStatusResult.node_status.endpoint"><strong>Endpoint:</strong> {{nodeStatusResult.node_status.endpoint}}</p>
+        <p><strong>Used Space:</strong> {{formatBytes(nodeStatusResult.node_status.used_space)}}</p>
+        <p><strong>Total Space:</strong> {{formatBytes(nodeStatusResult.node_status.total_available_space)}}</p>
+        <p *ngIf="nodeStatusResult.node_status.last_seen"><strong>Last Seen:</strong> {{formatDate(nodeStatusResult.node_status.last_seen)}}</p>
+      </div>
+    </div>
   </div>
   
-  <div class="test-section">
-    <h2>File Upload Test</h2>
-    <input type="file" (change)="testFileUpload($event)">
-  </div>
+  <!-- Router outlet for navigation -->
+  <router-outlet></router-outlet>
 </div>

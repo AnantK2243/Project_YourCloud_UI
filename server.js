@@ -8,8 +8,8 @@ const path = require('path');
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
-const WS_PORT = process.env.WS_PORT || 8080;
+const PORT = process.env.PORT;
+const WS_PORT = process.env.WS_PORT;
 
 // Load SSL certificates (required for HTTPS-only mode)
 let sslOptions = {};
@@ -25,18 +25,20 @@ try {
   process.exit(1);
 }
 
-// Configure CORS to allow requests from frontend (HTTPS only)
+// Configure CORS based on environment
+const allowedOrigins = ['http://localhost:4200', 'https://localhost:4200', 'http://localhost:3001', 'https://localhost:3001'];
+
 app.use(cors({
-  origin: ['https://localhost:4200', 'https://localhost:3001'],
+  origin: allowedOrigins,
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'HEAD'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Connection']
 }));
 app.use(express.json());
 
 // Add a simple request logger
 app.use((req, res, next) => {
-  console.log(`Incoming request: ${req.method} ${req.url}`);
+  // console.log(`Incoming request: ${req.method} ${req.url}`);
   next();
 });
 
@@ -56,8 +58,7 @@ const StorageNodeSchema = new mongoose.Schema({
   num_chunks: { type: Number, default: 0},
   last_seen: { type: Date, default: Date.now },
   hostname: String,
-  os_version: String,
-  endpoint: String
+  os_version: String
 });
 
 const StorageNode = mongoose.model('StorageNode', StorageNodeSchema);
@@ -97,117 +98,85 @@ function generateCommandId() {
   return 'cmd-' + require('crypto').randomBytes(8).toString('hex');
 }
 
-// Helper function to update node storage status
+// Optimized helper function to update node storage status (WebSocket-first, no DB lookup)
 async function updateNodeStatus(nodeId) {
   try {
-    // Find the node in the database
-    const node = await StorageNode.findOne({ node_id: nodeId });
-    if (!node) {
-      console.error(`Node ${nodeId} not found in database`);
-      return null;
-    }
-
-    // Check if node is connected via WebSocket
+    // Check if node is connected via WebSocket first (instant)
     const ws = nodeConnections.get(nodeId);
     const isConnected = ws && ws.readyState === WebSocket.OPEN;
     
-    let updateData = {};
-
-    // Request node status status
     if (isConnected) {
-      updateData.status = 'online';
-      updateData.last_seen = new Date(); // Set last_seen
-
+      // Node is online - request fresh status and update DB in background
       const statusCommand = {
         command_type: 'STATUS_REQUEST',
         command_id: generateCommandId()
       };
 
-      // Send status request and wait for response
-      return new Promise((resolve) => {
-        // Store the resolve function to call when response arrives
-        pendingCommands.set(statusCommand.command_id, (result) => {
-          if (result.type === 'STATUS_REPORT' && result.status) {
-            // Just resolve with the data - database is already updated by WebSocket handler
-            console.log(`Node ${nodeId} status request completed with fresh data`);
-            resolve({
+      // Send status request and handle response in background
+      pendingCommands.set(statusCommand.command_id, (result) => {
+        if (result.type === 'STATUS_REPORT' && result.status) {
+          // Update database in background with fresh data
+          StorageNode.findOneAndUpdate(
+            { node_id: nodeId },
+            {
               status: 'online',
-              used_space: result.status.used_space_bytes || node.used_space,
-              total_available_space: result.status.max_space_bytes || node.total_available_space,
-              num_chunks: result.status.current_chunk_count || node.num_chunks,
-              last_seen: new Date(),
-              node_id: nodeId,
-              message: 'Server connected',
-              endpoint: node.endpoint
-            });
-          } else {
-            // Status request failed or no detailed status, update with current updateData
-            StorageNode.findOneAndUpdate({ node_id: nodeId }, updateData, { new: true }).then(() => {
-              console.log(`Node ${nodeId} status updated (online, but status request failed or no detail):`, updateData);
-              resolve({
-                ...updateData,
-                node_id: nodeId,
-                message: 'Server connected',
-                endpoint: node.endpoint,
-                used_space: node.used_space || 0,
-                total_available_space: node.total_available_space || 0
-              });
-            }).catch((error) => {
-              console.error(`Error updating node ${nodeId} (online, status request failed):`, error);
-              resolve(null);
-            });
-          }
-        });
-
-        // Set timeout for status request
-        setTimeout(() => {
-          if (pendingCommands.has(statusCommand.command_id)) {
-            pendingCommands.delete(statusCommand.command_id);
-            StorageNode.findOneAndUpdate(
-              { node_id: nodeId },
-              updateData, 
-              { new: true }
-            ).then(() => {
-              console.log(`Status request timeout for node ${nodeId}. Updated status:`, updateData);
-              resolve({
-                ...updateData,
-                node_id: nodeId,
-                message: 'Server connected',
-                endpoint: node.endpoint,
-                used_space: node.used_space || 0,
-                total_available_space: node.total_available_space || 0
-              });
-            }).catch((error) => {
-              console.error(`Error updating node ${nodeId} after timeout:`, error);
-              resolve(null);
-            });
-          }
-        }, 1000); // 1 second timeout (reduced from 5 seconds)
-
-        // Send the command
-        ws.send(JSON.stringify(statusCommand));
+              used_space: result.status.used_space_bytes || 0,
+              total_available_space: result.status.max_space_bytes || 0,
+              num_chunks: result.status.current_chunk_count || 0,
+              last_seen: null
+            },
+            { new: true }
+          ).catch((error) => {
+            console.error(`Error updating node ${nodeId} database:`, error);
+          });
+        } else {
+          console.log(`Node ${nodeId} status request failed but node is still appears online`);
+          // Still update DB to mark as online even if status request failed
+          StorageNode.findOneAndUpdate(
+            { node_id: nodeId },
+            {
+              status: 'online',
+              last_seen: null
+            },
+            { new: true }
+          ).catch((error) => {
+            console.error(`Error updating node ${nodeId} status to online:`, error);
+          });
+        }
       });
+
+      // Set timeout for status request
+      setTimeout(() => {
+        if (pendingCommands.has(statusCommand.command_id)) {
+          pendingCommands.delete(statusCommand.command_id);
+          console.log(`Status request timeout for node ${nodeId} but node is still online`);
+          // Update DB to mark as online even on timeout
+          StorageNode.findOneAndUpdate(
+            { node_id: nodeId },
+            {
+              status: 'online',
+              last_seen: null
+            },
+            { new: true }
+          ).catch((error) => {
+            console.error(`Error updating node ${nodeId} status after timeout:`, error);
+          });
+        }
+      }, 1000); // 1 second timeout
+
+      // Send the command
+      ws.send(JSON.stringify(statusCommand));
+
+      // Return immediately without waiting for response
+      return {
+        status: 'online',
+        node_id: nodeId
+      };
     } else {
       // Node is not connected
-      updateData.status = 'offline';
-      const lastSeen = node.last_seen;
-      const timeSinceLastSeen = lastSeen ? Math.floor((new Date() - new Date(lastSeen)) / 1000 / 60) : null;
-      
-      await StorageNode.findOneAndUpdate(
-        { node_id: nodeId },
-        updateData,
-        { new: true }
-      );
-
-      console.log(`Node ${nodeId} status updated:`, updateData); 
       return {
-        ...updateData,
-        node_id: nodeId,
-        message: timeSinceLastSeen ? `Last seen ${timeSinceLastSeen} minutes ago` : 'Never connected',
-        endpoint: node.endpoint,
-        used_space: node.used_space || 0,
-        total_available_space: node.total_available_space || 0,
-        last_seen: lastSeen
+        status: 'offline',
+        node_id: nodeId
       };
     }
   } catch (error) {
@@ -217,6 +186,11 @@ async function updateNodeStatus(nodeId) {
 }
 
 // Routes
+
+// Health check endpoint for testing connectivity
+app.get('/api/health-check', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
 
 // Storage Node Status Check
 app.post('/api/check-status', async (req, res) => {
@@ -230,18 +204,6 @@ app.post('/api/check-status', async (req, res) => {
       });
     }
     
-    console.log(`Manual status check requested for node: ${node_id}`);
-    
-    // Check if node exists in database
-    const nodeExists = await StorageNode.findOne({ node_id });
-    if (!nodeExists) {
-      return res.status(404).json({
-        success: false,
-        error: `Node ${node_id} not found`
-      });
-    }
-    
-    // Get status for the specific node
     const nodeStatus = await updateNodeStatus(node_id);
     
     if (!nodeStatus) {
@@ -250,8 +212,8 @@ app.post('/api/check-status', async (req, res) => {
         error: `Failed to update status for node ${node_id}`
       });
     }
-    
-    res.json({
+
+    return res.json({
       success: true,
       node_id,
       node_status: nodeStatus
@@ -326,12 +288,12 @@ const httpsServerForWS = https.createServer(sslOptions);
 const wss = new WebSocket.Server({ server: httpsServerForWS });
 
 wss.on('connection', (ws) => {
-  console.log('WebSocket client connected');
+  // console.log('WebSocket client connected');
 
   ws.on('message', async (message) => {
     try {
       const data = JSON.parse(message);
-      console.log('Received WebSocket message:', data);
+      // console.log('Received WebSocket message:', data);
 
       // Handle different message types
       switch (data.type) {
@@ -346,25 +308,23 @@ wss.on('connection', (ws) => {
             ws.nodeId = data.node_id;
             nodeConnections.set(data.node_id, ws);
             
-            // Update node status to online and set endpoint
+            // Update node status to online
             try {
-              const clientEndpoint = `${ws._socket.remoteAddress}:${ws._socket.remotePort}`;
               await StorageNode.findOneAndUpdate(
                 { node_id: data.node_id },
                 { 
                   status: 'online',
-                  last_seen: new Date(),
-                  endpoint: clientEndpoint
+                  last_seen: null,
                 },
                 { new: true }
               );
-              console.log(`Node ${data.node_id} status updated to online with endpoint: ${clientEndpoint}`);
+              // console.log(`Node ${data.node_id} status updated to online`);
             } catch (error) {
               console.error(`Error updating node ${data.node_id} status:`, error);
             }
             
             ws.send(JSON.stringify({ type: 'AUTH_SUCCESS', message: 'Authentication successful' }));
-            console.log(`Node ${data.node_id} authenticated successfully`);
+            //console.log(`Node ${data.node_id} authenticated successfully`);
           } else {
             ws.send(JSON.stringify({ type: 'AUTH_FAILED', message: 'Invalid credentials' }));
             console.log(`Authentication failed for node ${data.node_id}`);
@@ -387,7 +347,7 @@ wss.on('connection', (ws) => {
           
         case 'STATUS_REPORT':
           // Handle status reports from storage client
-          console.log(`Status report for ${data.command_id}:`, data.status);
+          //console.log(`Status report for ${data.command_id}:`, data.status);
           if (data.status && ws.nodeId) {
             // Update node status in database with fresh data
             try {
@@ -398,11 +358,11 @@ wss.on('connection', (ws) => {
                   used_space: data.status.used_space_bytes || 0,
                   total_available_space: data.status.max_space_bytes || 0,
                   num_chunks: data.status.current_chunk_count || 0,
-                  last_seen: new Date()
+                  last_seen: null
                 },
                 { new: true }
               );
-              console.log(`Node ${ws.nodeId} storage status updated from status report`);
+              // console.log(`Node ${ws.nodeId} storage status updated from status report`);
             } catch (error) {
               console.error(`Error updating node ${ws.nodeId} storage status:`, error);
             }
@@ -426,13 +386,14 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
-    if (ws.isUIClient) {
-      // UI client disconnecting
-      if (typeof uiConnections !== 'undefined') {
-        uiConnections.delete(ws);
-        console.log(`UI client disconnected. Remaining UI connections: ${uiConnections.size}`);
-      }
-    } else if (ws.nodeId) {
+    // if (ws.isUIClient) {
+    //   // UI client disconnecting
+    //   if (typeof uiConnections !== 'undefined') {
+    //     uiConnections.delete(ws);
+    //     console.log(`UI client disconnected. Remaining UI connections: ${uiConnections.size}`);
+    //   }
+    // } else 
+    if (ws.nodeId) {
       // Storage client disconnecting - update status to offline
       nodeConnections.delete(ws.nodeId);
       
@@ -455,11 +416,21 @@ wss.on('connection', (ws) => {
   });
 });
 
-// Start HTTPS server only
-const httpsServer = https.createServer(sslOptions, app);
-httpsServer.listen(PORT, () => {
-  console.log(`HTTPS Backend server running on port ${PORT}`);
+// Start both HTTP (for internal) and HTTPS (for external) servers
+const http = require('http');
+
+// HTTP server for internal communication (frontend API calls)
+const httpServer = http.createServer(app);
+httpServer.listen(PORT, '127.0.0.1', () => {
+  console.log(`HTTP Backend server running on 127.0.0.1:${PORT} (internal use)`);
   console.log(`MongoDB Atlas connection status: ${mongoose.connection.readyState === 1 ? 'connected' : 'connecting...'}`);
+});
+
+// HTTPS server for external access via ngrok
+const httpsServer = https.createServer(sslOptions, app);
+const HTTPS_PORT = parseInt(PORT) + 1;
+httpsServer.listen(HTTPS_PORT, () => {
+  console.log(`HTTPS Backend server running on port ${HTTPS_PORT} (external access)`);
 });
 
 // Start the secure WebSocket server

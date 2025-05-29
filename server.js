@@ -174,9 +174,12 @@ async function updateNodeStatus(nodeId) {
       };
     } else {
       // Node is not connected
+      const nodeInDb = await StorageNode.findOne({ node_id: nodeId });
+
       return {
         status: 'offline',
-        node_id: nodeId
+        node_id: nodeId,
+        last_seen: nodeInDb.last_seen
       };
     }
   } catch (error) {
@@ -240,14 +243,14 @@ app.post('/api/register-node', async (req, res) => {
     let isUnique = false;
     
     while (!isUnique) {
-      node_id = 'node-' + require('crypto').randomBytes(8).toString('hex');
+      node_id = require('crypto').randomBytes(8).toString('hex');
       const existingNode = await StorageNode.findOne({ node_id });
       if (!existingNode) {
         isUnique = true;
       }
     }
 
-    const auth_token = require('crypto').randomBytes(32).toString('hex');
+    const auth_token = require('crypto').randomBytes(64).toString('hex');
 
     // Create new node with generated node_id and system info
     const node = new StorageNode({
@@ -405,9 +408,7 @@ wss.on('connection', (ws) => {
           last_seen: new Date()
         },
         { new: true }
-      ).then(() => {
-        console.log(`Storage client ${ws.nodeId} disconnected and status updated to offline`);
-      }).catch((error) => {
+      ).catch((error) => {
         console.error(`Error updating node ${ws.nodeId} status to offline:`, error);
       });
     } else {

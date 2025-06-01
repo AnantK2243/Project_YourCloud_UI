@@ -1,0 +1,32 @@
+<div>
+  <h1>Project YourCloud Dashboard</h1>
+
+  <div>
+    <button (click)="logout()">Logout</button>
+  </div>
+
+  <div>
+    <h3>Node Status Checker</h3>
+    <input type="text" [(ngModel)]="nodeId" placeholder="Enter Node ID" />
+    <button (click)="checkNodeStatus()">Check Status</button>
+
+    <div *ngIf="nodeStatusMessage">
+      {{ nodeStatusMessage }}
+    </div>
+
+    <div *ngIf="nodeStatusResult">
+      <h3>Storage Node Status</h3>
+      <div>
+        <p><strong>Node ID:</strong> {{ nodeStatusResult.node_id }}</p>
+        <p>
+          <strong>Status:</strong>
+          <span>{{ nodeStatusResult.node_status.status }}</span>
+        </p>
+        <p>
+          <strong>Last Seen:</strong>
+          <span>{{ nodeStatusResult.node_status.last_seen }}</span>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,23 +1,4 @@
 <div>
-  <h1>{{title}}</h1>
-    <div>
-      <input type="text" [(ngModel)]="nodeId">
-      <button (click)="checkNodeStatus()">Check Status</button>
-    
-    <div *ngIf="nodeStatusMessage">
-      {{nodeStatusMessage}}
-    </div>
-    
-    <div *ngIf="nodeStatusResult">
-      <h3>Storage Node Status</h3>
-      <div>
-        <p><strong>Node ID:</strong> {{nodeStatusResult.node_id}}</p>
-        <p><strong>Status:</strong> <span>{{nodeStatusResult.node_status.status}}</span></p>
-        <p><strong>Last Seen:</strong> <span>{{nodeStatusResult.node_status.last_seen}}</span></p>
-      </div>
-    </div>
-  </div>
-  
   <!-- Router outlet for navigation -->
   <router-outlet></router-outlet>
 </div>

@@ -1,0 +1,42 @@
+<div>
+  <h2>Register</h2>
+
+  <div>
+    <label>Name:</label>
+    <input type="text" [(ngModel)]="name" placeholder="Enter your name" />
+  </div>
+
+  <div>
+    <label>Email:</label>
+    <input type="email" [(ngModel)]="email" placeholder="Enter your email" />
+  </div>
+
+  <div>
+    <label>Password:</label>
+    <input
+      type="password"
+      [(ngModel)]="password"
+      placeholder="Enter your password"
+    />
+  </div>
+
+  <div>
+    <label>Confirm Password:</label>
+    <input
+      type="password"
+      [(ngModel)]="confirmPassword"
+      placeholder="Confirm your password"
+    />
+  </div>
+
+  <button (click)="onRegister()">Register</button>
+  <button (click)="goToLogin()">Go to Login</button>
+
+  <div *ngIf="errorMessage">
+    <p style="color: red">{{ errorMessage }}</p>
+  </div>
+
+  <div *ngIf="successMessage">
+    <p style="color: green">{{ successMessage }}</p>
+  </div>
+</div>

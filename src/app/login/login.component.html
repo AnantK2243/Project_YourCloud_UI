@@ -1,0 +1,28 @@
+<div>
+  <h2>Login</h2>
+
+  <div>
+    <label>Email:</label>
+    <input type="email" [(ngModel)]="email" placeholder="Enter your email" />
+  </div>
+
+  <div>
+    <label>Password:</label>
+    <input
+      type="password"
+      [(ngModel)]="password"
+      placeholder="Enter your password"
+    />
+  </div>
+
+  <button (click)="onLogin()">Login</button>
+  <button (click)="goToRegister()">Go to Register</button>
+
+  <div *ngIf="errorMessage">
+    <p style="color: red">{{ errorMessage }}</p>
+  </div>
+
+  <div *ngIf="successMessage">
+    <p style="color: green">{{ successMessage }}</p>
+  </div>
+</div>

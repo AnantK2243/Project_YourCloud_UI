@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, Inject, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../auth.service';
 import { CommonModule } from '@angular/common';
@@ -16,7 +16,11 @@ export class LoginComponent {
   errorMessage: string = '';
   successMessage: string = '';
 
-  constructor(private authService: AuthService, private router: Router) {}
+  constructor(
+    private authService: AuthService,
+    private router: Router,
+    @Inject(PLATFORM_ID) private platformId: Object
+  ) {}
 
   onLogin() {
     if (!this.email || !this.password) {
@@ -29,7 +33,8 @@ export class LoginComponent {
       .subscribe({
         next: (response) => {
           if (response.success) {
-            localStorage.setItem('token', response.token);
+            // Use auth service to store token (handles SSR properly)
+            this.authService.setToken(response.token);
             this.successMessage = 'Login successful!';
             this.errorMessage = '';
             // Navigate to main app after successful login

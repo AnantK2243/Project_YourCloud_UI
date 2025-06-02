@@ -13,20 +13,6 @@ const app = express();
 const PORT = process.env.PORT;
 const WS_PORT = process.env.WS_PORT;
 
-// Load SSL certificates (required for HTTPS-only mode)
-let sslOptions = {};
-try {
-  sslOptions = {
-    key: fs.readFileSync(path.join(__dirname, 'ssl', 'key.pem')),
-    cert: fs.readFileSync(path.join(__dirname, 'ssl', 'cert.pem'))
-  };
-  console.log('SSL certificates loaded successfully');
-} catch (error) {
-  console.error('SSL certificates not found. HTTPS-only mode requires SSL certificates.');
-  console.error('Please ensure ssl/key.pem and ssl/cert.pem exist in the project directory.');
-  process.exit(1);
-}
-
 // Configure CORS based on environment
 const allowedOrigins = ['http://localhost:4200', 'https://localhost:4200', 'http://localhost:3001', 'https://localhost:3001'];
 
@@ -59,8 +45,8 @@ const StorageNodeSchema = new mongoose.Schema({
   used_space: { type: Number, default: 0 },
   num_chunks: { type: Number, default: 0},
   last_seen: { type: Date, default: Date.now },
-  hostname: String,
-  os_version: String
+  label: String,
+  owner_user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 });
 
 const StorageNode = mongoose.model('StorageNode', StorageNodeSchema);
@@ -97,6 +83,7 @@ const UserSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, unique: true, required: true },
   password: { type: String, required: true },
+  storage_nodes: [{ type: String }],
   created_at: { type: Date, default: Date.now }
 });
 
@@ -207,7 +194,29 @@ app.get('/api/health-check', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// Authentication middleware
+// Token blacklist for logout functionality
+const tokenBlacklist = new Map();
+
+// Function to clean up expired tokens from the blacklist
+function cleanupExpiredTokens() {
+  const now = Date.now();
+  let cleanedCount = 0;
+  for (const [token, expiresAt] of tokenBlacklist.entries()) {
+    if (expiresAt < now) {
+      tokenBlacklist.delete(token);
+      cleanedCount++;
+    }
+  }
+  if (cleanedCount > 0) {
+    console.log(`Cleaned ${cleanedCount} expired token(s) from the blacklist.`);
+  }
+}
+
+// Periodically clean up the blacklist
+const cleanupInterval = 60 * 60 * 1000;
+setInterval(cleanupExpiredTokens, cleanupInterval);
+console.log(`Token blacklist cleanup job scheduled to run every ${cleanupInterval / (60 * 1000)} minutes.`);
+
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -216,14 +225,53 @@ const authenticateToken = (req, res, next) => {
     return res.status(401).json({ success: false, message: 'Access token required' });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET || 'your-default-secret-key', (err, user) => {
+  // Check if token is blacklisted
+  if (tokenBlacklist.has(token)) {
+    return res.status(401).json({ success: false, message: 'Token has been invalidated' });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) {
       return res.status(403).json({ success: false, message: 'Invalid or expired token' });
     }
     req.user = user;
+    req.token = token;
     next();
   });
 };
+
+// Logout endpoint to blacklist token
+app.post('/api/logout', authenticateToken, (req, res) => {
+  try {
+    const token = req.token;
+    const decodedUser = req.user; // Decoded payload from authenticateToken
+
+    if (token && decodedUser && decodedUser.iat) {
+      // Calculate expiry time: iat is in seconds, expiresIn is '24h'
+      const issuedAtMillis = decodedUser.iat * 1000;
+      const twentyFourHoursInMillis = 24 * 60 * 60 * 1000;
+      const expiresAt = issuedAtMillis + twentyFourHoursInMillis;
+      
+      tokenBlacklist.set(token, expiresAt);
+      // console.log(`Token blacklisted for user ${decodedUser.email}, will be auto-cleaned after ${new Date(expiresAt).toISOString()}`);
+    } else {
+      // Fallback if iat is not available for some reason, blacklist without auto-cleanup info
+      tokenBlacklist.set(token, Date.now() + (24 * 60 * 60 * 1000));
+      console.warn(`Token blacklisted for user (iat not found), will be auto-cleaned in 24h from now.`);
+    }
+    
+    res.json({
+      success: true,
+      message: 'Logged out successfully'
+    });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Logout failed'
+    });
+  }
+});
 
 // User Registration
 app.post('/api/register', async (req, res) => {
@@ -305,9 +353,18 @@ app.post('/api/login', async (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { userId: user._id, email: user.email, name: user.name },
-      process.env.JWT_SECRET || 'your-default-secret-key',
-      { expiresIn: '24h' }
+      { 
+        userId: user._id, 
+        email: user.email, 
+        name: user.name,
+        iat: Math.floor(Date.now() / 1000) // Issued at time
+      },
+      process.env.JWT_SECRET,
+      { 
+        expiresIn: '24h',
+        issuer: 'yourcloud-api',
+        audience: 'yourcloud-users'
+      }
     );
 
     res.json({
@@ -365,14 +422,18 @@ app.post('/api/check-status', async (req, res) => {
   }
 });
 
-// Storage Client Endpoints
-
-// Storage node registration
-app.post('/api/register-node', async (req, res) => {
+// Storage Node Registration
+app.post('/api/register-node', authenticateToken, async (req, res) => {
   try {
-    // Rust client sends: { available_max_gib: u64, system_info: { hostname, os_version } }
-    const { available_max_gib, system_info } = req.body;
+    const { node_name } = req.body;
     
+    if (!node_name || !node_name.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: 'node_name is required'
+      });
+    }
+
     // Generate a random unused node_id
     let node_id;
     let isUnique = false;
@@ -386,28 +447,39 @@ app.post('/api/register-node', async (req, res) => {
     }
 
     const auth_token = require('crypto').randomBytes(64).toString('hex');
+    // Hash the auth token before storing in database
+    const hashedAuthToken = await bcrypt.hash(auth_token, 10);
 
-    // Create new node with generated node_id and system info
+    // Create new node with generated node_id and user-provided name
     const node = new StorageNode({
       node_id,
-      auth_token,
+      auth_token: hashedAuthToken,
       status: 'offline', // Set to offline initially, will be online when WebSocket connects
-      total_available_space: available_max_gib ? available_max_gib * 1024 * 1024 * 1024 : 0, // Convert GiB to bytes
+      total_available_space: -1,
       used_space: 0,
       num_chunks: 0,
-      hostname: system_info.hostname,
-      os_version: system_info.os_version,
-      last_seen: new Date()
+      last_seen: new Date(),
+      label: node_name,
+      owner_user_id: req.user.userId // Associate node with the user
     });
 
     await node.save();
 
-    console.log(`New storage node registered: ${node_id} (${system_info.hostname})`);
+    // Add the node_id to the user's storage_nodes array
+    await User.findByIdAndUpdate(
+      req.user.userId,
+      { $addToSet: { storage_nodes: node_id } }, // $addToSet prevents duplicates
+      { new: true }
+    );
 
-    // Rust client expects: { node_id: String, auth_token: String }
+    // console.log(`New storage node registered: ${node_id} (${node_name.trim()}) for user ${req.user.email}`);
+
     res.json({
+      success: true,
       node_id,
-      auth_token
+      auth_token,
+      node_name: node_name.trim(),
+      message: 'Node registered successfully'
     });
   } catch (error) {
     console.error('Error registering node:', error);
@@ -418,10 +490,58 @@ app.post('/api/register-node', async (req, res) => {
   }
 });
 
+// Get user's storage nodes
+app.get('/api/user/storage-nodes', authenticateToken, async (req, res) => {
+  try {
+    // console.log('Fetching storage nodes for user:', req.user.userId);
+    
+    const user = await User.findById(req.user.userId);
+    // console.log('Found user:', user ? { id: user._id, email: user.email, storage_nodes: user.storage_nodes } : 'null');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Get detailed information about each storage node
+    const storageNodes = await StorageNode.find({
+      node_id: { $in: user.storage_nodes }
+    }).select('-auth_token'); // Exclude auth_token for security
+
+    // console.log('Found storage nodes:', storageNodes.length);
+
+    res.json({
+      success: true,
+      storage_nodes: storageNodes
+    });
+
+  } catch (error) {
+    console.error('Error fetching user storage nodes:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch storage nodes'
+    });
+  }
+});
+
 // Store WebSocket connections by node_id for command routing
 const nodeConnections = new Map();
 
 // WebSocket server with SSL
+let sslOptions = {};
+try {
+  sslOptions = {
+    key: fs.readFileSync(path.join(__dirname, 'ssl', 'key.pem')),
+    cert: fs.readFileSync(path.join(__dirname, 'ssl', 'cert.pem'))
+  };
+  // console.log('SSL certificates loaded');
+} catch (error) {
+  console.error('SSL certificates not found');
+  process.exit(1);
+}
+
 const httpsServerForWS = https.createServer(sslOptions);
 const wss = new WebSocket.Server({ server: httpsServerForWS });
 
@@ -438,10 +558,10 @@ wss.on('connection', (ws) => {
         case 'AUTH':
           // Verify the node_id and token against the database
           const node = await StorageNode.findOne({ 
-            node_id: data.node_id, 
-            auth_token: data.token 
+            node_id: data.node_id
           });
-          if (node) {
+          
+          if (node && await bcrypt.compare(data.token, node.auth_token)) {
             // Store connection for command routing
             ws.nodeId = data.node_id;
             nodeConnections.set(data.node_id, ws);
@@ -463,6 +583,9 @@ wss.on('connection', (ws) => {
             
             ws.send(JSON.stringify({ type: 'AUTH_SUCCESS', message: 'Authentication successful' }));
             //console.log(`Node ${data.node_id} authenticated successfully`);
+
+            // Update info about node
+            updateNodeStatus(data.node_id);
           } else {
             ws.send(JSON.stringify({ type: 'AUTH_FAILED', message: 'Invalid credentials' }));
             console.log(`Authentication failed for node ${data.node_id}`);
@@ -552,21 +675,13 @@ wss.on('connection', (ws) => {
   });
 });
 
-// Start both HTTP (for internal) and HTTPS (for external) servers
+// Start HTTP server
 const http = require('http');
 
-// HTTP server for internal communication (frontend API calls)
 const httpServer = http.createServer(app);
 httpServer.listen(PORT, '127.0.0.1', () => {
-  console.log(`HTTP Backend server running on 127.0.0.1:${PORT} (internal use)`);
+  console.log(`HTTP Backend server running on 127.0.0.1:${PORT}`);
   console.log(`MongoDB Atlas connection status: ${mongoose.connection.readyState === 1 ? 'connected' : 'connecting...'}`);
-});
-
-// HTTPS server for external access via ngrok
-const httpsServer = https.createServer(sslOptions, app);
-const HTTPS_PORT = parseInt(PORT) + 1;
-httpsServer.listen(HTTPS_PORT, () => {
-  console.log(`HTTPS Backend server running on port ${HTTPS_PORT} (external access)`);
 });
 
 // Start the secure WebSocket server

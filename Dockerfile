@@ -1,4 +1,4 @@
-FROM node:18-alpine as angular-builder
+FROM node:18-alpine AS angular-builder
 
 WORKDIR /app
 

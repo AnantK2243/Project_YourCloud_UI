@@ -15,7 +15,7 @@ tmp/
 bazel-out/
 
 # Environment and secrets
-.env
+# .env
 
 # IDE and editor files
 .vscode/
@@ -67,4 +67,4 @@ pids
 *.pid.lock
 
 # SSL certificates (mounted as volumes)
-ssl/
+# ssl/

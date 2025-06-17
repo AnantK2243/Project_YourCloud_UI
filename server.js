@@ -204,7 +204,20 @@ async function updateNodeStatus(nodeId) {
 
 // Health check endpoint for testing connectivity
 app.get('/api/health-check', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+  const status = {
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    uptime: process.uptime(),
+    version: '1.0.0'
+  };
+  res.json(status);
+});
+
+// Simple health endpoint (for load balancers)
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
 });
 
 // Token blacklist for logout functionality

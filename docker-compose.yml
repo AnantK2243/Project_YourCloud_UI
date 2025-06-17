@@ -3,7 +3,7 @@ services:
     build: 
       context: .
       dockerfile: Dockerfile
-    container_name: yourcloud-ui
+    container_name: project-yourcloud.me
     ports:
       - "${FRONTEND_PORT:-4200}:${FRONTEND_PORT:-4200}"
       - "${WS_PORT:-8080}:${WS_PORT:-8080}"

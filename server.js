@@ -10,20 +10,12 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 const app = express();
-const BACKEND_PORT = process.env.BACKEND_PORT;
-const FRONTEND_PORT = process.env.FRONTEND_PORT;
-const WS_PORT = process.env.WS_PORT;
+const APP_PORT = process.env.APP_PORT || 4200;
 
 // Configure CORS based on environment
 const allowedOrigins = [
-  'http://localhost:4200', 
-  'https://localhost:4200', 
-  'http://localhost:3000', 
-  'https://localhost:3000',
-  `http://localhost:${FRONTEND_PORT}`,
-  `https://localhost:${FRONTEND_PORT}`,
-  `http://localhost:${BACKEND_PORT}`,
-  `https://localhost:${BACKEND_PORT}`
+  `http://localhost:${APP_PORT}`,
+  `https://localhost:${APP_PORT}`
 ];
 
 app.use(cors({
@@ -556,20 +548,21 @@ app.get('/api/user/storage-nodes', authenticateToken, async (req, res) => {
 const nodeConnections = new Map();
 
 // WebSocket server with SSL
-let sslOptions = {};
+const sslOptions = {};
 try {
-  sslOptions = {
-    key: fs.readFileSync(path.join(__dirname, 'ssl', 'key.pem')),
-    cert: fs.readFileSync(path.join(__dirname, 'ssl', 'cert.pem'))
-  };
-  // console.log('SSL certificates loaded');
+    sslOptions.key = fs.readFileSync(path.join(__dirname, 'ssl', 'origin-key.key'));
+    sslOptions.cert = fs.readFileSync(path.join(__dirname, 'ssl', 'origin-cert.pem'));
+    sslOptions.ca = fs.readFileSync(path.join(__dirname, 'ssl', 'origin-ca.pem'));
+    console.log('SSL certificates loaded successfully.');
 } catch (error) {
-  console.error('SSL certificates not found');
-  process.exit(1);
+    console.error('Could not load SSL certificate files', error);
+    process.exit(1);
 }
 
-const httpsServerForWS = https.createServer(sslOptions);
-const wss = new WebSocket.Server({ server: httpsServerForWS });
+const server = https.createServer(sslOptions, app);
+
+const wss = new WebSocket.Server({ server: server });
+
 
 wss.on('connection', (ws) => {
   // console.log('WebSocket client connected');
@@ -701,31 +694,12 @@ wss.on('connection', (ws) => {
   });
 });
 
-// Start HTTP server
-const http = require('http');
-
 // Catch-all handler for Angular routes (must be after API routes)
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist/user_interface/browser/index.csr.html'));
 });
 
-const httpServer = http.createServer(app);
-httpServer.listen(BACKEND_PORT, '0.0.0.0', () => {
-  console.log(`HTTP Backend server running on 0.0.0.0:${BACKEND_PORT}`);
-  console.log(`MongoDB Atlas connection status: ${mongoose.connection.readyState === 1 ? 'connected' : 'connecting...'}`);
-});
-
-// Start HTTPS server for frontend
-if (process.env.NODE_ENV === 'production') {
-  const httpsServer = https.createServer(sslOptions, app);
-  httpsServer.listen(FRONTEND_PORT, '0.0.0.0', () => {
-    console.log(`HTTPS Frontend server (Angular + API) running on 0.0.0.0:${FRONTEND_PORT}`);
-  });
-} else {
-  console.log(`Frontend server disabled - using Angular dev server on port ${FRONTEND_PORT}`);
-}
-
-// Start the secure WebSocket server
-httpsServerForWS.listen(WS_PORT, () => {
-  console.log(`Secure WebSocket server (WSS) running on port ${WS_PORT}`);
+server.listen(APP_PORT, '0.0.0.0', () => {
+    console.log(`YourCloud Server (HTTPS/WSS) is running on port ${APP_PORT}`);
+    console.log(`MongoDB Status: ${mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'}`);
 });

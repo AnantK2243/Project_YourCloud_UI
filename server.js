@@ -10,11 +10,21 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT;
+const BACKEND_PORT = process.env.BACKEND_PORT;
+const FRONTEND_PORT = process.env.FRONTEND_PORT;
 const WS_PORT = process.env.WS_PORT;
 
 // Configure CORS based on environment
-const allowedOrigins = ['http://localhost:4200', 'https://localhost:4200', 'http://localhost:3001', 'https://localhost:3001'];
+const allowedOrigins = [
+  'http://localhost:4200', 
+  'https://localhost:4200', 
+  'http://localhost:3000', 
+  'https://localhost:3000',
+  `http://localhost:${FRONTEND_PORT}`,
+  `https://localhost:${FRONTEND_PORT}`,
+  `http://localhost:${BACKEND_PORT}`,
+  `https://localhost:${BACKEND_PORT}`
+];
 
 app.use(cors({
   origin: allowedOrigins,
@@ -23,6 +33,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Connection']
 }));
 app.use(express.json());
+
+// Serve static files from Angular build
+app.use(express.static(path.join(__dirname, 'dist/user_interface/browser')));
 
 // Add a simple request logger
 app.use((req, res, next) => {
@@ -678,11 +691,26 @@ wss.on('connection', (ws) => {
 // Start HTTP server
 const http = require('http');
 
+// Catch-all handler for Angular routes (must be after API routes)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist/user_interface/browser/index.html'));
+});
+
 const httpServer = http.createServer(app);
-httpServer.listen(PORT, '127.0.0.1', () => {
-  console.log(`HTTP Backend server running on 127.0.0.1:${PORT}`);
+httpServer.listen(BACKEND_PORT, '0.0.0.0', () => {
+  console.log(`HTTP Backend server running on 0.0.0.0:${BACKEND_PORT}`);
   console.log(`MongoDB Atlas connection status: ${mongoose.connection.readyState === 1 ? 'connected' : 'connecting...'}`);
 });
+
+// Start HTTPS server for frontend
+if (process.env.NODE_ENV === 'production') {
+  const httpsServer = https.createServer(sslOptions, app);
+  httpsServer.listen(FRONTEND_PORT, '0.0.0.0', () => {
+    console.log(`HTTPS Frontend server (Angular + API) running on 0.0.0.0:${FRONTEND_PORT}`);
+  });
+} else {
+  console.log(`Frontend server disabled - using Angular dev server on port ${FRONTEND_PORT}`);
+}
 
 // Start the secure WebSocket server
 httpsServerForWS.listen(WS_PORT, () => {

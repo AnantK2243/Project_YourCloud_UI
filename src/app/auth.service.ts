@@ -7,12 +7,21 @@ import { isPlatformBrowser } from '@angular/common';
   providedIn: 'root',
 })
 export class AuthService {
-  private apiUrl = 'http://127.0.0.1:3000/api';
+  private apiUrl = this.getApiUrl();
 
   constructor(
     private http: HttpClient,
     @Inject(PLATFORM_ID) private platformId: Object
   ) {}
+
+  private getApiUrl(): string {
+    // In production/container, API is served from the same origin
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+      return `${window.location.origin}/api`;
+    }
+    // Development fallback
+    return 'http://127.0.0.1:3000/api';
+  }
 
   private isBrowser(): boolean {
     return isPlatformBrowser(this.platformId);

@@ -1,0 +1,45 @@
+services:
+  yourcloud-ui:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: yourcloud-ui
+    ports:
+      - "${FRONTEND_PORT:-4200}:${FRONTEND_PORT:-4200}"
+      - "${WS_PORT:-8080}:${WS_PORT:-8080}"
+    environment:
+      - PORT=${BACKEND_PORT:-3000}
+      - WS_PORT=${WS_PORT:-8080}
+      - FRONTEND_PORT=${FRONTEND_PORT:-4200}
+    env_file:
+      - .env
+    volumes:
+      - ./ssl:/app/ssl:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:${BACKEND_PORT:-3000}/api/health-check', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - yourcloud-network
+
+  # Optional: Cloudflare Tunnel service
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: yourcloud-tunnel
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    restart: unless-stopped
+    depends_on:
+      - yourcloud-ui
+    networks:
+      - yourcloud-network
+    profiles:
+      - tunnel
+
+networks:
+  yourcloud-network:
+    driver: bridge

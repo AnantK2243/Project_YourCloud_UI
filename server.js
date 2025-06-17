@@ -693,7 +693,7 @@ const http = require('http');
 
 // Catch-all handler for Angular routes (must be after API routes)
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist/user_interface/browser/index.html'));
+  res.sendFile(path.join(__dirname, 'dist/user_interface/browser/index.csr.html'));
 });
 
 const httpServer = http.createServer(app);

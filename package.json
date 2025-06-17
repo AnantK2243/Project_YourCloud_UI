@@ -10,9 +10,9 @@
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "serve:ssr:user_interface": "node dist/user_interface/server/server.mjs",
-    "serve:prod": "SERVE_FRONTEND=true node server.js",
+    "serve:prod": "node server.js",
     "dev": "concurrently \"npm run start\" \"npm run start:backend\"",
-    "docker:dev": "SERVE_FRONTEND=true nodemon server.js"
+    "docker:prod": "node server.js"
   },
   "private": true,
   "dependencies": {

@@ -39,6 +39,7 @@ export type DirectoryItem = {
 export class FileService {
   private apiUrl = this.getApiUrl();
   private readonly CHUNK_SIZE = 8 * 1024 * 1024; // 8MB chunks
+  private readonly CONCURRENCY_LIMIT = 2;
   private directory = new BehaviorSubject<Directory | null>(null);
   private storageNodeId: string | null = null;
 
@@ -252,7 +253,7 @@ export class FileService {
     return [...directoryItems, ...fileItems];
   }
 
-  // Upload a file to the current directory
+  // Upload a file to the current directory with controlled concurrency
   async uploadFileStream(browserFile: globalThis.File, onProgress?: (progress: number) => void): Promise<void> {
     if (!this.storageNodeId) {
       throw new Error('Node ID not available');
@@ -267,28 +268,28 @@ export class FileService {
       throw new Error('No file provided');
     }
 
-    // Create a new file object with metadata
     const newFile: File = {
       chunkId: this.cryptoService.generateUUID(),
       name: browserFile.name,
       size: browserFile.size,
       createdAt: new Date().toISOString(),
-      iv: '', // Will be set after encryption
+      iv: '', // Will be set after the first chunk is encrypted
       fileChunks: []
     };
 
     const stream = browserFile.stream();
     const reader = stream.getReader();
     
-    try {
-      
-      let chunkIndex = 0;
-      let totalBytesRead = 0;
-      let buffer = new Uint8Array(this.CHUNK_SIZE * 2);
-      let bufferSize = 0;
-      let endOfStream = false;
-      let fileIv = undefined;
+    const uploadPromises: Promise<{ index: number, chunkId: string }>[] = [];
+    const completedChunks: { index: number, chunkId: string }[] = [];
+    let totalBytesRead = 0;
+    let chunkIndex = 0;
+    let buffer = new Uint8Array(this.CHUNK_SIZE * 2);
+    let bufferSize = 0;
+    let endOfStream = false;
+    let fileIv: Uint8Array | undefined = undefined;
 
+    try {
       while (true) {
         while (bufferSize < this.CHUNK_SIZE && !endOfStream) {
           const { done, value } = await reader.read();
@@ -315,63 +316,69 @@ export class FileService {
         if (bufferSize === 0 && endOfStream) {
           break;
         }
+        
+        const chunkSize = Math.min(this.CHUNK_SIZE, bufferSize);
+        const chunkData = new Uint8Array(chunkSize);
+        chunkData.set(buffer.subarray(0, chunkSize));
 
-        // If we have data, process it as a chunk
-        if (bufferSize > 0) {
-          const chunkSize = Math.min(this.CHUNK_SIZE, bufferSize);
-          const chunkData = new Uint8Array(chunkSize);
-          chunkData.set(buffer.subarray(0, chunkSize));
-          
-          const chunkId = this.cryptoService.generateUUID();
-          
-          // Remove next chunk from buffer
-          if (bufferSize > chunkSize) {
-            buffer.copyWithin(0, chunkSize);
-            bufferSize -= chunkSize;
-          } else {
-            bufferSize = 0;
-          }
+        // Remove next chunk from buffer
+        if (bufferSize > chunkSize) {
+          buffer.copyWithin(0, chunkSize);
+          bufferSize -= chunkSize;
+        } else {
+          bufferSize = 0;
+        }
 
+        const currentChunkIndex = chunkIndex;
+        const uploadTask = async (): Promise<{ index: number, chunkId: string }> => {
           try {
+            const chunkId = this.cryptoService.generateUUID();
+
             const { encryptedData, iv } = await this.cryptoService.encryptData(chunkData.buffer, fileIv);
-            
-            // Store IV from first chunk for file metadata
-            if (chunkIndex === 0) {
+
+            if (currentChunkIndex === 0) {
               fileIv = iv;
               newFile.iv = Array.from(fileIv).map(b => b.toString(16).padStart(2, '0')).join('');
             }
-
+            
             await this.http.post(
               `${this.apiUrl}/chunks/store/${this.storageNodeId}/${chunkId}`,
               encryptedData,
               { headers: this.getHeaders().set('Content-Type', 'application/octet-stream') }
             ).toPromise();
 
-            newFile.fileChunks.push(chunkId);
-
-            chunkIndex++;
+            return { index: currentChunkIndex, chunkId };
           } catch (error) {
-            console.error(`Error uploading chunk ${chunkIndex}:`, error);
+            console.error(`Error uploading chunk ${currentChunkIndex}:`, error);
             throw error;
+          }
+        };
+
+        const promise = uploadTask();
+        uploadPromises.push(promise);
+
+        if (uploadPromises.length >= this.CONCURRENCY_LIMIT) {
+          const resolvedChunk = await uploadPromises.shift();
+          if (resolvedChunk) {
+            completedChunks.push(resolvedChunk);
           }
         }
 
-        // Check if we should exit the loop
-        if (endOfStream && bufferSize === 0) {
-          break;
-        }
+        chunkIndex++;
       }
 
-      // Add the new file to the current directory
+      // Collect and order all chunks
+      const remainingChunkResults = await Promise.all(uploadPromises);
+      const allChunkResults: { index: number, chunkId: string }[] = [...completedChunks, ...remainingChunkResults];
+      allChunkResults.sort((a, b) => a.index - b.index);
+      newFile.fileChunks = allChunkResults.map(result => result.chunkId);
+    
       currentDirectory.files.push(newFile);
-      
-      // Update the UI
       this.directory.next(currentDirectory);
 
-      if (onProgress) onProgress(100);
-
     } catch (error) {
-      console.error('Error during file upload:', error);
+      console.error('Error during concurrent file upload:', error);
+      await reader.cancel();
       throw error;
     } finally {
       try {

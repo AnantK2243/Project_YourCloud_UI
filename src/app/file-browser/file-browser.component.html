@@ -1,0 +1,42 @@
+<div>
+  <div>
+    <h2>{{ nodeName }}</h2>
+    <button (click)="goBack()">← Back to Dashboard</button>
+  </div>
+
+  <div *ngIf="initialized">
+    <ng-container *ngFor="let segment of directoryPath; let i = index; let last = last">
+      <a (click)="navigateTo(i)" *ngIf="!last">{{ segment.name }}</a>
+      <span *ngIf="!last"> / </span>
+      <span *ngIf="last">{{ segment.name }}</span>
+    </ng-container>
+  </div>
+
+  <!-- Show Page Status -->
+  <div *ngIf="loading">
+    <p>Loading...</p>
+  </div>
+
+  <div *ngIf="error">
+    <p>{{ error }}</p>
+    <button (click)="initializeFileSystem()">Retry</button>
+  </div>
+
+  <!-- Show Directory Content -->
+  <div *ngIf="initialized && !loading && !error">
+    <div *ngIf="directoryListing.length === 0">
+      <p>This directory is empty.</p>
+    </div>
+
+    <ul *ngIf="directoryListing.length > 0">
+      <li *ngFor="let item of directoryListing" (click)="handleItemClick(item)">
+        <span>{{ item.type }}</span>
+        <span>{{ item.name }}</span>
+        <div *ngIf="item.type === 'file'">
+          <span>{{ formatFileSize(item.size) }}</span>
+          <span>{{ formatDate(item.createdAt) }}</span>
+        </div>
+      </li>
+    </ul>
+  </div>
+</div>

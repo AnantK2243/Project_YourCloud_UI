@@ -3,22 +3,23 @@
 
   <div>
     <button (click)="logout()">Logout</button>
-    <button (click)="showNodeRegistrationPopup()" style="margin-left: 10px;">Register New Node</button>
+    <button (click)="showNodeRegistrationPopup()">Register New Node</button>
   </div>
 
   <!-- User's Storage Nodes -->
-  <div style="margin: 20px 0;">
+  <div>
     <h3>Your Storage Nodes</h3>
     <div *ngIf="loadingNodes">Loading your storage nodes...</div>
     <div *ngIf="!loadingNodes && userStorageNodes.length === 0">
       <p>You don't have any storage nodes yet. Click "Register New Node" to create one.</p>
     </div>
     <div *ngIf="!loadingNodes && userStorageNodes.length > 0">
-      <div *ngFor="let node of userStorageNodes" style="border: 1px solid #ccc; padding: 10px; margin: 10px 0; border-radius: 5px;">
+      <div *ngFor="let node of userStorageNodes" 
+          (click)="node.status === 'online' ? openFileBrowser(node) : null">
         <p><strong>Name:</strong> {{ node.label }}</p>
         <p><strong>Node ID:</strong> {{ node.node_id }}</p>
         <p><strong>Status:</strong> 
-          <span [style.color]="node.status === 'online' ? 'green' : 'red'">
+          <span>
             {{ node.status }}
           </span>
         </p>
@@ -31,44 +32,45 @@
         </p>
         <p><strong>Chunks:</strong> {{ node.num_chunks || 0 }}</p>
         <p *ngIf="node.last_seen"><strong>Last Seen:</strong> {{ node.last_seen | date:'short' }}</p>
+        <p *ngIf="node.status === 'online'">
+          Click to browse files →
+        </p>
       </div>
     </div>
   </div>
 
   <!-- Node Registration Popup -->
-  <div *ngIf="showRegisterPopup" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000;">
-    <div style="background: white; padding: 20px; border-radius: 5px; min-width: 400px; max-width: 600px;">
+  <div *ngIf="showRegisterPopup">
+    <div>
       <h3>Register New Storage Node</h3>
       
-      <div style="margin: 15px 0;">
-        <label style="display: block; margin-bottom: 5px;">Node Name:</label>
+      <div>
+        <label>Node Name:</label>
         <input 
           type="text" 
           [(ngModel)]="registerNodeName" 
           placeholder="Enter a descriptive name for your node"
-          style="width: 100%; padding: 8px; box-sizing: border-box;"
         />
       </div>
       
-      <div style="margin: 15px 0;">
-        <button (click)="registerNode()" style="margin-right: 10px;">Register Node</button>
+      <div>
+        <button (click)="registerNode()">Register Node</button>
         <button (click)="hideNodeRegistrationPopup()">Cancel</button>
       </div>
       
-      <div *ngIf="registerMessage" style="margin: 15px 0;">
-        <p [style.color]="registrationResult ? 'green' : 'red'">{{ registerMessage }}</p>
+      <div *ngIf="registerMessage">
+        <p>{{ registerMessage }}</p>
       </div>
       
-      <div *ngIf="registrationResult" style="margin: 15px 0; padding: 15px; background-color: #f0f0f0; border-radius: 5px;">
+      <div *ngIf="registrationResult">
         <h4>Registration Successful!</h4>
         <p><strong>Node Name:</strong> {{ registrationResult.node_name }}</p>
         <p><strong>Generated Node ID:</strong> {{ registrationResult.node_id }}</p>
         <p><strong>Auth Token:</strong></p>
         <textarea 
           readonly 
-          style="width: 100%; height: 60px; font-family: monospace; font-size: 12px; padding: 5px; box-sizing: border-box;"
         >{{ registrationResult.auth_token }}</textarea>
-        <p style="margin-top: 10px; font-size: 12px; color: #666;">
+        <p>
           <strong>Important:</strong> Add Node ID and Auth Token to config file. Default location is ~/.config/Project_YourCloud/config.toml.
         </p>
       </div>

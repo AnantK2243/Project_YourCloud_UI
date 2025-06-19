@@ -13,10 +13,7 @@ const app = express();
 const APP_PORT = process.env.APP_PORT || 4200;
 
 // Configure CORS based on environment
-const allowedOrigins = [
-  `http://localhost:${APP_PORT}`,
-  `https://localhost:${APP_PORT}`
-];
+const allowedOrigins = [`https://localhost:${APP_PORT}`];
 
 app.use(cors({
   origin: allowedOrigins,
@@ -26,7 +23,6 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Serve static files from Angular build
 app.use(express.static(path.join(__dirname, 'dist/user_interface/browser')));
 
 // Add a simple request logger
@@ -51,48 +47,25 @@ const StorageNodeSchema = new mongoose.Schema({
   num_chunks: { type: Number, default: 0},
   last_seen: { type: Date, default: Date.now },
   label: String,
+  root_directory_initialized: { type: Boolean, default: false },
   owner_user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 });
 
 const StorageNode = mongoose.model('StorageNode', StorageNodeSchema);
-
-// File Schema for your cloud storage
-const FileSchema = new mongoose.Schema({
-  path: { type: String, required: true },
-  name: { type: String, required: true },
-  size: Number,
-  type: { type: String, enum: ['file', 'directory'], required: true },
-  owner: String,
-  parent_path: String,
-  chunk_ids: [String],
-  created_at: { type: Date, default: Date.now },
-  updated_at: { type: Date, default: Date.now }
-});
-
-const File = mongoose.model('File', FileSchema);
-
-const ChunkSchema = new mongoose.Schema({
-  chunk_id: { type: String, unique: true, required: true },
-  file_id: mongoose.Schema.Types.ObjectId,
-  sequence_number: Number,
-  size: Number,
-  storage_nodes: [String],
-  checksum: String,
-  created_at: { type: Date, default: Date.now }
-});
-
-const Chunk = mongoose.model('Chunk', ChunkSchema);
 
 // User Schema for authentication
 const UserSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, unique: true, required: true },
   password: { type: String, required: true },
+  salt: { type: String, required: true },
   storage_nodes: [{ type: String }],
   created_at: { type: Date, default: Date.now }
 });
 
 const User = mongoose.model('User', UserSchema);
+
+// Helper functions
 
 // Storage for pending commands awaiting responses
 const pendingCommands = new Map();
@@ -102,15 +75,28 @@ function generateCommandId() {
   return 'cmd-' + require('crypto').randomBytes(8).toString('hex');
 }
 
-// Optimized helper function to update node storage status (WebSocket-first, no DB lookup)
+// Validates user owns the storage node
+async function validateUserOwnsNode(userId, nodeId) {
+  const user = await User.findById(userId);
+  if (!user || !user.storage_nodes || !user.storage_nodes.includes(nodeId)) {
+    throw new Error('User does not own this storage node');
+  }
+  
+  const ws = nodeConnections.get(nodeId);
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    throw new Error(`Storage node ${nodeId} is not connected`);
+  }
+  
+  return true;
+}
+
+// Updates storage node status
 async function updateNodeStatus(nodeId) {
   try {
-    // Check if node is connected via WebSocket first (instant)
     const ws = nodeConnections.get(nodeId);
     const isConnected = ws && ws.readyState === WebSocket.OPEN;
     
     if (isConnected) {
-      // Node is online - request fresh status and update DB in background
       const statusCommand = {
         command_type: 'STATUS_REQUEST',
         command_id: generateCommandId()
@@ -119,7 +105,6 @@ async function updateNodeStatus(nodeId) {
       // Send status request and handle response in background
       pendingCommands.set(statusCommand.command_id, (result) => {
         if (result.type === 'STATUS_REPORT' && result.status) {
-          // Update database in background with fresh data
           StorageNode.findOneAndUpdate(
             { node_id: nodeId },
             {
@@ -135,7 +120,6 @@ async function updateNodeStatus(nodeId) {
           });
         } else {
           console.log(`Node ${nodeId} status request failed but node is still appears online`);
-          // Still update DB to mark as online even if status request failed
           StorageNode.findOneAndUpdate(
             { node_id: nodeId },
             {
@@ -154,7 +138,6 @@ async function updateNodeStatus(nodeId) {
         if (pendingCommands.has(statusCommand.command_id)) {
           pendingCommands.delete(statusCommand.command_id);
           console.log(`Status request timeout for node ${nodeId} but node is still online`);
-          // Update DB to mark as online even on timeout
           StorageNode.findOneAndUpdate(
             { node_id: nodeId },
             {
@@ -192,26 +175,6 @@ async function updateNodeStatus(nodeId) {
   }
 }
 
-// Routes
-
-// Health check endpoint for testing connectivity
-app.get('/api/health-check', (req, res) => {
-  const status = {
-    status: 'OK',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
-    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
-    uptime: process.uptime(),
-    version: '1.0.0'
-  };
-  res.json(status);
-});
-
-// Simple health endpoint (for load balancers)
-app.get('/health', (req, res) => {
-  res.status(200).send('OK');
-});
-
 // Token blacklist for logout functionality
 const tokenBlacklist = new Map();
 
@@ -231,9 +194,9 @@ function cleanupExpiredTokens() {
 }
 
 // Periodically clean up the blacklist
-const cleanupInterval = 60 * 60 * 1000;
+const cleanupInterval = 24 * 60 * 60 * 1000;
 setInterval(cleanupExpiredTokens, cleanupInterval);
-console.log(`Token blacklist cleanup job scheduled to run every ${cleanupInterval / (60 * 1000)} minutes.`);
+console.log(`Token blacklist cleanup job scheduled to run every ${cleanupInterval / (60 * 60 * 1000)} hours.`);
 
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -257,6 +220,65 @@ const authenticateToken = (req, res, next) => {
     next();
   });
 };
+
+// Storage Management Helper Functions
+
+// Send command to storage node and wait for response
+async function sendStorageNodeCommand(nodeId, command) {
+  return new Promise((resolve, reject) => {
+    const ws = nodeConnections.get(nodeId);
+    
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      reject(new Error(`Storage node ${nodeId} is not connected`));
+      return;
+    }
+
+    const commandId = generateCommandId();
+    const fullCommand = {
+      ...command,
+      command_id: commandId
+    };
+
+    // Set up response handler
+    pendingCommands.set(commandId, (result) => {
+      if (result.success) {
+        resolve(result);
+      } else {
+        reject(new Error(result.error || 'Command failed'));
+      }
+    });
+
+    // Set timeout
+    setTimeout(() => {
+      if (pendingCommands.has(commandId)) {
+        pendingCommands.delete(commandId);
+        reject(new Error('Command timeout'));
+      }
+    }, 30000); // 30 second timeout
+
+    // Send command
+    ws.send(JSON.stringify(fullCommand));
+  });
+}
+
+// API Routes
+
+// Health check endpoint for testing connectivity
+app.get('/api/health-check', (req, res) => {
+  const status = {
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    uptime: process.uptime(),
+    version: '1.0.0'
+  };
+  res.json(status);
+});
+
+// Simple health endpoint
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
 
 // Logout endpoint to blacklist token
 app.post('/api/logout', authenticateToken, (req, res) => {
@@ -294,12 +316,12 @@ app.post('/api/logout', authenticateToken, (req, res) => {
 // User Registration
 app.post('/api/register', async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, salt } = req.body;
 
-    if (!name || !email || !password) {
+    if (!name || !email || !password || !salt) {
       return res.status(400).json({
         success: false,
-        message: 'Name, email, and password are required'
+        message: 'Name, email, password, and salt are required'
       });
     }
 
@@ -320,7 +342,8 @@ app.post('/api/register', async (req, res) => {
     const newUser = new User({
       name,
       email,
-      password: hashedPassword
+      password: hashedPassword,
+      salt: salt
     });
 
     await newUser.save();
@@ -392,7 +415,8 @@ app.post('/api/login', async (req, res) => {
       user: {
         id: user._id,
         name: user.name,
-        email: user.email
+        email: user.email,
+        salt: user.salt
       }
     });
 
@@ -472,11 +496,11 @@ app.post('/api/register-node', authenticateToken, async (req, res) => {
     const node = new StorageNode({
       node_id,
       auth_token: hashedAuthToken,
-      status: 'offline', // Set to offline initially, will be online when WebSocket connects
+      status: 'offline',
       total_available_space: -1,
       used_space: 0,
       num_chunks: 0,
-      last_seen: new Date(),
+      last_seen: null,
       label: node_name,
       owner_user_id: req.user.userId // Associate node with the user
     });
@@ -544,6 +568,211 @@ app.get('/api/user/storage-nodes', authenticateToken, async (req, res) => {
   }
 });
 
+// Check/Mark root as initialized
+app.get('/api/node/:nodeId/initialize-root', authenticateToken, async (req, res) => {
+  try {
+    const { nodeId } = req.params;
+
+    // Validate user owns this storage node
+    await validateUserOwnsNode(req.user.userId, nodeId);
+    
+    const node = await StorageNode.findOne({ node_id: nodeId });
+
+    if (!node) {
+      return res.status(404).json({
+        success: false,
+        error: 'Storage node not found'
+      });
+    }
+
+    let wasInitialized = false;
+    if (node.root_directory_initialized !== true) {
+      node.root_directory_initialized = true;
+      await node.save();
+      wasInitialized = true;
+    }
+
+    res.json({
+      success: true,
+      wasInitialized: wasInitialized,
+    });
+
+  } catch (error) {
+    console.error('Error marking root directory as initialized:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Store chunk endpoint
+app.post('/api/chunks/store/:nodeId/:chunkId', authenticateToken, async (req, res) => {
+  try {
+    const { nodeId, chunkId } = req.params;
+    
+    if (!nodeId || !chunkId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Node ID and Chunk ID are required'
+      });
+    }
+
+    // Validate user owns this storage node
+    await validateUserOwnsNode(req.user.userId, nodeId);
+
+    // Collect raw binary data
+    const chunks = [];
+    
+    req.on('data', chunk => {
+      chunks.push(chunk);
+    });
+
+    req.on('end', async () => {
+      try {
+        const chunkData = Buffer.concat(chunks);
+        
+        if (chunkData.length === 0) {
+          return res.status(400).json({
+            success: false,
+            error: 'No data provided'
+          });
+        }
+        
+        // Send STORE_CHUNK command
+        const result = await sendStorageNodeCommand(nodeId, {
+          command_type: 'STORE_CHUNK',
+          chunk_id: chunkId,
+          data: chunkData.toString('base64')
+        });
+
+        res.json({ success: true });
+        
+      } catch (error) {
+        console.error('Error storing chunk:', error);
+        res.status(500).json({
+          success: false,
+          error: error.message
+        });
+      }
+    });
+
+    req.on('error', (error) => {
+      console.error('Request error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    });
+
+  } catch (error) {
+    console.error('Error in store chunk endpoint:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Get chunk endpoint
+app.get('/api/chunks/get/:nodeId/:chunkId', authenticateToken, async (req, res) => {
+  try {
+    const { nodeId, chunkId } = req.params;
+    
+    if (!nodeId || !chunkId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Node ID and Chunk ID are required'
+      });
+    }
+
+    // Validate user owns this storage node
+    await validateUserOwnsNode(req.user.userId, nodeId);
+    
+    // Send GET_CHUNK command
+    const result = await sendStorageNodeCommand(nodeId, {
+      command_type: 'GET_CHUNK',
+      chunk_id: chunkId
+    });
+
+    if (result.success && result.data) {
+      // Convert base64 back to buffer and send as response
+      const chunkData = Buffer.from(result.data, 'base64');
+      res.set('Content-Type', 'application/octet-stream');
+      res.set('Content-Length', chunkData.length.toString());
+      res.send(chunkData);
+    } else {
+      res.status(404).json({
+        success: false,
+        error: result.error || 'Chunk not found'
+      });
+    }
+
+  } catch (error) {
+    console.error('Error retrieving chunk:', error);
+    
+    // Check for specific error types
+    if (error.message.includes('not found') || error.message.includes('Chunk not found')) {
+      res.status(404).json({
+        success: false,
+        error: 'Chunk not found'
+      });
+    } else if (error.message.includes('not connected')) {
+      res.status(503).json({
+        success: false,
+        error: 'Storage node is not available'
+      });
+    } else if (error.message.includes('does not own')) {
+      res.status(403).json({
+        success: false,
+        error: 'Access denied'
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Internal server error'
+      });
+    }
+  }
+});
+
+// Delete chunk endpoint
+app.delete('/api/chunks/delete/:nodeId/:chunkId', authenticateToken, async (req, res) => {
+  try {
+    const { nodeId, chunkId } = req.params;
+    
+    if (!nodeId || !chunkId) {
+      return res.status(400).json({
+        success: false,
+        error: 'Node ID and Chunk ID are required'
+      });
+    }
+
+    // Validate user owns this storage node
+    await validateUserOwnsNode(req.user.userId, nodeId);
+    
+    // Send DELETE_CHUNK command to specific storage node
+    const result = await sendStorageNodeCommand(nodeId, {
+      command_type: 'DELETE_CHUNK',
+      chunk_id: chunkId
+    });
+
+    res.json({ success: true });
+
+  } catch (error) {
+    console.error('Error deleting chunk:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+// Catch-all handler for Angular routes (must be after API routes)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist/user_interface/browser/index.csr.html'));
+});
+
 // Store WebSocket connections by node_id for command routing
 const nodeConnections = new Map();
 
@@ -562,7 +791,6 @@ try {
 const server = https.createServer(sslOptions, app);
 
 const wss = new WebSocket.Server({ server: server });
-
 
 wss.on('connection', (ws) => {
   // console.log('WebSocket client connected');
@@ -694,12 +922,6 @@ wss.on('connection', (ws) => {
   });
 });
 
-// Catch-all handler for Angular routes (must be after API routes)
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist/user_interface/browser/index.csr.html'));
-});
-
 server.listen(APP_PORT, '0.0.0.0', () => {
-    console.log(`YourCloud Server (HTTPS/WSS) is running on port ${APP_PORT}`);
-    console.log(`MongoDB Status: ${mongoose.connection.readyState === 1 ? 'Connected' : 'Disconnected'}`);
+    console.log(`YourCloud Server running on port ${APP_PORT}`);
 });

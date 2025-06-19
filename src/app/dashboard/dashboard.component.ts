@@ -44,6 +44,13 @@ export class DashboardComponent implements OnInit {
     this.loadUserStorageNodes();
   }
 
+  private getApiUrl(): string {
+    if (typeof window !== 'undefined') {
+      return `${window.location.origin}/api`;
+    }
+    return 'https://localhost:4200/api';
+  }
+
   // Load user's storage nodes
   async loadUserStorageNodes() {
     this.loadingNodes = true;
@@ -86,7 +93,7 @@ export class DashboardComponent implements OnInit {
       this.nodeStatusResult = null;
 
       const response: any = await lastValueFrom(
-        this.http.post('http://127.0.0.1:3001/api/check-status', {
+        this.http.post(`${this.getApiUrl()}/check-status`, {
           node_id: this.nodeId.trim(),
         })
       );
@@ -168,5 +175,11 @@ export class DashboardComponent implements OnInit {
           error.message || 'An unexpected error occurred';
       }
     }
+  }
+
+  openFileBrowser(node: any) {
+    this.router.navigate(['/file-browser', node.node_id], {
+      queryParams: { nodeName: node.label }
+    });
   }
 }

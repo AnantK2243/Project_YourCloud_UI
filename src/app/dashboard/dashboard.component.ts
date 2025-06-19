@@ -25,23 +25,19 @@ export class DashboardComponent implements OnInit {
 
   // User's storage nodes
   userStorageNodes: any[] = [];
-  loadingNodes: boolean = false;
+  loadingNodes: boolean = true;
 
   constructor(
     private authService: AuthService,
     private router: Router,
     private http: HttpClient,
     @Inject(PLATFORM_ID) private platformId: Object
-  ) {
-    // Use afterNextRender to ensure data loading happens after client-side hydration
-    afterNextRender(() => {
-      // This will run only on the client side after hydration
-      this.loadUserStorageNodes();
-    });
-  }
+  ) {}
 
   ngOnInit() {
-    this.loadUserStorageNodes();
+    if (isPlatformBrowser(this.platformId)) {
+      this.loadUserStorageNodes();
+    }
   }
 
   private getApiUrl(): string {
@@ -53,7 +49,6 @@ export class DashboardComponent implements OnInit {
 
   // Load user's storage nodes
   async loadUserStorageNodes() {
-    this.loadingNodes = true;
     try {
       const response: any = await lastValueFrom(
         this.authService.getUserStorageNodes()

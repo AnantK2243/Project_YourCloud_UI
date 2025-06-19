@@ -50,7 +50,7 @@ export class RegisterComponent {
             // Navigate to login after successful registration
             setTimeout(() => {
               this.router.navigate(['/login']);
-            }, 2000);
+            }, 200);
           } else {
             this.errorMessage = response.message || 'Registration failed';
             this.successMessage = '';

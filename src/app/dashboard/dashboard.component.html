@@ -33,7 +33,7 @@
         <p><strong>Chunks:</strong> {{ node.num_chunks || 0 }}</p>
         <p *ngIf="node.last_seen"><strong>Last Seen:</strong> {{ node.last_seen | date:'short' }}</p>
         <p *ngIf="node.status === 'online'">
-          Click to browse files →
+          Click to browse files ->
         </p>
       </div>
     </div>

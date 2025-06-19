@@ -841,10 +841,37 @@ wss.on('connection', (ws) => {
           
         case 'COMMAND_RESULT':
           // Handle command results from storage client
-          console.log(`Command result for ${data.command_id}: ${data.success ? 'SUCCESS' : 'FAILED'}`);
+          // console.log(`Command result for ${data.command_id}: ${data.success ? 'SUCCESS' : 'FAILED'}`);
           if (!data.success && data.error) {
             console.error(`Command error: ${data.error}`);
           }
+          
+          // Update storage node metrics for successful operations with storage impact
+          if (data.success && ws.nodeId && data.storage_delta !== undefined && data.storage_delta !== null) {
+            try {
+              const storageDelta = data.storage_delta;
+              const chunkDelta = storageDelta > 0 ? 1 : (storageDelta < 0 ? -1 : 0);
+              
+              if (storageDelta !== 0 || chunkDelta !== 0) {
+                const updateFields = {};
+                if (storageDelta !== 0) {
+                  updateFields.used_space = storageDelta;
+                }
+                if (chunkDelta !== 0) {
+                  updateFields.num_chunks = chunkDelta;
+                }
+                
+                await StorageNode.findOneAndUpdate(
+                  { node_id: ws.nodeId },
+                  { $inc: updateFields },
+                  { new: true }
+                );
+              }
+            } catch (error) {
+              console.error(`Error updating node ${ws.nodeId} metrics:`, error);
+            }
+          }
+          
           // Store command result for any waiting requests
           if (pendingCommands.has(data.command_id)) {
             const resolve = pendingCommands.get(data.command_id);

@@ -40,7 +40,7 @@ export class LoginComponent {
             // Navigate to main app after successful login
             setTimeout(() => {
               this.router.navigate(['/dashboard']);
-            }, 1000);
+            }, 200);
           } else {
             this.errorMessage = response.message || 'Login failed';
             this.successMessage = '';

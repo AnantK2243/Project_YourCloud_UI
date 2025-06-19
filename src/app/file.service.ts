@@ -38,7 +38,7 @@ export type DirectoryItem = {
 
 export class FileService {
   private apiUrl = this.getApiUrl();
-  private readonly CHUNK_SIZE = 4 * 1024 * 1024; // 4MB chunks
+  private readonly CHUNK_SIZE = 8 * 1024 * 1024; // 8MB chunks
   private directory = new BehaviorSubject<Directory | null>(null);
   private storageNodeId: string | null = null;
 
@@ -62,6 +62,11 @@ export class FileService {
     });
   }
 
+  // Get current directory observable for components to subscribe to
+  getDirectoryObservable(): Observable<Directory | null> {
+    return this.directory.asObservable();
+  }
+
   async initializePage(password: string, nodeId: string): Promise<string> {
     // Initialize to the root directory on page load
     try {
@@ -73,7 +78,10 @@ export class FileService {
 
       if (wasInitialized) {
         // Create empty root directory
-        const newDirectory = await this.createDirectory("/", directoryChunkId);
+        const newDirectory = await this.createDirectory("", directoryChunkId);
+        this.directory.next(newDirectory);
+
+        // Update the UI
         this.directory.next(newDirectory);
       } else{
         // Load the root directory
@@ -150,7 +158,7 @@ export class FileService {
     }
   }
   
-
+  // Fetch directory metadata, decrypt it, and return it
   private async fetchDirectory(directoryChunkId: string): Promise<Directory> {
     if (!this.storageNodeId) {
       throw new Error('Node ID not available');
@@ -195,6 +203,9 @@ export class FileService {
       if (!directoryData.directories || !directoryData.files){
         throw new Error('Directory data invalid');
       }
+
+      // Update the UI
+      this.directory.next(directoryData);
       
       return directoryData;
     } catch (error: any) {
@@ -216,6 +227,7 @@ export class FileService {
     }
   }
 
+  // Get list of files and directories in the current directory
   async getDirectoryFiles(): Promise<DirectoryItem[]> {
     const currentDirectory = this.directory.getValue();
 
@@ -237,14 +249,136 @@ export class FileService {
       chunkId: file.chunkId
     }));
 
-    return [...directoryItems, ...fileItems].sort((a, b) => {
-      if (a.type === 'directory' && b.type === 'file') {
-        return -1; // Directories first
+    return [...directoryItems, ...fileItems];
+  }
+
+  // Upload a file to the current directory
+  async uploadFileStream(browserFile: globalThis.File, onProgress?: (progress: number) => void): Promise<void> {
+    if (!this.storageNodeId) {
+      throw new Error('Node ID not available');
+    }
+
+    const currentDirectory = this.directory.getValue();
+    if (!currentDirectory) {
+      throw new Error('Current directory is not initialized');
+    }
+
+    if (!browserFile) {
+      throw new Error('No file provided');
+    }
+
+    // Create a new file object with metadata
+    const newFile: File = {
+      chunkId: this.cryptoService.generateUUID(),
+      name: browserFile.name,
+      size: browserFile.size,
+      createdAt: new Date().toISOString(),
+      iv: '', // Will be set after encryption
+      fileChunks: []
+    };
+
+    const stream = browserFile.stream();
+    const reader = stream.getReader();
+    
+    try {
+      
+      let chunkIndex = 0;
+      let totalBytesRead = 0;
+      let buffer = new Uint8Array(this.CHUNK_SIZE * 2);
+      let bufferSize = 0;
+      let endOfStream = false;
+      let fileIv = undefined;
+
+      while (true) {
+        while (bufferSize < this.CHUNK_SIZE && !endOfStream) {
+          const { done, value } = await reader.read();
+          
+          if (done) {
+            endOfStream = true;
+            break;
+          }
+          
+          if (value) {
+            buffer.set(value, bufferSize);
+            bufferSize += value.length;
+            totalBytesRead += value.length;
+          }
+
+          // Update progress
+          if (onProgress) {
+            const progress = Math.min(100, Number((totalBytesRead / browserFile.size).toPrecision(2)) * 100);
+            onProgress(progress);
+          }
+        }
+
+        // If no data in buffer and stream ended, we're done
+        if (bufferSize === 0 && endOfStream) {
+          break;
+        }
+
+        // If we have data, process it as a chunk
+        if (bufferSize > 0) {
+          const chunkSize = Math.min(this.CHUNK_SIZE, bufferSize);
+          const chunkData = new Uint8Array(chunkSize);
+          chunkData.set(buffer.subarray(0, chunkSize));
+          
+          const chunkId = this.cryptoService.generateUUID();
+          
+          // Remove next chunk from buffer
+          if (bufferSize > chunkSize) {
+            buffer.copyWithin(0, chunkSize);
+            bufferSize -= chunkSize;
+          } else {
+            bufferSize = 0;
+          }
+
+          try {
+            const { encryptedData, iv } = await this.cryptoService.encryptData(chunkData.buffer, fileIv);
+            
+            // Store IV from first chunk for file metadata
+            if (chunkIndex === 0) {
+              fileIv = iv;
+              newFile.iv = Array.from(fileIv).map(b => b.toString(16).padStart(2, '0')).join('');
+            }
+
+            await this.http.post(
+              `${this.apiUrl}/chunks/store/${this.storageNodeId}/${chunkId}`,
+              encryptedData,
+              { headers: this.getHeaders().set('Content-Type', 'application/octet-stream') }
+            ).toPromise();
+
+            newFile.fileChunks.push(chunkId);
+
+            chunkIndex++;
+          } catch (error) {
+            console.error(`Error uploading chunk ${chunkIndex}:`, error);
+            throw error;
+          }
+        }
+
+        // Check if we should exit the loop
+        if (endOfStream && bufferSize === 0) {
+          break;
+        }
       }
-      if (a.type === 'file' && b.type === 'directory') {
-        return 1; // Files after
+
+      // Add the new file to the current directory
+      currentDirectory.files.push(newFile);
+      
+      // Update the UI
+      this.directory.next(currentDirectory);
+
+      if (onProgress) onProgress(100);
+
+    } catch (error) {
+      console.error('Error during file upload:', error);
+      throw error;
+    } finally {
+      try {
+        reader.releaseLock();
+      } catch (e) {
+        console.warn('Could not release reader lock:', e);
       }
-      return a.name.localeCompare(b.name); // Sort by name otherwise
-    });
+    }
   }
 }

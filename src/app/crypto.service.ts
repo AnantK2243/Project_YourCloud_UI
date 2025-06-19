@@ -130,7 +130,7 @@ export class CryptoService {
     return hexString.substring(0, 32);
   }
 
-  async encryptData(data: ArrayBuffer): Promise<{ encryptedData: ArrayBuffer, iv: Uint8Array }> {
+  async encryptData(data: ArrayBuffer, iv?: Uint8Array): Promise<{ encryptedData: ArrayBuffer, iv: Uint8Array }> {
     if (!this.isBrowser()) {
       throw new Error('Crypto operations not available on server');
     }
@@ -140,7 +140,7 @@ export class CryptoService {
     }
 
     // Generate a random IV
-    const iv = crypto.getRandomValues(new Uint8Array(12));
+    iv = iv || crypto.getRandomValues(new Uint8Array(12));
 
     // Encrypt the data
     const encryptedData = await crypto.subtle.encrypt(

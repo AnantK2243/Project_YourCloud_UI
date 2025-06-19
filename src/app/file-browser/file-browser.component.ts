@@ -1,7 +1,7 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
-import { FileService, Directory, File as AppFile } from '../file.service';
+import { FileService, Directory, File } from '../file.service';
 import { AuthService } from '../auth.service';
 import { CommonModule } from '@angular/common';
 
@@ -34,8 +34,14 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
   loading: boolean = false;
   error: string = '';
   initialized: boolean = false;
+  uploadProgress: number = 0;
+  isUploading: boolean = false;
+  uploadStatus: string = '';
+
+  @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
 
   private routeSub: Subscription | undefined;
+  private directorySub: Subscription | undefined;
 
   constructor(
     private route: ActivatedRoute,
@@ -52,11 +58,20 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
         this.initializeFileSystem();
       }
     });
+
+    this.directorySub = this.fileService.getDirectoryObservable().subscribe(directory => {
+      if (directory) {
+        this.updateDirectoryListing(directory);
+      }
+    });
   }
 
   ngOnDestroy(): void {
     if (this.routeSub) {
       this.routeSub.unsubscribe();
+    }
+    if (this.directorySub) {
+      this.directorySub.unsubscribe();
     }
   }
 
@@ -78,10 +93,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
     return new Date(dateString).toLocaleDateString();
   }
 
-  get currentDirectoryName(): string {
-    return this.directoryPath.length > 0 ? this.directoryPath[this.directoryPath.length - 1].name : '';
-  }
-
   async initializeFileSystem() {
     this.loading = true;
     this.error = '';
@@ -97,10 +108,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
       const chunkId = await this.fileService.initializePage(password, this.nodeId);
 
       // Set the initial path
-      this.directoryPath = [{ name: '/', chunkId: chunkId }];
-
-      // Load the root directory contents
-      await this.loadCurrentDirectory();
+      this.directoryPath = [{ name: '', chunkId: chunkId }];
 
       this.initialized = true;
     } catch (error: any) {
@@ -114,44 +122,72 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
     }
   }
 
-  private async loadCurrentDirectory(): Promise<void> {
-    this.loading = true;
+  private updateDirectoryListing(directory: Directory): void {
+    const directoryItems: DisplayItem[] = directory.directories.map(dir => ({
+      type: 'directory',
+      name: dir.name,
+      chunkId: dir.chunkId
+    }));
+
+    const fileItems: DisplayItem[] = directory.files.map(file => ({
+      type: 'file',
+      name: file.name,
+      size: file.size,
+      createdAt: file.createdAt,
+      chunkId: file.chunkId
+    }));
+
+    this.directoryListing = [...directoryItems, ...fileItems].sort((a, b) => {
+      if (a.type === 'directory' && b.type === 'file') {
+        return -1; // Directories first
+      }
+      if (a.type === 'file' && b.type === 'directory') {
+        return 1; // Files after
+      }
+      return a.name.localeCompare(b.name); // Sort by name otherwise
+    });
+  }
+
+  async onFileSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const browserFile = input.files?.[0];
+    
+    if (!browserFile) {
+      return;
+    }
+
+    this.isUploading = true;
+    this.uploadProgress = 0;
+    this.uploadStatus = `Uploading ${browserFile.name}...`;
+    this.error = '';
+
     try {
-      const fileList = await this.fileService.getDirectoryFiles();
-      this.directoryListing = fileList.map(file => ({
-        name: file.name,
-        type: file.type,
-        size: file.type === 'file' ? file.size : undefined,
-        createdAt: file.type === 'file' ? file.createdAt : undefined,
-        chunkId: file.chunkId
-      }));
-    } catch (err) {
-      this.error = `Failed to load directory contents.`;
-      console.error(err);
-    } finally {
-      this.loading = false;
+      await this.fileService.uploadFileStream(browserFile, (progress) => {
+        this.uploadProgress = progress;
+      });
+
+      this.uploadStatus = `Successfully uploaded ${browserFile.name}`;
+
+      // Reset upload state after 2 seconds
+      setTimeout(() => {
+        this.isUploading = false;
+        this.uploadStatus = '';
+        this.uploadProgress = 0;
+      }, 2000);
+
+    } catch (error: any) {
+      console.error('Upload failed:', error);
+      this.error = `Upload failed: ${error.message || 'Unknown error'}`;
+      this.isUploading = false;
+      this.uploadStatus = '';
+      this.uploadProgress = 0;
     }
+
+    // Reset the input
+    input.value = '';
   }
 
-  async handleItemClick(item: DisplayItem): Promise<void> {
-    if (item.type === 'directory') {
-      // Add new segment to path and load the directory
-      this.directoryPath.push({ name: item.name, chunkId: item.chunkId });
-      await this.loadCurrentDirectory();
-    } else {
-      // Handle file click (e.g., download)
-      console.log('File clicked:', item.name);
-      // this.downloadFile(item);
-    }
-  }
-
-  async navigateTo(pathIndex: number): Promise<void> {
-    if (pathIndex < 0 || pathIndex >= this.directoryPath.length - 1) {
-      return; // Cannot navigate to current directory or out of bounds
-    }
-
-    const targetSegment = this.directoryPath[pathIndex];
-    this.directoryPath = this.directoryPath.slice(0, pathIndex + 1);
-    await this.loadCurrentDirectory();
+  triggerFileUpload(): void {
+    this.fileInput.nativeElement.click();
   }
 }

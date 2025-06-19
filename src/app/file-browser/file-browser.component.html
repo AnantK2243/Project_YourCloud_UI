@@ -1,19 +1,39 @@
 <div>
   <div>
     <h2>{{ nodeName }}</h2>
-    <button (click)="goBack()">← Back to Dashboard</button>
+    <button (click)="goBack()"><- Back to Dashboard</button>
   </div>
 
-  <div *ngIf="initialized">
-    <ng-container *ngFor="let segment of directoryPath; let i = index; let last = last">
-      <a (click)="navigateTo(i)" *ngIf="!last">{{ segment.name }}</a>
-      <span *ngIf="!last"> / </span>
-      <span *ngIf="last">{{ segment.name }}</span>
-    </ng-container>
-  </div>
+  
+  <!-- File Upload Section -->
+  <div *ngIf="initialized && !loading && !error">
+    <input 
+    type="file" 
+    id="fileInput" 
+    #fileInput
+    (change)="onFileSelected($event)" 
+    style="display: none;"
+    [disabled]="isUploading"
+    />
+    <button (click)="triggerFileUpload()" [disabled]="isUploading">
+      {{ isUploading ? 'Uploading...' : 'Upload File' }}
+    </button>
+    
+    <!-- Upload Progress -->
+    <div *ngIf="isUploading">
+      <div>{{ uploadStatus }}</div>
+      <div>{{ uploadProgress }}%</div>
+    </div>
 
-  <!-- Show Page Status -->
-  <div *ngIf="loading">
+    <!-- Breadcrumb Navigation -->
+    <div *ngIf="initialized">
+      <ng-container *ngFor="let segment of directoryPath; let i = index; let last = last">
+        {{ segment.name }}<span>/</span>
+      </ng-container>
+    </div>
+
+    <!-- Show Page Status -->
+    <div *ngIf="loading">
     <p>Loading...</p>
   </div>
 
@@ -29,12 +49,10 @@
     </div>
 
     <ul *ngIf="directoryListing.length > 0">
-      <li *ngFor="let item of directoryListing" (click)="handleItemClick(item)">
-        <span>{{ item.type }}</span>
-        <span>{{ item.name }}</span>
+      <li *ngFor="let item of directoryListing">
+        <span>{{ item.type }} - {{ item.name }}</span>
         <div *ngIf="item.type === 'file'">
-          <span>{{ formatFileSize(item.size) }}</span>
-          <span>{{ formatDate(item.createdAt) }}</span>
+          <span>{{ formatFileSize(item.size) }} - {{ formatDate(item.createdAt) }}</span>
         </div>
       </li>
     </ul>

@@ -7,6 +7,18 @@
   
   <!-- File Upload Section -->
   <div *ngIf="initialized && !loading && !error">
+    <!-- Upload Method Toggle -->
+    <div>
+      <label>
+        <input type="radio" name="uploadMethod" value="http" [(ngModel)]="uploadMethod" [disabled]="isUploading" (change)="onUploadMethodChange()">
+        HTTP Upload (traditional)
+      </label>
+      <label style="margin-left: 20px;">
+        <input type="radio" name="uploadMethod" value="p2p" [(ngModel)]="uploadMethod" [disabled]="isUploading" (change)="onUploadMethodChange()">
+        P2P Upload (WebRTC)
+      </label>
+    </div>
+    
     <input 
     type="file" 
     id="fileInput" 

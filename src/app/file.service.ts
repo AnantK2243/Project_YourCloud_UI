@@ -3,6 +3,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable, BehaviorSubject } from 'rxjs';
 import { AuthService } from './auth.service';
 import { CryptoService } from './crypto.service';
+import { WebRTCService } from './webrtc.service';
 
 export interface File {
   chunkId: string;
@@ -38,7 +39,8 @@ export type DirectoryItem = {
 
 export class FileService {
   private apiUrl = this.getApiUrl();
-  private readonly CHUNK_SIZE = 8 * 1024 * 1024; // 8MB chunks
+  private readonly WS_CHUNK_SIZE = 8 * 1024 * 1024; // 8MB chunks
+  private readonly P2P_CHUNK_SIZE = 64 * 1024 * 1024; // 64MB chunks
   private readonly CONCURRENCY_LIMIT = 2;
   private directory = new BehaviorSubject<Directory | null>(null);
   private storageNodeId: string | null = null;
@@ -46,7 +48,8 @@ export class FileService {
   constructor(
     private http: HttpClient,
     private authService: AuthService,
-    private cryptoService: CryptoService
+    private cryptoService: CryptoService,
+    private webrtcService: WebRTCService
   ) {}
 
   private getApiUrl(): string {
@@ -284,14 +287,14 @@ export class FileService {
     const completedChunks: { index: number, chunkId: string }[] = [];
     let totalBytesRead = 0;
     let chunkIndex = 0;
-    let buffer = new Uint8Array(this.CHUNK_SIZE * 2);
+    let buffer = new Uint8Array(this.WS_CHUNK_SIZE * 2);
     let bufferSize = 0;
     let endOfStream = false;
     let fileIv: Uint8Array | undefined = undefined;
 
     try {
       while (true) {
-        while (bufferSize < this.CHUNK_SIZE && !endOfStream) {
+        while (bufferSize < this.WS_CHUNK_SIZE && !endOfStream) {
           const { done, value } = await reader.read();
           
           if (done) {
@@ -317,12 +320,13 @@ export class FileService {
           break;
         }
         
-        const chunkSize = Math.min(this.CHUNK_SIZE, bufferSize);
+        const chunkSize = Math.min(this.WS_CHUNK_SIZE, bufferSize);
         const chunkData = new Uint8Array(chunkSize);
         chunkData.set(buffer.subarray(0, chunkSize));
 
         // Remove next chunk from buffer
         if (bufferSize > chunkSize) {
+          buffer.copyWithin(0, this.WS_CHUNK_SIZE, bufferSize);
           buffer.copyWithin(0, chunkSize);
           bufferSize -= chunkSize;
         } else {
@@ -377,7 +381,7 @@ export class FileService {
       this.directory.next(currentDirectory);
 
     } catch (error) {
-      console.error('Error during concurrent file upload:', error);
+      console.error('Error during file upload:', error);
       await reader.cancel();
       throw error;
     } finally {
@@ -386,6 +390,152 @@ export class FileService {
       } catch (e) {
         console.warn('Could not release reader lock:', e);
       }
+    }
+  }
+
+  // Upload a file using WebRTC P2P connection with same encryption as HTTP
+  async uploadFileP2P(browserFile: globalThis.File, onProgress?: (progress: number) => void): Promise<void> {
+    if (!this.storageNodeId) {
+      throw new Error('Node ID not available');
+    }
+
+    const currentDirectory = this.directory.getValue();
+    if (!currentDirectory) {
+      throw new Error('Current directory is not initialized');
+    }
+
+    if (!browserFile) {
+      throw new Error('No file provided');
+    }
+
+    const newFile: File = {
+      chunkId: this.cryptoService.generateUUID(),
+      name: browserFile.name,
+      size: browserFile.size,
+      createdAt: new Date().toISOString(),
+      iv: '', // Will be set after the first chunk is encrypted
+      fileChunks: []
+    };
+
+    try {
+      // Start P2P session with storage node
+      const sessionId = await this.webrtcService.startUploadSession(
+        this.storageNodeId,
+        {
+          fileName: browserFile.name,
+          fileSize: browserFile.size,
+          purpose: 'upload'
+        }
+      );
+
+      // Wait for connection and data channel to be ready
+      await new Promise<void>((resolve, reject) => {
+        const statusSub = this.webrtcService.sessionStatus$.subscribe(status => {
+          if (status.sessionId === sessionId) {
+            if (status.status === 'connected' && status.dataChannelReady) {
+              statusSub.unsubscribe();
+              resolve();
+            } else if (status.status === 'failed') {
+              statusSub.unsubscribe();
+              reject(new Error('P2P connection failed'));
+            }
+          }
+        });
+
+        // Timeout after 15 seconds
+        setTimeout(() => {
+          statusSub.unsubscribe();
+          reject(new Error('P2P connection timeout'));
+        }, 15000);
+      });
+
+      // Process file in chunks sequentially
+      const stream = browserFile.stream();
+      const reader = stream.getReader();
+      
+      const completedChunks: { index: number, chunkId: string }[] = [];
+      let totalBytesRead = 0;
+      let chunkIndex = 0;
+      let buffer = new Uint8Array(this.P2P_CHUNK_SIZE * 2);
+      let bufferSize = 0;
+      let endOfStream = false;
+      let fileIv: Uint8Array | undefined = undefined;
+
+      while (true) {
+        while (bufferSize < this.P2P_CHUNK_SIZE && !endOfStream) {
+          const { done, value } = await reader.read();
+          
+          if (done) {
+            endOfStream = true;
+            break;
+          }
+          
+          if (value) {
+            buffer.set(value, bufferSize);
+            bufferSize += value.length;
+            totalBytesRead += value.length;
+          }
+
+          // Update progress
+          if (onProgress) {
+            const progress = Math.min(100, Number((totalBytesRead / browserFile.size).toPrecision(2)) * 100);
+            onProgress(progress);
+          }
+        }
+
+        // If no data in buffer and stream ended, we're done
+        if (bufferSize === 0 && endOfStream) {
+          break;
+        }
+
+        const chunkData = buffer.slice(0, Math.min(this.P2P_CHUNK_SIZE, bufferSize));
+        const chunkId = this.cryptoService.generateUUID();
+
+        // Process chunk sequentially
+        const currentChunkIndex = chunkIndex;
+        try {
+          const { encryptedData, iv } = await this.cryptoService.encryptData(chunkData.buffer, fileIv);
+
+          if (currentChunkIndex === 0) {
+            fileIv = iv;
+            newFile.iv = Array.from(fileIv).map(b => b.toString(16).padStart(2, '0')).join('');
+          }
+          
+          // Send chunk via P2P data channel
+          await this.webrtcService.sendChunk(sessionId, chunkId, encryptedData);
+
+          // Add completed chunk
+          completedChunks.push({ index: currentChunkIndex, chunkId });
+          
+        } catch (error) {
+          console.error(`Error uploading chunk ${currentChunkIndex} via P2P:`, error);
+          throw error;
+        }
+        chunkIndex++;
+
+        // Prepare buffer for next iteration
+        if (bufferSize > this.P2P_CHUNK_SIZE) {
+          buffer.copyWithin(0, this.P2P_CHUNK_SIZE, bufferSize);
+          bufferSize -= this.P2P_CHUNK_SIZE;
+        } else {
+          bufferSize = 0;
+        }
+      }
+
+      // Sort chunks by index and update file
+      completedChunks.sort((a, b) => a.index - b.index);
+      newFile.fileChunks = completedChunks.map(chunk => chunk.chunkId);
+
+      // Add file to directory and save (just update the observable for now)
+      currentDirectory.files.push(newFile);
+      this.directory.next(currentDirectory);
+
+      // Cleanup P2P session
+      this.webrtcService.closeSession(sessionId);
+
+    } catch (error) {
+      console.error('P2P upload failed:', error);
+      throw error;
     }
   }
 }

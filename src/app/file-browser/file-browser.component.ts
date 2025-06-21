@@ -3,7 +3,9 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { FileService, Directory, File } from '../file.service';
 import { AuthService } from '../auth.service';
+import { WebRTCService } from '../webrtc.service';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 
 // Simplified interface for display purposes
 interface DisplayItem {
@@ -23,7 +25,7 @@ interface PathSegment {
 @Component({
   selector: 'app-file-browser',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './file-browser.component.html'
 })
 export class FileBrowserComponent implements OnInit, OnDestroy {
@@ -37,6 +39,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
   uploadProgress: number = 0;
   isUploading: boolean = false;
   uploadStatus: string = '';
+  uploadMethod: 'http' | 'p2p' = 'p2p';
 
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
 
@@ -47,7 +50,8 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     public fileService: FileService,
-    private authService: AuthService
+    private authService: AuthService,
+    private webrtcService: WebRTCService
   ) {}
 
   ngOnInit(): void {
@@ -73,6 +77,8 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
     if (this.directorySub) {
       this.directorySub.unsubscribe();
     }
+    // Clean up WebRTC connections
+    this.webrtcService.destroy();
   }
 
   goBack() {
@@ -99,6 +105,16 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
     this.initialized = false;
 
     try {
+      // Initialize WebRTC service if P2P upload is selected
+      if (this.uploadMethod === 'p2p') {
+        try {
+          await this.webrtcService.initialize();
+        } catch (webrtcError) {
+          console.error('WebRTC initialization failed:', webrtcError);
+          throw new Error('Failed to initialize P2P connection. Please use HTTP upload or refresh.');
+        }
+      }
+
       const password = await this.authService.getUserPassword();
       if (!password) {
         throw new Error('User password not found. Please log in again.');
@@ -162,9 +178,15 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
     this.error = '';
 
     try {
-      await this.fileService.uploadFileStream(browserFile, (progress) => {
-        this.uploadProgress = progress;
-      });
+      if (this.uploadMethod === 'p2p') {
+        await this.fileService.uploadFileP2P(browserFile, (progress) => {
+          this.uploadProgress = progress;
+        });
+      } else {
+        await this.fileService.uploadFileStream(browserFile, (progress) => {
+          this.uploadProgress = progress;
+        });
+      }
 
       this.uploadStatus = `Successfully uploaded ${browserFile.name}`;
 
@@ -189,5 +211,19 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 
   triggerFileUpload(): void {
     this.fileInput.nativeElement.click();
+  }
+
+  // Handle upload method change
+  async onUploadMethodChange() {
+    if (this.uploadMethod === 'p2p' && this.initialized) {
+      try {
+        await this.webrtcService.initialize();
+        console.log('WebRTC service initialized for P2P upload');
+        this.error = '';
+      } catch (error) {
+        console.error('Failed to initialize WebRTC service:', error);
+        this.error = 'Failed to initialize P2P connection. Please use HTTP upload.';
+      }
+    }
   }
 }

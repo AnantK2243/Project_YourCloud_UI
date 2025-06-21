@@ -15,7 +15,7 @@ services:
     networks:
       - yourcloud-network
 
-  # Optional: Cloudflare Tunnel service
+  # Cloudflare Tunnel service
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: yourcloud-tunnel

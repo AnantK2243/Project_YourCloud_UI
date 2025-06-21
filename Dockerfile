@@ -2,40 +2,38 @@ FROM node:18-alpine AS angular-builder
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files first (better caching)
 COPY package*.json ./
-RUN npm install
+RUN npm ci --silent
 
 # Copy source code
 COPY . .
 
 # Build the Angular application for production
-RUN npm run build
+RUN npm run build:prod
 
 # Stage 2: Production runtime with both frontend and backend
 FROM node:18-alpine
 
 WORKDIR /app
 
-# Install production dependencies
-COPY package*.json ./
-RUN npm install --only=production
+# Create user and directories first
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S yourcloud -u 1001 -G nodejs && \
+    mkdir -p /app/ssl && \
+    chown -R yourcloud:nodejs /app && \
+    chmod 755 /app/ssl
 
-# Copy built Angular files from previous stage (SSR build)
-COPY --from=angular-builder /app/dist ./dist
+# Copy package files and install production dependencies
+COPY --chown=yourcloud:nodejs package*.json ./
+RUN npm ci --only=production --silent && npm cache clean --force
+
+# Copy built Angular files from previous stage
+COPY --from=angular-builder --chown=yourcloud:nodejs /app/dist ./dist
 
 # Copy backend server and environment files
-COPY server.js .
-COPY .env .
+COPY --chown=yourcloud:nodejs server.js .env ./
 
-# Create SSL directory (certificates will be mounted via volume)
-RUN mkdir -p /app/ssl
-
-# Create a non-root user for security
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S yourcloud -u 1001
-RUN chown -R yourcloud:nodejs /app
-RUN chmod 755 /app/ssl
 USER yourcloud
 
 # Expose the frontend and websocket ports (backend port is internal only)

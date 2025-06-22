@@ -50,9 +50,21 @@
 
     <ul *ngIf="directoryListing.length > 0">
       <li *ngFor="let item of directoryListing">
-        <span>{{ item.type }} - {{ item.name }}</span>
-        <div *ngIf="item.type === 'file'">
-          <span>{{ formatFileSize(item.size) }} - {{ formatDate(item.createdAt) }}</span>
+        <div>
+          <div>
+            <span>{{ item.type }} - {{ item.name }}</span>
+            <div *ngIf="item.type === 'file'">
+              <span>{{ formatFileSize(item.size) }} - {{ formatDate(item.createdAt) }}</span>
+            </div>
+          </div>
+          <div>
+            <button 
+              (click)="deleteItem(item)" 
+              [disabled]="loading"
+              title="Delete">
+              {{ loading ? 'Deleting...' : 'Delete' }}
+            </button>
+          </div>
         </div>
       </li>
     </ul>

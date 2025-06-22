@@ -1,6 +1,7 @@
 import { Component, OnInit, Inject, PLATFORM_ID, afterNextRender } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../auth.service';
+import { SessionHandlerService } from '../session-handler.service';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
@@ -31,6 +32,7 @@ export class DashboardComponent implements OnInit {
     private authService: AuthService,
     private router: Router,
     private http: HttpClient,
+    private sessionHandler: SessionHandlerService,
     @Inject(PLATFORM_ID) private platformId: Object
   ) {}
 
@@ -66,6 +68,11 @@ export class DashboardComponent implements OnInit {
       }
     } catch (error: any) {
       console.error('Error loading storage nodes:', error);
+      
+      // Check if this is a session/authentication error
+      if (this.sessionHandler.checkAndHandleSessionError(error)) {
+        return;
+      }
     } finally {
       this.loadingNodes = false;
     }
@@ -102,6 +109,12 @@ export class DashboardComponent implements OnInit {
       }
     } catch (error: any) {
       console.error('Node status check failed (raw error object):', error);
+      
+      // Check if this is a session/authentication error
+      if (this.sessionHandler.checkAndHandleSessionError(error)) {
+        return;
+      }
+      
       if (error instanceof HttpErrorResponse) {
         console.error(
           `Status: ${error.status}, StatusText: ${error.statusText}`
@@ -160,6 +173,12 @@ export class DashboardComponent implements OnInit {
       }
     } catch (error: any) {
       console.error('Node registration failed:', error);
+      
+      // Check if this is a session/authentication error
+      if (this.sessionHandler.checkAndHandleSessionError(error)) {
+        return;
+      }
+      
       if (error instanceof HttpErrorResponse) {
         this.registerMessage =
           error.error?.error ||

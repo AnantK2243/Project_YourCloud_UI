@@ -228,6 +228,57 @@ export class FileService {
     }
   }
 
+  public async deleteFile(fileChunkId: string): Promise<void> {
+    if (!this.storageNodeId) {
+      throw new Error('Node ID not available');
+    }
+    
+    const currentDirectory = this.directory.getValue();
+    if (!currentDirectory) {
+      throw new Error('Current directory is not initialized');
+    }
+
+    // Find the file to delete
+    const fileIndex = currentDirectory.files.findIndex(file => file.chunkId === fileChunkId);
+    if (fileIndex === -1) {
+      throw new Error('File not found in current directory');
+    }
+
+    const fileToDelete = currentDirectory.files[fileIndex];
+    
+    try {
+      // Delete all data chunks that make up this file
+      for (const dataChunkId of fileToDelete.fileChunks) {
+        await this.deleteChunk(dataChunkId);
+      }
+
+      // Remove the file from the directory
+      currentDirectory.files.splice(fileIndex, 1);
+      
+      // Update the local state
+      this.directory.next(currentDirectory);
+      
+    } catch (error) {
+      console.error(`Error deleting file ${fileToDelete.name}:`, error);
+      throw error;
+    }
+  }
+
+  public async deleteChunk(chunkId: string): Promise<void> {
+    if (!this.storageNodeId) {
+      throw new Error('Node ID not available');
+    }
+    try {
+      await this.http.delete(
+        `${this.apiUrl}/chunks/delete/${this.storageNodeId}/${chunkId}`,
+        { headers: this.getHeaders() }
+      ).toPromise();
+    } catch (error) {
+      console.error(`Error deleting chunk ${chunkId}:`, error);
+      throw error;
+    }
+  }
+
   // Get list of files and directories in the current directory
   async getDirectoryFiles(): Promise<DirectoryItem[]> {
     const currentDirectory = this.directory.getValue();
@@ -372,7 +423,10 @@ export class FileService {
       allChunkResults.sort((a, b) => a.index - b.index);
       newFile.fileChunks = allChunkResults.map(result => result.chunkId);
     
+      // Add file to directory
       currentDirectory.files.push(newFile);
+      
+      // Update the local state
       this.directory.next(currentDirectory);
 
     } catch (error) {

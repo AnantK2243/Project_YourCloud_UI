@@ -18,6 +18,10 @@
   <button (click)="onLogin()">Login</button>
   <button (click)="goToRegister()">Go to Register</button>
 
+  <div *ngIf="infoMessage">
+    <p>{{ infoMessage }}</p>
+  </div>
+
   <div *ngIf="errorMessage">
     <p>{{ errorMessage }}</p>
   </div>

@@ -3,6 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { FileService, Directory, File } from '../file.service';
 import { AuthService } from '../auth.service';
+import { SessionHandlerService } from '../session-handler.service';
 import { CommonModule } from '@angular/common';
 
 // Simplified interface for display purposes
@@ -47,7 +48,8 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
     private route: ActivatedRoute,
     private router: Router,
     public fileService: FileService,
-    private authService: AuthService
+    private authService: AuthService,
+    private sessionHandler: SessionHandlerService
   ) {}
 
   ngOnInit(): void {
@@ -101,7 +103,9 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
     try {
       const password = await this.authService.getUserPassword();
       if (!password) {
-        throw new Error('User password not found. Please log in again.');
+        // Session expired - redirect to login immediately
+        this.sessionHandler.handleSessionExpired();
+        return;
       }
 
       // Initialize the file service
@@ -113,10 +117,14 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
       this.initialized = true;
     } catch (error: any) {
       console.error('Error initializing file system:', error);
-      this.error = 'Failed to initialize file system: ' + (error.message || 'Unknown error');
-      if (error.message.includes('password')) {
-        setTimeout(() => this.router.navigate(['/login']), 2000);
+      
+      // Check if this is a session/authentication error
+      if (this.sessionHandler.checkAndHandleSessionError(error)) {
+        return;
       }
+      
+      // Handle other errors normally
+      this.error = 'Failed to initialize file system: ' + (error.message || 'Unknown error');
     } finally {
       this.loading = false;
     }
@@ -168,15 +176,22 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 
       this.uploadStatus = `Successfully uploaded ${browserFile.name}`;
 
-      // Reset upload state after 2 seconds
+      // Reset upload state after 1 seconds
       setTimeout(() => {
         this.isUploading = false;
         this.uploadStatus = '';
         this.uploadProgress = 0;
-      }, 2000);
+      }, 1000);
 
     } catch (error: any) {
       console.error('Upload failed:', error);
+      
+      // Check if this is a session/authentication error
+      if (this.sessionHandler.checkAndHandleSessionError(error)) {
+        return;
+      }
+      
+      // Handle other errors normally
       this.error = `Upload failed: ${error.message || 'Unknown error'}`;
       this.isUploading = false;
       this.uploadStatus = '';
@@ -185,6 +200,48 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 
     // Reset the input
     input.value = '';
+  }
+
+  async deleteItem(item: DisplayItem): Promise<void> {
+    // Validate the item
+    if (!item.chunkId) {
+      this.error = 'Cannot delete: Invalid item (missing chunk ID)';
+      return;
+    }
+
+    // Confirm deletion
+    if (!confirm(`Are you sure you want to delete "${item.name}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    // Show loading state
+    this.loading = true;
+    this.error = '';
+
+    try {      
+      // Call the delete API for files
+      if (item.type === 'file') {
+        await this.fileService.deleteFile(item.chunkId);
+      } else {
+        // For directories, use the existing deleteChunk method
+        await this.fileService.deleteChunk(item.chunkId);
+      }
+          
+      // Refresh the directory listing to reflect the deletion
+      await this.initializeFileSystem();
+    } catch (error: any) {
+      console.error('Delete failed:', error);
+      
+      // Check if this is a session/authentication error
+      if (this.sessionHandler.checkAndHandleSessionError(error)) {
+        return;
+      }
+      
+      // Handle other errors normally
+      this.error = `Delete failed: ${error.message || 'Unknown error'}`;
+    } finally {
+      this.loading = false;
+    }
   }
 
   triggerFileUpload(): void {

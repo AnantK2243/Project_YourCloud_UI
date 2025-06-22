@@ -1,5 +1,5 @@
-import { Component, Inject, PLATFORM_ID } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, Inject, PLATFORM_ID, OnInit } from '@angular/core';
+import { Router, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../auth.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -10,23 +10,45 @@ import { FormsModule } from '@angular/forms';
   imports: [CommonModule, FormsModule],
   templateUrl: './login.component.html',
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   email: string = '';
   password: string = '';
   errorMessage: string = '';
   successMessage: string = '';
+  infoMessage: string = ''; // For session expiration messages
 
   constructor(
     private authService: AuthService,
     private router: Router,
+    private route: ActivatedRoute,
     @Inject(PLATFORM_ID) private platformId: Object
   ) {}
+
+  ngOnInit() {
+    // Check for message query parameter
+    this.route.queryParams.subscribe(params => {
+      if (params['message']) {
+        this.infoMessage = params['message'];
+        // Clear the query parameter from the URL
+        this.router.navigate([], { 
+          relativeTo: this.route,
+          queryParams: {},
+          replaceUrl: true
+        });
+      }
+    });
+  }
 
   onLogin() {
     if (!this.email || !this.password) {
       this.errorMessage = 'Please fill in all fields';
       return;
     }
+
+    // Clear messages when attempting login
+    this.errorMessage = '';
+    this.successMessage = '';
+    this.infoMessage = '';
 
     this.authService
       .login({ email: this.email, password: this.password })

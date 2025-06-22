@@ -70,6 +70,9 @@ const User = mongoose.model('User', UserSchema);
 // Storage for pending commands awaiting responses
 const pendingCommands = new Map();
 
+// Storage for frame reconstruction
+const pendingFrameReconstructions = new Map();
+
 // Generate unique command IDs
 function generateCommandId() {
   return 'cmd-' + require('crypto').randomBytes(8).toString('hex');
@@ -256,11 +259,117 @@ async function sendStorageNodeCommand(nodeId, command) {
       }
     }, 30000); // 30 second timeout
 
-    // Send command
-    ws.send(JSON.stringify(fullCommand));
+    try {
+      ws.send(JSON.stringify(fullCommand));
+    } catch (error) {
+      pendingCommands.delete(commandId);
+      reject(error);
+    }
   });
 }
 
+// Send store command with data
+async function sendStoreCommand(nodeId, command, binaryData) {
+  return new Promise(async (resolve, reject) => {
+    const ws = nodeConnections.get(nodeId);
+    
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      reject(new Error(`Storage node ${nodeId} is not connected`));
+      return;
+    }
+
+    const commandId = generateCommandId();
+    const fullCommand = {
+      ...command,
+      command_id: commandId
+    };
+
+    // Set up response handler
+    pendingCommands.set(commandId, (result) => {
+      if (result.success) {
+        resolve(result);
+      } else {
+        reject(new Error(result.error || 'Command failed'));
+      }
+    });
+
+    // Set timeout
+    setTimeout(() => {
+      if (pendingCommands.has(commandId)) {
+        pendingCommands.delete(commandId);
+        reject(new Error('Command timeout'));
+      }
+    }, 30000); // 30 second timeout
+
+    try {
+      // Define max chunk size for binary data (16MB)
+      const MAX_BINARY_FRAME_SIZE = 32 * 1024 * 1024; // 32MB
+
+      if (binaryData.length <= MAX_BINARY_FRAME_SIZE) {
+        // Send as single chunk
+        const frameCommand = {
+          ...fullCommand,
+          frame_number: 1,
+          total_frames: 1
+        };
+
+        await sendSingleFrame(ws, frameCommand, binaryData);
+      } else {
+        // Split into multiple frames
+        const totalFrames = Math.ceil(binaryData.length / MAX_BINARY_FRAME_SIZE);
+
+        for (let i = 0; i < totalFrames; i++) {
+          const start = i * MAX_BINARY_FRAME_SIZE;
+          const end = Math.min(start + MAX_BINARY_FRAME_SIZE, binaryData.length);
+          const frameData = binaryData.slice(start, end);
+
+          const frameCommand = {
+            ...fullCommand,
+            frame_number: i + 1,
+            total_frames: totalFrames
+          };
+
+          await sendSingleFrame(ws, frameCommand, frameData);
+
+          // Small delay between frames to prevent overwhelming the client
+          if (i < totalFrames - 1) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+        }
+      }
+    } catch (error) {
+      pendingCommands.delete(commandId);
+      reject(error);
+    }
+  });
+}
+
+// Helper function to send a single frame
+async function sendSingleFrame(ws, command, binaryData) {
+  try {
+    // Create combined binary message: [4 bytes: json_length][json][binary_data]
+      const jsonString = JSON.stringify(command);
+      const jsonBytes = Buffer.from(jsonString, 'utf8');
+      
+      // Create combined message buffer
+      const combinedMessage = Buffer.alloc(4 + jsonBytes.length + binaryData.length);
+      
+      // Write JSON length as 4-byte little-endian integer
+      combinedMessage.writeUInt32LE(jsonBytes.length, 0);
+      
+      // Write JSON command
+      jsonBytes.copy(combinedMessage, 4);
+      
+      // Write binary data
+      binaryData.copy(combinedMessage, 4 + jsonBytes.length);
+      
+      // Send as single binary WebSocket message
+      ws.send(combinedMessage);
+    } catch (error) {
+      pendingCommands.delete(commandId);
+      throw error;
+    }
+}
 // API Routes
 
 // Health check endpoint for testing connectivity
@@ -639,12 +748,12 @@ app.post('/api/chunks/store/:nodeId/:chunkId', authenticateToken, async (req, re
           });
         }
         
-        // Send STORE_CHUNK command
-        const result = await sendStorageNodeCommand(nodeId, {
+        // Send STORE_CHUNK command with binary data
+        const result = await sendStoreCommand(nodeId, {
           command_type: 'STORE_CHUNK',
           chunk_id: chunkId,
-          data: chunkData.toString('base64')
-        });
+          data_size: chunkData.length
+        }, chunkData);
 
         res.json({ success: true });
         
@@ -696,11 +805,9 @@ app.get('/api/chunks/get/:nodeId/:chunkId', authenticateToken, async (req, res) 
     });
 
     if (result.success && result.data) {
-      // Convert base64 back to buffer and send as response
-      const chunkData = Buffer.from(result.data, 'base64');
       res.set('Content-Type', 'application/octet-stream');
-      res.set('Content-Length', chunkData.length.toString());
-      res.send(chunkData);
+      res.set('Content-Length', result.data.length.toString());
+      res.send(result.data);
     } else {
       res.status(404).json({
         success: false,
@@ -773,6 +880,222 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist/user_interface/browser/index.csr.html'));
 });
 
+// WebSocket Helper Functions
+
+async function handleWebSocketText(message, ws) {
+  const data = JSON.parse(message);
+
+  switch (data.type) {
+    case 'AUTH':
+      // Verify the node_id and token against the database
+      const node = await StorageNode.findOne({ 
+        node_id: data.node_id
+      });
+      
+      if (node && await bcrypt.compare(data.token, node.auth_token)) {
+        // Store connection for command routing
+        ws.nodeId = data.node_id;
+        nodeConnections.set(data.node_id, ws);
+        
+        // Update node status to online
+        try {
+          await StorageNode.findOneAndUpdate(
+            { node_id: data.node_id },
+            { 
+              status: 'online',
+              last_seen: null
+            },
+            { new: true }
+          );
+        } catch (error) {
+          console.error(`Error updating node ${data.node_id} status:`, error);
+        }
+        
+        ws.send(JSON.stringify({ type: 'AUTH_SUCCESS', message: 'Authentication successful' }));
+        //console.log(`Node ${data.node_id} authenticated successfully`);
+
+        // Update info about node
+        updateNodeStatus(data.node_id);
+      } else {
+        ws.send(JSON.stringify({ type: 'AUTH_FAILED', message: 'Invalid credentials' }));
+        console.log(`Authentication failed for node ${data.node_id}`);
+      }
+      break;
+      
+    case 'COMMAND_RESULT':
+      await handleCommandResult(data, ws);
+      break;
+      
+    case 'STATUS_REPORT':
+      // Handle status reports from storage client
+      //console.log(`Status report for ${data.command_id}:`, data.status);
+      if (data.status && ws.nodeId) {
+        // Update node status in database with fresh data
+        try {
+          await StorageNode.findOneAndUpdate(
+            { node_id: ws.nodeId },
+            {
+              status: 'online',
+              used_space: data.status.used_space_bytes || 0,
+              total_available_space: data.status.max_space_bytes || 0,
+              num_chunks: data.status.current_chunk_count || 0,
+              last_seen: null
+            },
+            { new: true }
+          );
+          // console.log(`Node ${ws.nodeId} storage status updated from status report`);
+        } catch (error) {
+          console.error(`Error updating node ${ws.nodeId} storage status:`, error);
+        }
+      }
+      // Resolve any pending commands waiting for this status report
+      if (pendingCommands.has(data.command_id)) {
+        const resolve = pendingCommands.get(data.command_id);
+        pendingCommands.delete(data.command_id);
+        resolve(data);
+      }
+      break;
+      
+    default:
+      console.log('Unknown message type:', data.type);
+      break;
+  }
+}
+
+async function handleWebSocketBinary(message, ws){
+  if (message.length < 4) {
+    throw new Error('Binary message too short');
+  }
+  
+  // Read JSON header length (first 4 bytes, little-endian)
+  const jsonLength = message.readUInt32LE(0);
+  
+  // Extract JSON header
+  const jsonData = message.subarray(4, 4 + jsonLength);
+  const data = JSON.parse(jsonData.toString('utf8'));
+  
+  // Extract binary payload
+  const binaryPayload = message.subarray(4 + jsonLength);
+  
+  // Handle binary command result
+  if (data.type === 'GET_CHUNK_RESULT' && data.data_size !== undefined) {
+    if (binaryPayload.length !== data.data_size) {
+      throw new Error(`Binary payload size mismatch: expected ${data.data_size}, got ${binaryPayload.length}`);
+    }
+    
+    // Handle framed GET_CHUNK_RESULT
+    await handleFramedGetChunkResult(data, binaryPayload, ws);
+  } else {
+    // For other binary message types, just log and ignore for now
+    console.warn(`Unknown received binary message of type ${data.type} with command_id ${data.command_id}`);
+  }
+}
+
+// Handle framed GET_CHUNK_RESULT responses
+async function handleFramedGetChunkResult(data, binaryPayload, ws) {
+  const { command_id, frame_number, total_frames } = data;
+  
+  if (!frame_number || !total_frames) {
+    // Single frame response
+    data.data = binaryPayload;
+    delete data.data_size;
+    await handleCommandResult(data, ws);
+    return;
+  }
+  
+  // Multi-frame response - reconstruct
+  const frameKey = command_id;
+  
+  if (!pendingFrameReconstructions.has(frameKey)) {
+    pendingFrameReconstructions.set(frameKey, {
+      frames: new Map(),
+      total_frames,
+      received_count: 0,
+      command_data: { ...data }
+    });
+  }
+  
+  const reconstruction = pendingFrameReconstructions.get(frameKey);
+  
+  // Add this frame
+  if (!reconstruction.frames.has(frame_number)) {
+    reconstruction.frames.set(frame_number, binaryPayload);
+    reconstruction.received_count++;
+  }
+  
+  // Check if complete
+  if (reconstruction.received_count === total_frames) {
+    // Reconstruct the full binary data
+    const fullData = Buffer.alloc(
+      Array.from(reconstruction.frames.values())
+        .reduce((total, frame) => total + frame.length, 0)
+    );
+    
+    let offset = 0;
+    for (let i = 1; i <= total_frames; i++) {
+      const frameData = reconstruction.frames.get(i);
+      if (!frameData) {
+        throw new Error(`Missing frame ${i} of ${total_frames} for command ${command_id}`);
+      }
+      frameData.copy(fullData, offset);
+      offset += frameData.length;
+    }
+    
+    // Clean up and process complete response
+    pendingFrameReconstructions.delete(frameKey);
+    
+    const completeResponse = {
+      ...reconstruction.command_data,
+      data: fullData
+    };
+    delete completeResponse.data_size;
+    delete completeResponse.frame_number;
+    delete completeResponse.total_frames;
+    
+    // Process the complete response
+    await handleCommandResult(completeResponse, ws);
+  }
+}
+
+async function handleCommandResult(data, ws) {
+  if (!data.success && data.error) {
+    console.error(`Command error: ${data.error}`);
+  }
+  
+  // Update storage node metrics for successful operations with storage impact
+  if (data.success && ws.nodeId && data.storage_delta !== undefined && data.storage_delta !== null) {
+    try {
+      const storageDelta = data.storage_delta;
+      const chunkDelta = storageDelta > 0 ? 1 : (storageDelta < 0 ? -1 : 0);
+      
+      if (storageDelta !== 0 || chunkDelta !== 0) {
+        const updateFields = {};
+        if (storageDelta !== 0) {
+          updateFields.used_space = storageDelta;
+        }
+        if (chunkDelta !== 0) {
+          updateFields.num_chunks = chunkDelta;
+        }
+        
+        await StorageNode.findOneAndUpdate(
+          { node_id: ws.nodeId },
+          { $inc: updateFields },
+          { new: true }
+        );
+      }
+    } catch (error) {
+      console.error(`Error updating node ${ws.nodeId} metrics:`, error);
+    }
+  }
+  
+  // Store command result for any waiting requests
+  if (pendingCommands.has(data.command_id)) {
+    const resolve = pendingCommands.get(data.command_id);
+    pendingCommands.delete(data.command_id);
+    resolve(data);
+  }
+}
+
 // Store WebSocket connections by node_id for command routing
 const nodeConnections = new Map();
 
@@ -790,129 +1113,20 @@ try {
 
 const server = https.createServer(sslOptions, app);
 
+// Configure WebSocket server with limits
 const wss = new WebSocket.Server({ server: server });
 
 wss.on('connection', (ws) => {
   // console.log('WebSocket client connected');
 
-  ws.on('message', async (message) => {
+  ws.on('message', async (message, isBinary) => {
     try {
-      const data = JSON.parse(message);
-      // console.log('Received WebSocket message:', data);
-
-      // Handle different message types
-      switch (data.type) {
-        case 'AUTH':
-          // Verify the node_id and token against the database
-          const node = await StorageNode.findOne({ 
-            node_id: data.node_id
-          });
-          
-          if (node && await bcrypt.compare(data.token, node.auth_token)) {
-            // Store connection for command routing
-            ws.nodeId = data.node_id;
-            nodeConnections.set(data.node_id, ws);
-            
-            // Update node status to online
-            try {
-              await StorageNode.findOneAndUpdate(
-                { node_id: data.node_id },
-                { 
-                  status: 'online',
-                  last_seen: null,
-                },
-                { new: true }
-              );
-              // console.log(`Node ${data.node_id} status updated to online`);
-            } catch (error) {
-              console.error(`Error updating node ${data.node_id} status:`, error);
-            }
-            
-            ws.send(JSON.stringify({ type: 'AUTH_SUCCESS', message: 'Authentication successful' }));
-            //console.log(`Node ${data.node_id} authenticated successfully`);
-
-            // Update info about node
-            updateNodeStatus(data.node_id);
-          } else {
-            ws.send(JSON.stringify({ type: 'AUTH_FAILED', message: 'Invalid credentials' }));
-            console.log(`Authentication failed for node ${data.node_id}`);
-          }
-          break;
-          
-        case 'COMMAND_RESULT':
-          // Handle command results from storage client
-          // console.log(`Command result for ${data.command_id}: ${data.success ? 'SUCCESS' : 'FAILED'}`);
-          if (!data.success && data.error) {
-            console.error(`Command error: ${data.error}`);
-          }
-          
-          // Update storage node metrics for successful operations with storage impact
-          if (data.success && ws.nodeId && data.storage_delta !== undefined && data.storage_delta !== null) {
-            try {
-              const storageDelta = data.storage_delta;
-              const chunkDelta = storageDelta > 0 ? 1 : (storageDelta < 0 ? -1 : 0);
-              
-              if (storageDelta !== 0 || chunkDelta !== 0) {
-                const updateFields = {};
-                if (storageDelta !== 0) {
-                  updateFields.used_space = storageDelta;
-                }
-                if (chunkDelta !== 0) {
-                  updateFields.num_chunks = chunkDelta;
-                }
-                
-                await StorageNode.findOneAndUpdate(
-                  { node_id: ws.nodeId },
-                  { $inc: updateFields },
-                  { new: true }
-                );
-              }
-            } catch (error) {
-              console.error(`Error updating node ${ws.nodeId} metrics:`, error);
-            }
-          }
-          
-          // Store command result for any waiting requests
-          if (pendingCommands.has(data.command_id)) {
-            const resolve = pendingCommands.get(data.command_id);
-            pendingCommands.delete(data.command_id);
-            resolve(data);
-          }
-          break;
-          
-        case 'STATUS_REPORT':
-          // Handle status reports from storage client
-          //console.log(`Status report for ${data.command_id}:`, data.status);
-          if (data.status && ws.nodeId) {
-            // Update node status in database with fresh data
-            try {
-              await StorageNode.findOneAndUpdate(
-                { node_id: ws.nodeId },
-                {
-                  status: 'online',
-                  used_space: data.status.used_space_bytes || 0,
-                  total_available_space: data.status.max_space_bytes || 0,
-                  num_chunks: data.status.current_chunk_count || 0,
-                  last_seen: null
-                },
-                { new: true }
-              );
-              // console.log(`Node ${ws.nodeId} storage status updated from status report`);
-            } catch (error) {
-              console.error(`Error updating node ${ws.nodeId} storage status:`, error);
-            }
-          }
-          // Resolve any pending commands waiting for this status report
-          if (pendingCommands.has(data.command_id)) {
-            const resolve = pendingCommands.get(data.command_id);
-            pendingCommands.delete(data.command_id);
-            resolve(data);
-          }
-          break;
-          
-        default:
-          console.log('Unknown message type:', data.type);
-          break;
+      if (isBinary) {
+        // Handle binary message
+        await handleWebSocketBinary(message, ws);
+      } else {
+        // Handle text message
+        await handleWebSocketText(message.toString(), ws);
       }
     } catch (error) {
       console.error('WebSocket message error:', error);

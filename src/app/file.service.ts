@@ -38,7 +38,7 @@ export type DirectoryItem = {
 
 export class FileService {
   private apiUrl = this.getApiUrl();
-  private readonly CHUNK_SIZE = 8 * 1024 * 1024; // 8MB chunks
+  private readonly CHUNK_SIZE = 256 * 1024 * 1024; // 256MB chunks
   private readonly CONCURRENCY_LIMIT = 2;
   private directory = new BehaviorSubject<Directory | null>(null);
   private storageNodeId: string | null = null;
@@ -318,8 +318,7 @@ export class FileService {
         }
         
         const chunkSize = Math.min(this.CHUNK_SIZE, bufferSize);
-        const chunkData = new Uint8Array(chunkSize);
-        chunkData.set(buffer.subarray(0, chunkSize));
+        const chunkData = buffer.slice(0, chunkSize).buffer;
 
         // Remove next chunk from buffer
         if (bufferSize > chunkSize) {
@@ -334,7 +333,7 @@ export class FileService {
           try {
             const chunkId = this.cryptoService.generateUUID();
 
-            const { encryptedData, iv } = await this.cryptoService.encryptData(chunkData.buffer, fileIv);
+            const { encryptedData, iv } = await this.cryptoService.encryptData(chunkData, fileIv);
 
             if (currentChunkIndex === 0) {
               fileIv = iv;

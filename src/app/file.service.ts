@@ -158,7 +158,27 @@ export class FileService {
       throw error;
     }
   }
-  
+
+  private async updateDirectory(): Promise<void> {
+    if (!this.storageNodeId) {
+      throw new Error('Node ID not available');
+    }
+
+    const currentDirectory = this.directory.getValue();
+    if (!currentDirectory) {
+      throw new Error('Current directory is not initialized');
+    }
+
+    // Delete old directory metadata
+    await this.deleteChunk(currentDirectory.chunkId);
+
+    // Store updated directory metadata
+    await this.storeDirectory(currentDirectory);
+
+    // Update the local state
+    this.directory.next(currentDirectory);
+  }
+
   // Fetch directory metadata, decrypt it, and return it
   private async fetchDirectory(directoryChunkId: string): Promise<Directory> {
     if (!this.storageNodeId) {
@@ -255,8 +275,8 @@ export class FileService {
       // Remove the file from the directory
       currentDirectory.files.splice(fileIndex, 1);
       
-      // Update the local state
-      this.directory.next(currentDirectory);
+      // Update the directory metadata
+      await this.updateDirectory();
       
     } catch (error) {
       console.error(`Error deleting file ${fileToDelete.name}:`, error);
@@ -426,8 +446,8 @@ export class FileService {
       // Add file to directory
       currentDirectory.files.push(newFile);
       
-      // Update the local state
-      this.directory.next(currentDirectory);
+      // Update directory metadata
+      await this.updateDirectory();
 
     } catch (error) {
       console.error('Error during concurrent file upload:', error);

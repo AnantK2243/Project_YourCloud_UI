@@ -122,12 +122,16 @@ export class CryptoService {
     const hash = await crypto.subtle.digest('SHA-256', keyBuffer);
     const hashArray = new Uint8Array(hash);
     
-    // Convert to hex string and take first 32 characters for chunk ID
+    // Convert to hex string and take first 32 characters
     const hexString = Array.from(hashArray)
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
     
-    return hexString.substring(0, 32);
+    // Format as UUID to match other chunk IDs
+    const hex32 = hexString.substring(0, 32);
+    const uuid = `${hex32.substring(0, 8)}-${hex32.substring(8, 12)}-${hex32.substring(12, 16)}-${hex32.substring(16, 20)}-${hex32.substring(20, 32)}`;
+    
+    return uuid;
   }
 
   async encryptData(data: ArrayBuffer, iv?: Uint8Array): Promise<{ encryptedData: ArrayBuffer, iv: Uint8Array }> {

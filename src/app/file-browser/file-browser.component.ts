@@ -5,6 +5,7 @@ import { FileService, Directory, File } from '../file.service';
 import { AuthService } from '../auth.service';
 import { SessionHandlerService } from '../session-handler.service';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 
 // Simplified interface for display purposes
 interface DisplayItem {
@@ -24,7 +25,7 @@ interface PathSegment {
 @Component({
   selector: 'app-file-browser',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './file-browser.component.html'
 })
 export class FileBrowserComponent implements OnInit, OnDestroy {
@@ -34,10 +35,17 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
   directoryPath: PathSegment[] = [];
   loading: boolean = false;
   error: string = '';
+  validationError: string = '';
   initialized: boolean = false;
   uploadProgress: number = 0;
   isUploading: boolean = false;
   uploadStatus: string = '';
+  downloadProgress: number = 0;
+  isDownloading: boolean = false;
+  downloadStatus: string = '';
+  downloadingFileId: string = '';
+  isCreatingDirectory: boolean = false;
+  newDirectoryName: string = '';
 
   @ViewChild('fileInput') fileInput!: ElementRef<HTMLInputElement>;
 
@@ -93,6 +101,10 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
   formatDate(dateString: string | undefined): string {
     if (!dateString) return '';
     return new Date(dateString).toLocaleDateString();
+  }
+
+  getPath(): string {
+    return "/" + this.directoryPath.map(segment => segment.name).filter(name => name).join('/');
   }
 
   async initializeFileSystem() {
@@ -244,7 +256,180 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
     }
   }
 
+  async enterDirectory(item: DisplayItem): Promise<void> {
+    if (item.type !== 'directory') {
+      return;
+    }
+
+    try {
+      this.loading = true;
+      this.error = '';
+
+      await this.fileService.changeDirectory(item.chunkId);
+      
+      // Update breadcrumb path
+      this.directoryPath.push({ name: item.name, chunkId: item.chunkId });
+
+      // Force refresh the directory listing to ensure UI is updated
+      const currentDirectory = this.fileService.getCurrentDirectory();
+      if (currentDirectory) {
+        this.updateDirectoryListing(currentDirectory);
+      }
+
+    } catch (error: any) {
+      console.error('Navigation failed:', error);
+      
+      if (this.sessionHandler.checkAndHandleSessionError(error)) {
+        return;
+      }
+      
+      this.error = `Failed to open directory: ${error.message || 'Unknown error'}`;
+    } finally {
+      this.loading = false;
+    }
+  }
+  
+  async leaveDirectory(): Promise<void> {
+    // Can't leave if we're at the root directory or path is empty
+    if (this.directoryPath.length <= 1) {
+      return;
+    }
+
+    try {
+      this.loading = true;
+      this.error = '';
+
+      // Go to parent
+      await this.fileService.leaveDirectory();
+
+      // Update breadcrumb path by removing the last segment
+      this.directoryPath.pop();
+
+      // Force refresh the directory listing to ensure UI is updated
+      const currentDirectory = this.fileService.getCurrentDirectory();
+      if (currentDirectory) {
+        this.updateDirectoryListing(currentDirectory);
+      }
+
+    } catch (error: any) {
+      console.error('Navigation up failed:', error);
+      
+      if (this.sessionHandler.checkAndHandleSessionError(error)) {
+        return;
+      }
+      
+      this.error = `Failed to navigate up: ${error.message || 'Unknown error'}`;
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  async downloadItem(item: DisplayItem): Promise<void> {
+    // Only allow downloading files, not directories
+    if (item.type !== 'file') {
+      this.error = 'Cannot download directories';
+      return;
+    }
+
+    // Validate the item
+    if (!item.chunkId) {
+      this.error = 'Cannot download: Invalid item (missing chunk ID)';
+      return;
+    }
+
+    // Show loading state
+    this.isDownloading = true;
+    this.downloadProgress = 0;
+    this.downloadStatus = `Downloading ${item.name}...`;
+    this.downloadingFileId = item.chunkId;
+    this.error = '';
+
+    try {      
+      await this.fileService.downloadFileStream(item.chunkId, (progress) => {
+        this.downloadProgress = progress;
+      });
+      
+      this.downloadStatus = `Successfully downloaded ${item.name}`;
+
+      // Reset download state after 2 seconds
+      setTimeout(() => {
+        this.isDownloading = false;
+        this.downloadStatus = '';
+        this.downloadProgress = 0;
+        this.downloadingFileId = '';
+      }, 2000);
+
+    } catch (error: any) {
+      console.error('Download failed:', error);
+      
+      // Check if this is a session/authentication error
+      if (this.sessionHandler.checkAndHandleSessionError(error)) {
+        return;
+      }
+      
+      // Handle other errors normally
+      this.error = `Download failed: ${error.message || 'Unknown error'}`;
+      this.isDownloading = false;
+      this.downloadStatus = '';
+      this.downloadProgress = 0;
+      this.downloadingFileId = '';
+    }
+  }
+
   triggerFileUpload(): void {
     this.fileInput.nativeElement.click();
+  }
+
+  startCreatingDirectory(): void {
+    this.isCreatingDirectory = true;
+    this.newDirectoryName = '';
+    this.error = '';
+    this.validationError = '';
+  }
+
+  cancelCreateDirectory(): void {
+    this.isCreatingDirectory = false;
+    this.newDirectoryName = '';
+    this.validationError = '';
+  }
+
+  async createNewDirectory(): Promise<void> {
+    this.validationError = '';
+    
+    if (!this.newDirectoryName.trim()) {
+      this.validationError = 'Directory name cannot be empty';
+      return;
+    }
+
+    // Validate directory name (basic validation)
+    const invalidChars = /[<>:"/\\|?*]/;
+    if (invalidChars.test(this.newDirectoryName)) {
+      this.validationError = 'Directory name contains invalid characters';
+      return;
+    }
+
+    this.loading = true;
+    this.error = '';
+
+    try {
+      await this.fileService.createSubdirectory(this.newDirectoryName.trim());
+      
+      // Success - reset the form
+      this.isCreatingDirectory = false;
+      this.newDirectoryName = '';
+      
+    } catch (error: any) {
+      console.error('Failed to create directory:', error);
+      
+      // Check if this is a session/authentication error
+      if (this.sessionHandler.checkAndHandleSessionError(error)) {
+        return;
+      }
+      
+      // Handle other errors normally
+      this.error = `Failed to create directory: ${error.message || 'Unknown error'}`;
+    } finally {
+      this.loading = false;
+    }
   }
 }

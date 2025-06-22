@@ -16,6 +16,7 @@ export interface File {
 export interface Directory {
   chunkId: string;
   name: string;
+  parentId: string;
   files: File[];
   directories: Directory[]
 }
@@ -68,6 +69,11 @@ export class FileService {
     return this.directory.asObservable();
   }
 
+  // Get current directory value
+  getCurrentDirectory(): Directory | null {
+    return this.directory.getValue();
+  }
+
   async initializePage(password: string, nodeId: string): Promise<string> {
     // Initialize to the root directory on page load
     try {
@@ -79,7 +85,7 @@ export class FileService {
 
       if (wasInitialized) {
         // Create empty root directory
-        const newDirectory = await this.createDirectory("", directoryChunkId);
+        const newDirectory = await this.createDirectory("", "", directoryChunkId);
         this.directory.next(newDirectory);
 
         // Update the UI
@@ -112,16 +118,56 @@ export class FileService {
   }
 
   // Create an encrypted empty directory and return its metadata
-  async createDirectory(name: string, chunkID?: string): Promise<Directory> {
+  async createDirectory(name: string, parentId: string, chunkID?: string): Promise<Directory> {
     try {
       const directoryChunkId = chunkID || this.cryptoService.generateUUID();
-      const newDirectory: Directory = { chunkId: directoryChunkId, name, files: [], directories: [] };
+      const newDirectory: Directory = { 
+        chunkId: directoryChunkId, 
+        name, 
+        parentId: parentId, 
+        files: [], 
+        directories: [] 
+      };
 
+      // Store the subdirectory
       await this.storeDirectory(newDirectory);
 
       return newDirectory;
     } catch (error) {
       console.error('Error initializing directory:', error);
+      throw error;
+    }
+  }
+
+  // Create a subdirectory in the current directory
+  async createSubdirectory(name: string): Promise<void> {
+    if (!this.storageNodeId) {
+      throw new Error('Node ID not available');
+    }
+
+    const currentDirectory = this.directory.getValue();
+    if (!currentDirectory) {
+      throw new Error('Current directory is not initialized');
+    }
+
+    // Check if directory name already exists
+    const existingDir = currentDirectory.directories.find(d => d.name === name);
+    if (existingDir) {
+      throw new Error(`Directory "${name}" already exists`);
+    }
+
+    try {
+      // Create the new directory
+      const newDirectory = await this.createDirectory(name, currentDirectory.chunkId);
+
+      // Add the new directory to the current directory
+      currentDirectory.directories.push(newDirectory);
+
+      // Update the directory metadata
+      await this.updateDirectory();
+
+    } catch (error) {
+      console.error('Error creating subdirectory:', error);
       throw error;
     }
   }
@@ -175,8 +221,13 @@ export class FileService {
     // Store updated directory metadata
     await this.storeDirectory(currentDirectory);
 
-    // Update the local state
-    this.directory.next(currentDirectory);
+    // Update the local state with a deep copy to trigger observable
+    const updatedDirectory: Directory = {
+      ...currentDirectory,
+      directories: [...currentDirectory.directories],
+      files: [...currentDirectory.files]
+    };
+    this.directory.next(updatedDirectory);
   }
 
   // Fetch directory metadata, decrypt it, and return it
@@ -224,9 +275,6 @@ export class FileService {
       if (!directoryData.directories || !directoryData.files){
         throw new Error('Directory data invalid');
       }
-
-      // Update the UI
-      this.directory.next(directoryData);
       
       return directoryData;
     } catch (error: any) {
@@ -247,6 +295,34 @@ export class FileService {
       }
     }
   }
+
+  // Navigate into a directory
+  async changeDirectory(directoryChunkId: string): Promise<void> {
+    if (!this.storageNodeId) {
+      throw new Error('Node ID not available');
+    }
+
+    try {
+      // Fetch and decrypt the directory
+      const directory = await this.fetchDirectory(directoryChunkId);
+      
+      // Update the current directory
+      this.directory.next(directory);
+      
+    } catch (error) {
+      console.error('Error navigating to directory:', error);
+      throw error;
+    }
+  }
+
+  async leaveDirectory (): Promise<void> {
+    const currentDirectory = this.directory.getValue();
+    if (!currentDirectory) {
+      throw new Error('Current directory is not initialized');
+    }
+    await this.changeDirectory(currentDirectory.parentId);
+  }
+
 
   public async deleteFile(fileChunkId: string): Promise<void> {
     if (!this.storageNodeId) {
@@ -459,6 +535,95 @@ export class FileService {
       } catch (e) {
         console.warn('Could not release reader lock:', e);
       }
+    }
+  }
+
+  async downloadFileStream(fileChunkId: string, onProgress?: (progress: number) => void): Promise<void> {
+    if (!this.storageNodeId) {
+      throw new Error('Node ID not available');
+    }
+
+    const currentDirectory = this.directory.getValue();
+    if (!currentDirectory) {
+      throw new Error('Current directory is not initialized');
+    }
+
+    // Find the file to download
+    const file = currentDirectory.files.find(f => f.chunkId === fileChunkId);
+    if (!file) {
+      throw new Error('File not found in current directory');
+    }
+
+    try {
+      const downloadedChunks: ArrayBuffer[] = [];
+      let totalBytesDownloaded = 0;
+
+      // Download all data chunks that make up this file
+      for (let i = 0; i < file.fileChunks.length; i++) {
+        const dataChunkId = file.fileChunks[i];
+        
+        try {
+          // Download the encrypted chunk
+          const response = await this.http.get(
+            `${this.apiUrl}/chunks/get/${this.storageNodeId}/${dataChunkId}`,
+            { 
+              headers: this.getHeaders(),
+              responseType: 'arraybuffer'
+            }
+          ).toPromise();
+
+          if (!response || response.byteLength === 0) {
+            throw new Error(`No data received for chunk ${i + 1}`);
+          }
+
+          // Decrypt the chunk
+          const responseBuffer = new Uint8Array(response);
+          const iv = new Uint8Array(file.iv.match(/.{2}/g)!.map(byte => parseInt(byte, 16)));
+          const decryptedChunk = await this.cryptoService.decryptData(response, iv);
+          
+          downloadedChunks.push(decryptedChunk);
+          totalBytesDownloaded += decryptedChunk.byteLength;
+
+          // Update progress
+          if (onProgress) {
+            const progress = Math.min(100, ((i + 1) / file.fileChunks.length) * 100);
+            onProgress(progress);
+          }
+
+        } catch (error) {
+          console.error(`Error downloading chunk ${i + 1}:`, error);
+          throw new Error(`Failed to download chunk ${i + 1}: ${error}`);
+        }
+      }
+
+      // Combine all chunks into a single file
+      const totalSize = downloadedChunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+      const combinedData = new Uint8Array(totalSize);
+      let offset = 0;
+
+      for (const chunk of downloadedChunks) {
+        combinedData.set(new Uint8Array(chunk), offset);
+        offset += chunk.byteLength;
+      }
+
+      // Create blob and trigger download
+      const blob = new Blob([combinedData], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      
+      // Create temporary download link
+      const downloadLink = document.createElement('a');
+      downloadLink.href = url;
+      downloadLink.download = file.name;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      
+      // Cleanup
+      document.body.removeChild(downloadLink);
+      URL.revokeObjectURL(url);
+
+    } catch (error) {
+      console.error(`Error downloading file ${file.name}:`, error);
+      throw error;
     }
   }
 }

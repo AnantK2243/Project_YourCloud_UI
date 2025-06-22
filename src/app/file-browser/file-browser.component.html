@@ -8,16 +8,43 @@
   <!-- File Upload Section -->
   <div *ngIf="initialized && !loading && !error">
     <input 
-    type="file" 
-    id="fileInput" 
-    #fileInput
-    (change)="onFileSelected($event)" 
-    style="display: none;"
-    [disabled]="isUploading"
+      type="file" 
+      id="fileInput" 
+      #fileInput
+      (change)="onFileSelected($event)" 
+      style="display: none;"
+      [disabled]="isUploading"
     />
     <button (click)="triggerFileUpload()" [disabled]="isUploading">
       {{ isUploading ? 'Uploading...' : 'Upload File' }}
     </button>
+    
+    <!-- Create Directory Button -->
+    <button 
+      (click)="startCreatingDirectory()" 
+      [disabled]="isUploading || isCreatingDirectory">
+      Create Directory
+    </button>
+    
+    <!-- Directory Creation Form -->
+    <div *ngIf="isCreatingDirectory">
+      <input 
+        type="text" 
+        [(ngModel)]="newDirectoryName"
+        placeholder="Enter directory name"
+        (keyup.enter)="createNewDirectory()"
+        (input)="validationError = ''"
+      />
+      <button (click)="createNewDirectory()" [disabled]="loading">
+        {{ loading ? 'Creating...' : 'Create' }}
+      </button>
+      <button (click)="cancelCreateDirectory()" [disabled]="loading">
+        Cancel
+      </button>
+      <div *ngIf="validationError">
+        {{ validationError }}
+      </div>
+    </div>
     
     <!-- Upload Progress -->
     <div *ngIf="isUploading">
@@ -25,12 +52,21 @@
       <div>{{ uploadProgress }}%</div>
     </div>
 
+    <!-- Download Progress -->
+    <div *ngIf="isDownloading">
+      <div>{{ downloadStatus }}</div>
+      <div>{{ downloadProgress }}%</div>
+    </div>
+
     <!-- Breadcrumb Navigation -->
     <div *ngIf="initialized">
-      <ng-container *ngFor="let segment of directoryPath; let i = index; let last = last">
-        {{ segment.name }}<span>/</span>
-      </ng-container>
+      <span>Path: </span> {{ getPath() }}
     </div>
+
+    <!-- Go to parent -->
+    <button (click)="leaveDirectory()" [disabled]="loading">
+      Back
+    </button>
 
     <!-- Show Page Status -->
     <div *ngIf="loading">
@@ -52,21 +88,39 @@
       <li *ngFor="let item of directoryListing">
         <div>
           <div>
-            <span>{{ item.type }} - {{ item.name }}</span>
+            <span *ngIf="item.type === 'directory'">
+              {{item.type }} - {{ item.name }}
+            </span>
+            <span *ngIf="item.type === 'file'">
+              {{item.type }} - {{ item.name }}
+            </span>
             <div *ngIf="item.type === 'file'">
               <span>{{ formatFileSize(item.size) }} - {{ formatDate(item.createdAt) }}</span>
             </div>
           </div>
-          <div>
+          <div *ngIf="item.type === 'file'">
+            <button 
+              (click)="downloadItem(item)" 
+              [disabled]="loading || isDownloading"
+              title="Download">
+              {{ (isDownloading && downloadingFileId === item.chunkId) ? 'Downloading...' : 'Download' }}
+            </button>
             <button 
               (click)="deleteItem(item)" 
-              [disabled]="loading"
+              [disabled]="loading || isDownloading"
               title="Delete">
               {{ loading ? 'Deleting...' : 'Delete' }}
+            </button>
+          </div>
+          <div *ngIf="item.type === 'directory'">
+            <button
+              (click)="enterDirectory(item)"
+              [disabled]="loading || isDownloading"
+              title="Navigate to Directory">
+              Enter
             </button>
           </div>
         </div>
       </li>
     </ul>
   </div>
-</div>

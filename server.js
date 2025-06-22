@@ -616,6 +616,26 @@ app.post('/api/register-node', authenticateToken, async (req, res) => {
 
     await node.save();
 
+    // Set timeout to delete node if it doesn't connect within 1 hour
+    setTimeout(async () => {
+      try {
+        // Check if node still exists and is offline
+        const nodeCheck = await StorageNode.findOne({ node_id });
+        if (nodeCheck && nodeCheck.status === 'offline' && nodeCheck.last_seen === null) {
+          // Node never connected, remove it from database
+          await StorageNode.deleteOne({ node_id });
+          
+          // Remove node_id from user's storage_nodes array
+          await User.findByIdAndUpdate(
+            req.user.userId,
+            { $pull: { storage_nodes: node_id } }
+          );
+        }
+      } catch (error) {
+        console.error('Error cleaning up unconnected node:', error);
+      }
+    }, 60 * 60 * 1000); // 1 hour in milliseconds
+
     // Add the node_id to the user's storage_nodes array
     await User.findByIdAndUpdate(
       req.user.userId,

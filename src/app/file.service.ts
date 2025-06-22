@@ -74,6 +74,29 @@ export class FileService {
     return this.directory.getValue();
   }
 
+  // Generate a unique chunk ID with retry logic to avoid duplicates
+  private async generateUniqueChunkId(maxRetries: number = 10): Promise<string> {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const chunkId = this.cryptoService.generateUUID();
+      
+      try {
+        // Check if chunk already exists
+        const response = await this.http.get(
+          `${this.apiUrl}/chunks/chunk-avail/${this.storageNodeId}/${chunkId}`,
+          { headers: this.getHeaders() }
+        ).toPromise() as { success: boolean, chunk_id: string, available: boolean };
+
+        if (response.success && response.available) {
+          return chunkId; // Chunk doesn't exist
+        }
+      } catch (error: any) {
+        console.error('Error checking chunk existence:', error);
+        throw error;
+      }
+    }
+    throw new Error(`Failed to generate unique chunk ID after ${maxRetries} attempts`);
+  }
+
   async initializePage(password: string, nodeId: string): Promise<string> {
     // Initialize to the root directory on page load
     try {
@@ -120,7 +143,8 @@ export class FileService {
   // Create an encrypted empty directory and return its metadata
   async createDirectory(name: string, parentId: string, chunkID?: string): Promise<Directory> {
     try {
-      const directoryChunkId = chunkID || this.cryptoService.generateUUID();
+      const directoryChunkId = chunkID ?  chunkID : await this.generateUniqueChunkId();
+
       const newDirectory: Directory = { 
         chunkId: directoryChunkId, 
         name, 
@@ -364,7 +388,7 @@ export class FileService {
     }
 
     const newFile: File = {
-      chunkId: this.cryptoService.generateUUID(),
+      chunkId: await this.generateUniqueChunkId(),
       name: browserFile.name,
       size: browserFile.size,
       createdAt: new Date().toISOString(),
@@ -426,7 +450,7 @@ export class FileService {
         const currentChunkIndex = chunkIndex;
         const uploadTask = async (): Promise<{ index: number, chunkId: string }> => {
           try {
-            const chunkId = this.cryptoService.generateUUID();
+            const chunkId = await this.generateUniqueChunkId();
 
             const { encryptedData, iv } = await this.cryptoService.encryptData(chunkData, fileIv);
 

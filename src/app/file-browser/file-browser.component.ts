@@ -238,7 +238,8 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
       } else if (item.type === 'directory') {
         const result = await this.fileService.deleteDirectory(item.chunkId);
         if (!result.success) {
-          this.validationError = result.message || 'Failed to delete directory';
+          alert(result.message || 'Failed to delete directory');
+          this.loading = false;
           return;
         }
       }

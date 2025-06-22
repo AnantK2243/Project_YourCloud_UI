@@ -735,6 +735,43 @@ app.get('/api/node/:nodeId/initialize-root', authenticateToken, async (req, res)
   }
 });
 
+// Check chunk availability
+app.get('/api/chunks/chunk-avail/:nodeId/:chunkId', authenticateToken, async (req, res) => {
+  try {
+    const { nodeId, chunkId } = req.params;
+
+    // Validate user owns this storage node
+    await validateUserOwnsNode(req.user.userId, nodeId);
+
+    const command = {
+      command_type: 'CHECK_CHUNK',
+      chunk_id: chunkId
+    };
+
+    if (!command.chunk_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'chunk_id query parameter is required'
+      });
+    }
+
+    const result = await sendStorageNodeCommand(nodeId, command);
+
+    res.json({
+      success: true,
+      chunk_id: command.chunk_id,
+      available: !result.chunk_exists
+    });
+
+  } catch (error) {
+    console.error('Error checking chunk availability:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Store chunk endpoint
 app.post('/api/chunks/store/:nodeId/:chunkId', authenticateToken, async (req, res) => {
   try {
@@ -975,7 +1012,7 @@ async function handleWebSocketText(message, ws) {
         resolve(data);
       }
       break;
-      
+
     default:
       console.log('Unknown message type:', data.type);
       break;

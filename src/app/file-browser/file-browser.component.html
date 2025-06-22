@@ -108,7 +108,7 @@
             <button 
               (click)="deleteItem(item)" 
               [disabled]="loading || isDownloading"
-              title="Delete">
+              title="Delete File">
               {{ loading ? 'Deleting...' : 'Delete' }}
             </button>
           </div>
@@ -118,6 +118,12 @@
               [disabled]="loading || isDownloading"
               title="Navigate to Directory">
               Enter
+            </button>
+            <button 
+              (click)="deleteItem(item)" 
+              [disabled]="loading || isDownloading"
+              title="Delete Directory">
+              {{ loading ? 'Deleting...' : 'Delete' }}
             </button>
           </div>
         </div>

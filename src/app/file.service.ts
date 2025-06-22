@@ -323,58 +323,6 @@ export class FileService {
     await this.changeDirectory(currentDirectory.parentId);
   }
 
-
-  public async deleteFile(fileChunkId: string): Promise<void> {
-    if (!this.storageNodeId) {
-      throw new Error('Node ID not available');
-    }
-    
-    const currentDirectory = this.directory.getValue();
-    if (!currentDirectory) {
-      throw new Error('Current directory is not initialized');
-    }
-
-    // Find the file to delete
-    const fileIndex = currentDirectory.files.findIndex(file => file.chunkId === fileChunkId);
-    if (fileIndex === -1) {
-      throw new Error('File not found in current directory');
-    }
-
-    const fileToDelete = currentDirectory.files[fileIndex];
-    
-    try {
-      // Delete all data chunks that make up this file
-      for (const dataChunkId of fileToDelete.fileChunks) {
-        await this.deleteChunk(dataChunkId);
-      }
-
-      // Remove the file from the directory
-      currentDirectory.files.splice(fileIndex, 1);
-      
-      // Update the directory metadata
-      await this.updateDirectory();
-      
-    } catch (error) {
-      console.error(`Error deleting file ${fileToDelete.name}:`, error);
-      throw error;
-    }
-  }
-
-  public async deleteChunk(chunkId: string): Promise<void> {
-    if (!this.storageNodeId) {
-      throw new Error('Node ID not available');
-    }
-    try {
-      await this.http.delete(
-        `${this.apiUrl}/chunks/delete/${this.storageNodeId}/${chunkId}`,
-        { headers: this.getHeaders() }
-      ).toPromise();
-    } catch (error) {
-      console.error(`Error deleting chunk ${chunkId}:`, error);
-      throw error;
-    }
-  }
-
   // Get list of files and directories in the current directory
   async getDirectoryFiles(): Promise<DirectoryItem[]> {
     const currentDirectory = this.directory.getValue();
@@ -623,6 +571,104 @@ export class FileService {
 
     } catch (error) {
       console.error(`Error downloading file ${file.name}:`, error);
+      throw error;
+    }
+  }
+
+  public async deleteChunk(chunkId: string): Promise<void> {
+    if (!this.storageNodeId) {
+      throw new Error('Node ID not available');
+    }
+    try {
+      await this.http.delete(
+        `${this.apiUrl}/chunks/delete/${this.storageNodeId}/${chunkId}`,
+        { headers: this.getHeaders() }
+      ).toPromise();
+    } catch (error) {
+      console.error(`Error deleting chunk ${chunkId}:`, error);
+      throw error;
+    }
+  }
+
+  public async deleteFile(fileChunkId: string): Promise<void> {
+    if (!this.storageNodeId) {
+      throw new Error('Node ID not available');
+    }
+    
+    const currentDirectory = this.directory.getValue();
+    if (!currentDirectory) {
+      throw new Error('Current directory is not initialized');
+    }
+
+    // Find the file to delete
+    const fileIndex = currentDirectory.files.findIndex(file => file.chunkId === fileChunkId);
+    if (fileIndex === -1) {
+      throw new Error('File not found in current directory');
+    }
+
+    const fileToDelete = currentDirectory.files[fileIndex];
+    
+    try {
+      // Delete all data chunks that make up this file
+      for (const dataChunkId of fileToDelete.fileChunks) {
+        await this.deleteChunk(dataChunkId);
+      }
+
+      // Remove the file from the directory
+      currentDirectory.files.splice(fileIndex, 1);
+      
+      // Update the directory metadata
+      await this.updateDirectory();
+      
+    } catch (error) {
+      console.error(`Error deleting file ${fileToDelete.name}:`, error);
+      throw error;
+    }
+  }
+
+  public async deleteDirectory(directoryChunkId: string): Promise<{success: boolean, message?: string}> {
+    if (!this.storageNodeId) {
+      throw new Error('Node ID not available');
+    }
+    
+    const currentDirectory = this.directory.getValue();
+    if (!currentDirectory) {
+      throw new Error('Current directory is not initialized');
+    }
+
+    // Find the directory to delete
+    const directoryIndex = currentDirectory.directories.findIndex(dir => dir.chunkId === directoryChunkId);
+    if (directoryIndex === -1) {
+      throw new Error('Directory not found in current directory');
+    }
+
+    const directoryToDelete = currentDirectory.directories[directoryIndex];
+    
+    try {
+      // First, fetch the directory to check if it's empty
+      const targetDirectory = await this.fetchDirectory(directoryChunkId);
+      
+      // Check if directory is empty
+      if (targetDirectory.files.length > 0 || targetDirectory.directories.length > 0) {
+        return {
+          success: false,
+          message: `Cannot delete "${directoryToDelete.name}": Directory is not empty. Please delete all files and subdirectories first.`
+        };
+      }
+      
+      // Delete the directory chunk from storage
+      await this.deleteChunk(directoryChunkId);
+      
+      // Remove the directory from the parent directory
+      currentDirectory.directories.splice(directoryIndex, 1);
+      
+      // Update the parent directory metadata
+      await this.updateDirectory();
+      
+      return { success: true };
+      
+    } catch (error) {
+      console.error(`Error deleting directory ${directoryToDelete.name}:`, error);
       throw error;
     }
   }

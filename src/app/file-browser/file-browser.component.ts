@@ -229,18 +229,26 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
     // Show loading state
     this.loading = true;
     this.error = '';
+    this.validationError = '';
 
     try {      
-      // Call the delete API for files
+      // Call the appropriate delete method
       if (item.type === 'file') {
         await this.fileService.deleteFile(item.chunkId);
-      } else {
-        // For directories, use the existing deleteChunk method
-        await this.fileService.deleteChunk(item.chunkId);
+      } else if (item.type === 'directory') {
+        const result = await this.fileService.deleteDirectory(item.chunkId);
+        if (!result.success) {
+          this.validationError = result.message || 'Failed to delete directory';
+          return;
+        }
       }
-          
-      // Refresh the directory listing to reflect the deletion
-      await this.initializeFileSystem();
+      
+      // Refresh the current directory listing after successful deletion
+      const currentDirectory = this.fileService.getCurrentDirectory();
+      if (currentDirectory) {
+        this.updateDirectoryListing(currentDirectory);
+      }
+      
     } catch (error: any) {
       console.error('Delete failed:', error);
       

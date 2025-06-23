@@ -39,7 +39,7 @@ export type DirectoryItem = {
 
 export class FileService {
   private apiUrl = this.getApiUrl();
-  private readonly CHUNK_SIZE = 256 * 1024 * 1024; // 256MB chunks
+  private readonly CHUNK_SIZE = 64 * 1024 * 1024; // 64MB chunks
   private readonly CONCURRENCY_LIMIT = 2;
   private directory = new BehaviorSubject<Directory | null>(null);
   private storageNodeId: string | null = null;

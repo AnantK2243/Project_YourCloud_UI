@@ -1,5 +1,5 @@
 services:
-  yourcloud-ui:
+  project-yourcloud.me:
     build: 
       context: .
       dockerfile: Dockerfile
@@ -24,7 +24,7 @@ services:
       - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
     restart: unless-stopped
     depends_on:
-      - yourcloud-ui
+      - project-yourcloud.me
     networks:
       - yourcloud-network
     profiles:

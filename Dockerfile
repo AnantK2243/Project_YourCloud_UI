@@ -25,6 +25,7 @@ RUN npm install --only=production
 COPY --from=angular-builder /app/dist ./dist
 
 # Copy backend server and environment files
+COPY ./src ./src
 COPY server.js .
 COPY .env .
 

@@ -120,16 +120,20 @@ export class CryptoService {
     // Export the key and use it to generate a deterministic chunk ID
     const keyBuffer = await crypto.subtle.exportKey('raw', derivedKey);
     const hash = await crypto.subtle.digest('SHA-256', keyBuffer);
+    
     const hashArray = new Uint8Array(hash);
     
-    // Convert to hex string and take first 32 characters
-    const hexString = Array.from(hashArray)
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
+    // Create UUID v4 format with proper version and variant bits
+    const hex = Array.from(hashArray).map(b => b.toString(16).padStart(2, '0')).join('');
     
-    // Format as UUID to match other chunk IDs
-    const hex32 = hexString.substring(0, 32);
-    const uuid = `${hex32.substring(0, 8)}-${hex32.substring(8, 12)}-${hex32.substring(12, 16)}-${hex32.substring(16, 20)}-${hex32.substring(20, 32)}`;
+    // Format as proper UUID v4
+    const uuid = [
+      hex.substring(0, 8),
+      hex.substring(8, 12),
+      '4' + hex.substring(12, 15), // Version 4: '4' + 3 chars = 4 chars total
+      ((parseInt(hex.substring(16, 17), 16) & 0x3) | 0x8).toString(16) + hex.substring(17, 20), // Variant bits
+      hex.substring(20, 32)
+    ].join('-');
     
     return uuid;
   }

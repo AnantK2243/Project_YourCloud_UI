@@ -20,9 +20,45 @@ export class RegisterComponent {
 
   constructor(private authService: AuthService, private router: Router) {}
 
+  // Email validation
+  private isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
+
+  // Strong password validation
+  private isStrongPassword(password: string): boolean {
+    return (
+      password.length >= 8 &&
+      /(?=.*[a-z])/.test(password) &&
+      /(?=.*[A-Z])/.test(password) &&
+      /(?=.*\d)/.test(password)
+    );
+  }
+
   onRegister() {
+    // Clear previous messages
+    this.errorMessage = '';
+    this.successMessage = '';
+
     if (!this.name || !this.email || !this.password || !this.confirmPassword) {
       this.errorMessage = 'Please fill in all fields';
+      return;
+    }
+
+    // Enhanced validation
+    if (this.name.length < 2 || this.name.length > 50) {
+      this.errorMessage = 'Name must be between 2 and 50 characters';
+      return;
+    }
+
+    if (!/^[a-zA-Z\s'-]+$/.test(this.name)) {
+      this.errorMessage = 'Name contains invalid characters';
+      return;
+    }
+
+    if (!this.isValidEmail(this.email)) {
+      this.errorMessage = 'Please enter a valid email address';
       return;
     }
 
@@ -31,8 +67,9 @@ export class RegisterComponent {
       return;
     }
 
-    if (this.password.length < 6) {
-      this.errorMessage = 'Password must be at least 6 characters long';
+    if (!this.isStrongPassword(this.password)) {
+      this.errorMessage =
+        'Password must be at least 8 characters and contain uppercase, lowercase, and numeric characters';
       return;
     }
 

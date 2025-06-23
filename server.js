@@ -100,76 +100,64 @@ async function updateNodeStatus(nodeId) {
     const isConnected = ws && ws.readyState === WebSocket.OPEN;
     
     if (isConnected) {
-      const statusCommand = {
-        command_type: 'STATUS_REQUEST',
-        command_id: generateCommandId()
-      };
+      try {
+        // Request fresh status from storage node
+        const result = await sendStorageNodeCommand(nodeId, {
+          command_type: 'STATUS_REQUEST'
+        });
 
-      // Send status request and handle response in background
-      pendingCommands.set(statusCommand.command_id, (result) => {
         if (result.type === 'STATUS_REPORT' && result.status) {
-          StorageNode.findOneAndUpdate(
-            { node_id: nodeId },
-            {
-              status: 'online',
-              used_space: result.status.used_space_bytes || 0,
-              total_available_space: result.status.max_space_bytes || 0,
-              num_chunks: result.status.current_chunk_count || 0,
-              last_seen: null
-            },
-            { new: true }
-          ).catch((error) => {
-            console.error(`Error updating node ${nodeId} database:`, error);
-          });
+          // Return the fresh status data (DB already updated by STATUS_REPORT handler)
+          return {
+            status: 'online',
+            node_id: nodeId,
+            used_space_bytes: result.status.used_space_bytes || 0,
+            max_space_bytes: result.status.max_space_bytes || 0,
+            available_space_bytes: (result.status.max_space_bytes || 0) - (result.status.used_space_bytes || 0),
+            current_chunk_count: result.status.current_chunk_count || 0,
+            last_seen: null
+          };
         } else {
-          console.log(`Node ${nodeId} status request failed but node is still appears online`);
-          StorageNode.findOneAndUpdate(
-            { node_id: nodeId },
-            {
-              status: 'online',
-              last_seen: null
-            },
-            { new: true }
-          ).catch((error) => {
-            console.error(`Error updating node ${nodeId} status to online:`, error);
-          });
+          // Status request succeeded but didn't get proper data
+          return {
+            status: 'online',
+            node_id: nodeId,
+            used_space_bytes: 0,
+            max_space_bytes: 0,
+            available_space_bytes: 0,
+            current_chunk_count: 0,
+            last_seen: null
+          };
         }
-      });
-
-      // Set timeout for status request
-      setTimeout(() => {
-        if (pendingCommands.has(statusCommand.command_id)) {
-          pendingCommands.delete(statusCommand.command_id);
-          console.log(`Status request timeout for node ${nodeId} but node is still online`);
-          StorageNode.findOneAndUpdate(
-            { node_id: nodeId },
-            {
-              status: 'online',
-              last_seen: null
-            },
-            { new: true }
-          ).catch((error) => {
-            console.error(`Error updating node ${nodeId} status after timeout:`, error);
-          });
-        }
-      }, 1000); // 1 second timeout
-
-      // Send the command
-      ws.send(JSON.stringify(statusCommand));
-
-      // Return immediately without waiting for response
-      return {
-        status: 'online',
-        node_id: nodeId
-      };
+      } catch (statusError) {
+        // Status request failed but node is still connected
+        console.log(`Node ${nodeId} status request failed but node appears online:`, statusError.message);
+        return {
+          status: 'online',
+          node_id: nodeId,
+          used_space_bytes: 0,
+          max_space_bytes: 0,
+          available_space_bytes: 0,
+          current_chunk_count: 0,
+          last_seen: null
+        };
+      }
     } else {
-      // Node is not connected
-      const nodeInDb = await StorageNode.findOne({ node_id: nodeId });
+      // Node is not connected - get cached data from database
+      const nodeInDb = await StorageNode.findOneAndUpdate(
+        { node_id: nodeId },
+        { status: 'offline', last_seen: new Date() },
+        { new: true }
+      );
 
       return {
         status: 'offline',
         node_id: nodeId,
-        last_seen: nodeInDb.last_seen
+        used_space_bytes: nodeInDb?.used_space || 0,
+        max_space_bytes: nodeInDb?.total_available_space || 0,
+        available_space_bytes: Math.max(0, (nodeInDb?.total_available_space || 0) - (nodeInDb?.used_space || 0)),
+        current_chunk_count: nodeInDb?.num_chunks || 0,
+        last_seen: nodeInDb?.last_seen || new Date()
       };
     }
   } catch (error) {
@@ -539,33 +527,38 @@ app.post('/api/login', async (req, res) => {
 });
 
 // Storage Node Status Check
-app.post('/api/check-status', async (req, res) => {
+app.get('/api/check-status/:nodeId', authenticateToken, async (req, res) => {
   try {
-    const { node_id } = req.body;
+    const { nodeId } = req.params;
     
-    if (!node_id) {
+    if (!nodeId) {
       return res.status(400).json({
         success: false,
-        error: 'node_id is required'
+        error: 'nodeId parameter is required'
       });
     }
-    
-    const nodeStatus = await updateNodeStatus(node_id);
+
+    const nodeStatus = await updateNodeStatus(nodeId);
     
     if (!nodeStatus) {
       return res.status(500).json({
         success: false,
-        error: `Failed to update status for node ${node_id}`
+        error: `Failed to get status for node ${nodeId}`
       });
     }
 
-    return res.json({
+    res.json({
       success: true,
-      node_id,
+      node_id: nodeId,
+      used_space_bytes: nodeStatus.used_space_bytes,
+      max_space_bytes: nodeStatus.max_space_bytes,
+      available_space_bytes: nodeStatus.max_space_bytes - nodeStatus.used_space_bytes,
+      current_chunk_count: nodeStatus.current_chunk_count,
       node_status: nodeStatus
     });
-    
+
   } catch (error) {
+    console.error('Error getting storage status:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -1009,7 +1002,7 @@ async function handleWebSocketText(message, ws) {
       if (pendingCommands.has(data.command_id)) {
         const resolve = pendingCommands.get(data.command_id);
         pendingCommands.delete(data.command_id);
-        resolve(data);
+        resolve({ ...data, success: true });
       }
       break;
 

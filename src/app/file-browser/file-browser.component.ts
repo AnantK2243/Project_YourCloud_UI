@@ -35,7 +35,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
   directoryPath: PathSegment[] = [];
   loading: boolean = false;
   error: string = '';
-  validationError: string = '';
+  warning: string = '';
   initialized: boolean = false;
   uploadProgress: number = 0;
   isUploading: boolean = false;
@@ -109,7 +109,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 
   async initializeFileSystem() {
     this.loading = true;
-    this.error = '';
+    this.clearMessages();
     this.initialized = false;
 
     try {
@@ -143,6 +143,10 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
   }
 
   private updateDirectoryListing(directory: Directory): void {
+    // Clear warnings and errors
+    this.warning = '';
+    this.error = '';
+
     const directoryItems: DisplayItem[] = directory.directories.map(dir => ({
       type: 'directory',
       name: dir.name,
@@ -176,12 +180,24 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.isUploading = true;
-    this.uploadProgress = 0;
-    this.uploadStatus = `Uploading ${browserFile.name}...`;
-    this.error = '';
+    // Clear previous warnings and errors
+    this.clearMessages();
 
     try {
+      // Calculate total space needed for both file and directory metadata
+      const metadataSize = await this.fileService.estimateDirectoryMetadataSizeForFile(browserFile.name, browserFile.size);
+      const totalSpaceNeeded = browserFile.size + metadataSize;
+
+      // Check total space needed in one go
+      await this.fileService.checkStorageCapacity(totalSpaceNeeded, 'file upload and directory metadata');
+
+      // Only set upload UI state if storage check passes
+      this.isUploading = true;
+      this.uploadProgress = 0;
+      this.uploadStatus = `Uploading ${browserFile.name}...`;
+      this.error = ''; // Clear any previous errors
+      this.warning = ''; // Clear any previous warnings
+
       await this.fileService.uploadFileStream(browserFile, (progress) => {
         this.uploadProgress = progress;
       });
@@ -196,15 +212,31 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
       }, 1000);
 
     } catch (error: any) {
-      console.error('Upload failed:', error);
-      
       // Check if this is a session/authentication error
       if (this.sessionHandler.checkAndHandleSessionError(error)) {
         return;
       }
       
+      // Check if this is a storage space warning
+      if (error.isStorageWarning) {
+        const requiredSpace = (error.requiredSpace !== undefined && error.requiredSpace !== null) ? this.formatFileSize(error.requiredSpace) : 'unknown';
+        const availableSpace = (error.availableSpace !== undefined && error.availableSpace !== null) ? this.formatFileSize(error.availableSpace) : 'unknown';
+        const operationName = error.operationName || 'operation';
+        this.warning = `Insufficient storage space for ${operationName}. Required: ${requiredSpace}, Available: ${availableSpace}. Upload blocked.`;
+        
+        // Ensure upload state is reset for storage warnings
+        this.isUploading = false;
+        this.uploadStatus = '';
+        this.uploadProgress = 0;
+        return;
+      }
+      
+      console.error('Upload failed:', error);
+      
       // Handle other errors normally
       this.error = `Upload failed: ${error.message || 'Unknown error'}`;
+      
+      // Ensure upload state is reset on any error
       this.isUploading = false;
       this.uploadStatus = '';
       this.uploadProgress = 0;
@@ -229,7 +261,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
     // Show loading state
     this.loading = true;
     this.error = '';
-    this.validationError = '';
+    this.warning = '';
 
     try {      
       // Call the appropriate delete method
@@ -238,7 +270,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
       } else if (item.type === 'directory') {
         const result = await this.fileService.deleteDirectory(item.chunkId);
         if (!result.success) {
-          alert(result.message || 'Failed to delete directory');
+          this.warning = result.message || 'Failed to delete directory';
           this.loading = false;
           return;
         }
@@ -272,7 +304,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 
     try {
       this.loading = true;
-      this.error = '';
+      this.clearMessages();
 
       await this.fileService.changeDirectory(item.chunkId);
       
@@ -306,7 +338,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 
     try {
       this.loading = true;
-      this.error = '';
+      this.clearMessages();
 
       // Go to parent
       await this.fileService.leaveDirectory();
@@ -393,27 +425,23 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
     this.isCreatingDirectory = true;
     this.newDirectoryName = '';
     this.error = '';
-    this.validationError = '';
   }
 
   cancelCreateDirectory(): void {
     this.isCreatingDirectory = false;
     this.newDirectoryName = '';
-    this.validationError = '';
   }
 
   async createNewDirectory(): Promise<void> {
-    this.validationError = '';
-    
     if (!this.newDirectoryName.trim()) {
-      this.validationError = 'Directory name cannot be empty';
+      this.warning = 'Directory name cannot be empty';
       return;
     }
 
     // Validate directory name (basic validation)
     const invalidChars = /[<>:"/\\|?*]/;
     if (invalidChars.test(this.newDirectoryName)) {
-      this.validationError = 'Directory name contains invalid characters';
+      this.warning = 'Directory name contains invalid characters';
       return;
     }
 
@@ -421,6 +449,11 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
     this.error = '';
 
     try {
+      // Check storage space BEFORE attempting directory creation
+      const estimatedSize = await this.fileService.estimateDirectoryMetadataSize(this.newDirectoryName.trim());
+      await this.fileService.checkStorageCapacity(estimatedSize, 'directory metadata storage');
+
+      // Only proceed with directory creation if storage check passes
       await this.fileService.createSubdirectory(this.newDirectoryName.trim());
       
       // Success - reset the form
@@ -428,17 +461,37 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
       this.newDirectoryName = '';
       
     } catch (error: any) {
-      console.error('Failed to create directory:', error);
-      
       // Check if this is a session/authentication error
       if (this.sessionHandler.checkAndHandleSessionError(error)) {
         return;
       }
+      
+      // Check if this is a storage space warning
+      if (error.isStorageWarning) {
+        const requiredSpace = (error.requiredSpace !== undefined && error.requiredSpace !== null) ? this.formatFileSize(error.requiredSpace) : 'unknown';
+        const availableSpace = (error.availableSpace !== undefined && error.availableSpace !== null) ? this.formatFileSize(error.availableSpace) : 'unknown';
+        const operationName = error.operationName || 'directory creation';
+        this.warning = `Insufficient storage space for ${operationName}. Required: ${requiredSpace}, Available: ${availableSpace}. Directory creation cancelled.`;
+        return;
+      }
+      
+      console.error('Failed to create directory:', error);
       
       // Handle other errors normally
       this.error = `Failed to create directory: ${error.message || 'Unknown error'}`;
     } finally {
       this.loading = false;
     }
+  }
+
+  // Clear any warnings
+  clearWarnings(): void {
+    this.warning = '';
+  }
+
+  // Clear any errors and warnings
+  clearMessages(): void {
+    this.error = '';
+    this.warning = '';
   }
 }

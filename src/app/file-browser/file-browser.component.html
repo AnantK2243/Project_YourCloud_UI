@@ -33,7 +33,6 @@
         [(ngModel)]="newDirectoryName"
         placeholder="Enter directory name"
         (keyup.enter)="createNewDirectory()"
-        (input)="validationError = ''"
       />
       <button (click)="createNewDirectory()" [disabled]="loading">
         {{ loading ? 'Creating...' : 'Create' }}
@@ -41,9 +40,6 @@
       <button (click)="cancelCreateDirectory()" [disabled]="loading">
         Cancel
       </button>
-      <div *ngIf="validationError">
-        {{ validationError }}
-      </div>
     </div>
     
     <!-- Upload Progress -->
@@ -129,4 +125,9 @@
         </div>
       </li>
     </ul>
+  </div>
+
+  <!-- Non-critical errors/warnings -->
+  <div *ngIf="warning">
+    {{ warning }}
   </div>

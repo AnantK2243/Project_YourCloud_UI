@@ -44,7 +44,7 @@ export class DashboardComponent implements OnInit {
 
   private getApiUrl(): string {
     if (typeof window !== 'undefined') {
-      return `${window.location.origin}/api`;
+      return `${window.location.origin}`;
     }
     return 'https://localhost:4200/api';
   }
@@ -95,9 +95,7 @@ export class DashboardComponent implements OnInit {
       this.nodeStatusResult = null;
 
       const response: any = await lastValueFrom(
-        this.http.post(`${this.getApiUrl()}/check-status`, {
-          node_id: this.nodeId.trim(),
-        })
+        this.http.get(`${this.getApiUrl()}/api/check-status/${this.nodeId.trim()}`)
       );
 
       if (response.success) {

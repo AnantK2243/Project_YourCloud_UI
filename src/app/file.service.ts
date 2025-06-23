@@ -224,7 +224,7 @@ export class FileService {
         }
       ).toPromise();
     } catch (error: any) {
-      console.error('Error storing directory metadata:', error);
+      console.error(`Error uploading chunk:`, error);
       throw error;
     }
   }
@@ -372,6 +372,31 @@ export class FileService {
     return [...directoryItems, ...fileItems];
   }
 
+  // Check if there's enough storage space for the given data size
+  async checkStorageCapacity(requiredBytes: number, operationName: string = 'operation'): Promise<void> {
+    try {
+      const storageStatus = await this.checkSpaceAvailability();
+
+      if (requiredBytes > storageStatus.available_space_bytes) {
+        const storageError = new Error();
+        storageError.name = 'StorageSpaceWarning';
+        storageError.message = 'Insufficient storage space';
+        (storageError as any).isStorageWarning = true;
+        (storageError as any).availableSpace = storageStatus.available_space_bytes;
+        (storageError as any).requiredSpace = requiredBytes;
+        (storageError as any).operationName = operationName;
+        throw storageError;
+      }      
+    } catch (error) {
+      // If it's already a storage warning, re-throw it
+      if ((error as any).isStorageWarning) {
+        throw error;
+      }
+      // If storage status check failed, log warning but continue (best effort)
+      console.warn(`Could not check storage space before ${operationName}:`, error);
+    }
+  }
+
   // Upload a file to the current directory with controlled concurrency
   async uploadFileStream(browserFile: globalThis.File, onProgress?: (progress: number) => void): Promise<void> {
     if (!this.storageNodeId) {
@@ -466,7 +491,7 @@ export class FileService {
             ).toPromise();
 
             return { index: currentChunkIndex, chunkId };
-          } catch (error) {
+          } catch (error: any) {
             console.error(`Error uploading chunk ${currentChunkIndex}:`, error);
             throw error;
           }
@@ -695,5 +720,111 @@ export class FileService {
       console.error(`Error deleting directory ${directoryToDelete.name}:`, error);
       throw error;
     }
+  }
+
+  // Check storage space availability
+  private async checkSpaceAvailability(): Promise<{
+    used_space_bytes: number;
+    max_space_bytes: number;
+    available_space_bytes: number;
+    current_chunk_count: number;
+  }> {
+    if (!this.storageNodeId) {
+      throw new Error('Node ID not available');
+    }
+
+    const response = await this.http.get(
+      `${this.apiUrl}/check-status/${this.storageNodeId}`,
+      { headers: this.getHeaders() }
+    ).toPromise() as any;
+
+    if (!response || !response.success) {
+      throw new Error('Failed to get storage status');
+    }
+
+    return {
+      used_space_bytes: response.used_space_bytes,
+      max_space_bytes: response.max_space_bytes,
+      available_space_bytes: response.available_space_bytes,
+      current_chunk_count: response.current_chunk_count
+    };
+  }
+
+  // Estimate the size of directory metadata after adding a new subdirectory
+  async estimateDirectoryMetadataSize(newDirectoryName: string): Promise<number> {
+    const currentDirectory = this.directory.getValue();
+    if (!currentDirectory) {
+      throw new Error('Current directory is not initialized');
+    }
+
+    // Create a mock directory structure with the new subdirectory added
+    const mockDirectory = {
+      ...currentDirectory,
+      directories: [
+        ...currentDirectory.directories,
+        {
+          chunkId: 'temp-mock-dir-id-00000000-mock-uuid', // 36 characters like real UUID
+          name: newDirectoryName,
+          parentId: currentDirectory.chunkId,
+          files: [],
+          directories: []
+        }
+      ]
+    };
+    
+    // Calculate the size difference
+    const currentJsonString = JSON.stringify(currentDirectory);
+    const mockJsonString = JSON.stringify(mockDirectory);
+    
+    const currentSize = new TextEncoder().encode(currentJsonString).length;
+    const mockSize = new TextEncoder().encode(mockJsonString).length;
+    
+    // Calculate the difference + encryption overhead for the additional data
+    const sizeDifference = mockSize - currentSize;
+    const estimatedSize = sizeDifference + 128;
+    
+    return Math.max(estimatedSize, 200); // Minimum 200 bytes for any directory creation
+  }
+
+  // Estimate the size of directory metadata after adding a new file
+  async estimateDirectoryMetadataSizeForFile(fileName: string, fileSize: number): Promise<number> {
+    const currentDirectory = this.directory.getValue();
+    if (!currentDirectory) {
+      throw new Error('Current directory is not initialized');
+    }
+
+    // Calculate the number of chunks needed for this file size
+    const numChunks = Math.ceil(fileSize / this.CHUNK_SIZE);
+    // Generate mock chunk IDs that are the same length as real UUIDs (36 characters)
+    const mockChunks = Array.from({ length: numChunks }, (_, i) => `temp-chunk-id-${i.toString().padStart(8, '0')}-mock-uuid`);
+
+    // Create a mock file entry
+    const mockFile: File = {
+      chunkId: 'temp-mock-file-id-00000000-mock-uuid', // 36 characters like real UUID
+      name: fileName,
+      size: fileSize,
+      createdAt: new Date().toISOString(),
+      iv: 'temp-mock-iv-24-char-hex', // 24 characters like real IV hex string (12 bytes * 2)
+      fileChunks: mockChunks
+    };
+
+    // Create a mock directory structure with the new file added
+    const mockDirectory = {
+      ...currentDirectory,
+      files: [...currentDirectory.files, mockFile]
+    };
+
+    // Calculate the size difference more accurately
+    const currentJsonString = JSON.stringify(currentDirectory);
+    const mockJsonString = JSON.stringify(mockDirectory);
+    
+    const currentSize = new TextEncoder().encode(currentJsonString).length;
+    const mockSize = new TextEncoder().encode(mockJsonString).length;
+    
+    // Calculate the difference + encryption overhead for the additional data
+    const sizeDifference = mockSize - currentSize;
+    const estimatedSize = sizeDifference + 128;
+
+    return Math.max(estimatedSize, 300); // Minimum 300 bytes for any file addition
   }
 }

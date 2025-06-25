@@ -7,7 +7,7 @@
   
   <!-- File Upload Section -->
   <div *ngIf="initialized && !loading && !error">
-    <input 
+    <!-- <input 
       type="file" 
       id="fileInput" 
       #fileInput
@@ -17,7 +17,7 @@
     />
     <button (click)="triggerFileUpload()" [disabled]="isUploading">
       {{ isUploading ? 'Uploading...' : 'Upload File' }}
-    </button>
+    </button> -->
     
     <!-- Create Directory Button -->
     <button 
@@ -76,12 +76,12 @@
 
   <!-- Show Directory Content -->
   <div *ngIf="initialized && !loading && !error">
-    <div *ngIf="directoryListing.length === 0">
+    <div *ngIf="directoryList.length === 0">
       <p>This directory is empty.</p>
     </div>
 
-    <ul *ngIf="directoryListing.length > 0">
-      <li *ngFor="let item of directoryListing">
+    <ul *ngIf="directoryList.length > 0">
+      <li *ngFor="let item of directoryList">
         <div>
           <div>
             <span *ngIf="item.type === 'directory'">
@@ -95,12 +95,12 @@
             </div>
           </div>
           <div *ngIf="item.type === 'file'">
-            <button 
+            <!-- <button 
               (click)="downloadItem(item)" 
               [disabled]="loading || isDownloading"
               title="Download">
               {{ (isDownloading && downloadingFileId === item.chunkId) ? 'Downloading...' : 'Download' }}
-            </button>
+            </button> -->
             <button 
               (click)="deleteItem(item)" 
               [disabled]="loading || isDownloading"

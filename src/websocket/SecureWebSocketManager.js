@@ -164,11 +164,9 @@ class SecureWebSocketManager {
     }
   }
 
-  /**
-   * Set up event handlers for authenticated connection
-   */
+  // Set up event handlers for authenticated connection
   setupConnectionHandlers(ws, nodeId) {
-    // Handle messages (both text and binary)
+    // Handle messages
     ws.on('message', async (message, isBinary) => {
       try {
         if (isBinary) {
@@ -241,6 +239,17 @@ class SecureWebSocketManager {
         await this.handleCommandResult(data, ws);
         break;
         
+      case 'ICE_CANDIDATE_ANSWER':
+
+      case 'WEB_RTC_ANSWER':
+        if (this.pendingCommands.has(data.command_id)) {
+          const resolve = this.pendingCommands.get(data.command_id);
+          this.pendingCommands.delete(data.command_id);
+          data.success = true;
+          resolve(data);
+        }
+        break;
+        
       case 'STATUS_REPORT':
         // Handle status reports from storage client
         if (data.status && ws.nodeId) {
@@ -270,7 +279,7 @@ class SecureWebSocketManager {
         break;
 
       default:
-        console.log('Unknown message type:', data.type);
+        console.log('Unknown message type:', data);
         break;
     }
   }
@@ -300,7 +309,7 @@ class SecureWebSocketManager {
       // Handle framed GET_CHUNK_RESULT
       await this.handleFramedGetChunkResult(data, binaryPayload, ws);
     } else {
-      // For other binary message types, just log and ignore for now
+      // For other binary message types, just log and ignore
       console.warn(`Unknown received binary message of type ${data.type} with command_id ${data.command_id}`);
     }
   }
@@ -403,12 +412,22 @@ class SecureWebSocketManager {
       }
     }
     
-    // Store command result for any waiting requests
+    // Resolve any pending commands waiting for this result
     if (this.pendingCommands.has(data.command_id)) {
       const resolve = this.pendingCommands.get(data.command_id);
       this.pendingCommands.delete(data.command_id);
       resolve(data);
     }
+  }
+
+  // Send offer to storage node
+  sendToNode(nodeId, message) {
+    const connection = this.connections.get(nodeId);
+    if (connection && connection.ws.readyState === WebSocket.OPEN) {
+        connection.ws.send(JSON.stringify(message));
+        return true;
+    }
+    return false;
   }
 
   // Get connection by node ID

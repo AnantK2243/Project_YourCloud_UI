@@ -6,12 +6,10 @@
     "build": "ng build",
     "build:prod": "ng build --configuration production",
     "build:watch": "ng build --watch --configuration development",
-    "test": "ng test",
     "dev": "npm run build && dotenv -e .env nodemon server.js",
     "dev:watch": "concurrently -n \"Angular,Server\" -c \"cyan,green\" \"npm run build:watch\" \"dotenv -e .env nodemon server.js --ignore dist/ --ignore src/app/\"",
     "start": "npm run dev:watch",
-    "serve:prod": "node server.js",
-    "docker:prod": "node server.js"
+    "prod": "node server.js"
   },
   "private": true,
   "dependencies": {

@@ -21,7 +21,7 @@ app.set('trust proxy', 1);
 // Rate limiting configuration
 const authLimiter = rateLimit({
   windowMs: 900000, // 15 minutes
-  max: 50,
+  max: 25,
   message: {
     success: false,
     message: 'Too many authentication attempts, please try again later.'
@@ -72,9 +72,7 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Connection']
 }));
 
-// Body parsing with size limits
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
 // Apply rate limiting to API routes
 app.use('/api', apiLimiter);
@@ -82,10 +80,10 @@ app.use('/api', apiLimiter);
 // Serve static files
 app.use(express.static(path.join(__dirname, 'dist/user_interface/browser')));
 
-// Request logging middleware
+// Request logging
 app.use((req, res, next) => {
   if (process.env.NODE_ENV !== 'production') {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    console.log(`${new Date().toISOString()} - Incoming request: ${req.method} ${req.url}`);
   }
   next();
 });
@@ -131,9 +129,7 @@ app.use((error, req, res, next) => {
   console.error('Unhandled error:', error);
   res.status(500).json({
     success: false,
-    message: process.env.NODE_ENV === 'production' 
-      ? 'Internal server error' 
-      : error.message
+    message: process.env.NODE_ENV === 'production' ? 'Internal server error' : error.message
   });
 });
 

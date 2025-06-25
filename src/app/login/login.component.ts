@@ -15,7 +15,7 @@ export class LoginComponent implements OnInit {
   password: string = '';
   errorMessage: string = '';
   successMessage: string = '';
-  infoMessage: string = ''; // For session expiration messages
+  infoMessage: string = '';
   isSubmitting: boolean = false;
 
   constructor(
@@ -61,7 +61,7 @@ export class LoginComponent implements OnInit {
         next: (response) => {
           this.isSubmitting = false;
           if (response.success) {
-            // Use auth service to store token (handles SSR properly)
+            // Use auth service to store token
             this.authService.setToken(response.token);
             this.successMessage = 'Login successful!';
             this.errorMessage = '';

@@ -10,12 +10,8 @@ export class CryptoService {
 
   constructor(@Inject(PLATFORM_ID) private platformId: Object) {}
 
-  private isBrowser(): boolean {
-    return isPlatformBrowser(this.platformId);
-  }
-
   async generateMasterKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
-    if (!this.isBrowser()) {
+    if (!isPlatformBrowser(this.platformId)) {
       throw new Error('Crypto operations not available on server');
     }
 
@@ -53,14 +49,14 @@ export class CryptoService {
   }
 
   generateSalt(): Uint8Array {
-    if (!this.isBrowser()) {
+    if (!isPlatformBrowser(this.platformId)) {
       throw new Error('Crypto operations not available on server');
     }
     return crypto.getRandomValues(new Uint8Array(32));
   }
 
   generateUUID(): string {
-    if (!this.isBrowser()) {
+    if (!isPlatformBrowser(this.platformId)) {
       return 'server-uuid-' + Date.now();
     }
     return crypto.randomUUID();
@@ -79,7 +75,7 @@ export class CryptoService {
   }
   
   async getRootChunk(password: string): Promise<string> {
-    if (!this.isBrowser()) {
+    if (!isPlatformBrowser(this.platformId)) {
       throw new Error('Crypto operations not available on server');
     }
 
@@ -139,7 +135,7 @@ export class CryptoService {
   }
 
   async encryptData(data: ArrayBuffer, iv?: Uint8Array): Promise<{ encryptedData: ArrayBuffer, iv: Uint8Array }> {
-    if (!this.isBrowser()) {
+    if (!isPlatformBrowser(this.platformId)) {
       throw new Error('Crypto operations not available on server');
     }
 
@@ -164,7 +160,7 @@ export class CryptoService {
   }
 
   async decryptData(encryptedData: ArrayBuffer, iv: Uint8Array): Promise<ArrayBuffer> {
-    if (!this.isBrowser()) {
+    if (!isPlatformBrowser(this.platformId)) {
       throw new Error('Crypto operations not available on server');
     }
 
@@ -187,22 +183,5 @@ export class CryptoService {
   clearKeys(): void {
     this.masterRecoveryKey = null;
     this.userSalt = null;
-  }
-
-  uint8ArrayToBase64(array: Uint8Array): string {
-    let binary = '';
-    for (let i = 0; i < array.byteLength; i++) {
-      binary += String.fromCharCode(array[i]);
-    }
-    return btoa(binary);
-  }
-
-  base64ToUint8Array(base64: string): Uint8Array {
-    const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    return bytes;
   }
 }

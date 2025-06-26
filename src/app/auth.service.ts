@@ -5,7 +5,6 @@ import { isPlatformBrowser } from '@angular/common';
 import { CryptoService } from './crypto.service';
 import { SessionStorageService } from './session-storage.service';
 import { base64ToUint8Array, uint8ArrayToBase64 } from './utils/utils';
-import { lastValueFrom } from 'rxjs';
 
 @Injectable({
   providedIn: 'root',
@@ -133,24 +132,5 @@ export class AuthService {
       return;
     }
     localStorage.setItem('token', token);
-  }
-
-  async registerNode(nodeData: any): Promise<any> {
-    return await lastValueFrom(this.http.post(`${this.apiUrl}/register-node`, nodeData, {
-      headers: this.getAuthHeaders(),
-    }));
-  }
-
-  async getUserStorageNodes(): Promise<any> {
-    if (!isPlatformBrowser(this.platformId)) {
-      return Promise.resolve({ success: false, message: 'Not running in browser environment' });
-    }
-    const token = this.getToken();
-    if (!token) {
-      return Promise.resolve({ success: false, message: 'Not authenticated' });
-    }
-    return await lastValueFrom(this.http.get(`${this.apiUrl}/user/storage-nodes`, {
-      headers: this.getAuthHeaders(),
-    }));
   }
 }

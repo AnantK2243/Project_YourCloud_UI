@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 
 // Storage Node Schema
 const StorageNodeSchema = new mongoose.Schema({
+  node_name: String,
   node_id: { type: String, unique: true, required: true },
   auth_token: String,
   status: { type: String, default: 'offline' },
@@ -10,8 +11,6 @@ const StorageNodeSchema = new mongoose.Schema({
   used_space: { type: Number, default: 0 },
   num_chunks: { type: Number, default: 0},
   last_seen: { type: Date, default: Date.now },
-  label: String,
-  root_directory_initialized: { type: Boolean, default: false },
   owner_user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 });
 

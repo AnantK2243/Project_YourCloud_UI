@@ -1,5 +1,6 @@
 import { Component, OnInit, Inject, PLATFORM_ID, afterNextRender } from '@angular/core';
 import { Router } from '@angular/router';
+import { NodeService } from '../node.service';
 import { AuthService } from '../auth.service';
 import { SessionHandlerService } from '../session-handler.service';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
@@ -13,9 +14,9 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
   templateUrl: './dashboard.component.html',
 })
 export class DashboardComponent implements OnInit {
-  nodeId: string = '';
-  nodeStatusMessage: string = '';
-  nodeStatusResult: any = null;
+  warning: string = '';
+  error: string = '';
+  loading: boolean = true;
 
   // Node registration popup
   showRegisterPopup: boolean = false;
@@ -24,19 +25,28 @@ export class DashboardComponent implements OnInit {
   registrationResult: any = null;
 
   userStorageNodes: any[] = [];
-  loadingNodes: boolean = true;
+  private userStorageNodesSub: any;
 
   constructor(
+    private nodeService: NodeService,
     private authService: AuthService,
     private router: Router,
-    private http: HttpClient,
     private sessionHandler: SessionHandlerService,
     @Inject(PLATFORM_ID) private platformId: Object
   ) {}
 
   ngOnInit() {
     if (isPlatformBrowser(this.platformId)) {
-      this.loadUserStorageNodes();
+      this.userStorageNodesSub = this.nodeService.userStorageNodes$.subscribe(nodes => {
+        this.userStorageNodes = nodes;
+      });
+      this.refreshStorageNodes();
+    }
+  }
+
+  ngOnDestroy() {
+    if (this.userStorageNodesSub) {
+      this.userStorageNodesSub.unsubscribe();
     }
   }
 
@@ -54,27 +64,23 @@ export class DashboardComponent implements OnInit {
     this.registrationResult = null;
   }
 
-  async loadUserStorageNodes() {
-    this.loadingNodes = true;
-    this.userStorageNodes = [];
+  async refreshStorageNodes() {
+    this.loading = true;
+    this.clearMessages();
     try {
       // Fetch user storage nodes
-      const StorageNodes: any = await this.authService.getUserStorageNodes();
-
-      if (StorageNodes.success) {
-        this.userStorageNodes = StorageNodes.storage_nodes || [];
-      } else {
-        throw new Error(StorageNodes.error);
+      const response: any = await this.nodeService.loadUserStorageNodes();
+      if (!response.success) {
+        this.error = response.message || 'Failed to fetch storage nodes.';
       }
     } catch (error: any) {
       // Check if this is a session/authentication error
       if (this.sessionHandler.checkAndHandleSessionError(error)) {
         return;
       }
-
-      throw error;
+      this.error = error.message || 'An unexpected error occurred';
     } finally {
-      this.loadingNodes = false;
+      this.loading = false;
     }
   }
 
@@ -89,39 +95,83 @@ export class DashboardComponent implements OnInit {
       this.registerMessage = 'Registering node...';
       this.registrationResult = null;
 
-      const response: any = await this.authService.registerNode({
-        node_name: this.registerNodeName.trim()
-      });
+      const response: any = await this.nodeService.registerNode(this.registerNodeName.trim());
 
       if (response.success) {
-        this.registrationResult = response;
+        this.registrationResult = response.registration_result;
         this.registerMessage = 'Node registered successfully!';
-        // Refresh the node list to show the newly registered node
-        await this.loadUserStorageNodes();
+
+        this.refreshStorageNodes();
       } else {
-        this.registerMessage = response.error || 'Node registration failed';
+        this.registerMessage = response.message || 'Node registration failed';
       }
     } catch (error: any) {
-      console.error('Node registration failed:', error);
-      
       // Check if this is a session/authentication error
       if (this.sessionHandler.checkAndHandleSessionError(error)) {
         return;
       }
       
-      if (error instanceof HttpErrorResponse) {
-        this.registerMessage =
-          error.error?.error ||
-          error.error?.message ||
-          'Registration failed';
-      } else {
-        this.registerMessage =
-          error.message || 'An unexpected error occurred';
-      }
+      this.registerMessage = error.message || 'An unexpected error occurred';
     }
   }
 
-  
+  // Check the status of a node
+  async checkNodeStatus(nodeId: string) {
+    this.loading = true;
+    this.clearMessages();
+    if (!nodeId.trim()) {
+      this.error = 'Invalid Node ID provided for status check.';
+      return;
+    }
+
+    // Retrieve the status of the node
+    try {
+      const response: any = await this.nodeService.updateNodeStatus(nodeId);
+
+      if (!response.success) {
+        this.error = response.error || 'Failed to retrieve node status.';
+      }
+    } catch (error: any) {
+      // Check if this is a session/authentication error
+      if (this.sessionHandler.checkAndHandleSessionError(error)) {
+        return;
+      }
+      this.error = error.message || 'An unexpected error occurred';
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  async deleteNode(nodeId: string){
+    if (!nodeId.trim()) {
+      this.error = 'Invalid Node ID provided for deletion.';
+      return;
+    }
+
+    // Confirm deletion
+    if (!confirm(`Are you sure you want to delete "${nodeId}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    this.loading = true;
+    this.clearMessages();
+
+    try {
+      const response: any = await this.nodeService.deleteStorageNode(nodeId);
+      if (!response.success) {
+        this.error = response.error || 'Failed to delete storage node.';
+      }
+    } catch (error: any) {
+      // Check if this is a session/authentication error
+      if (this.sessionHandler.checkAndHandleSessionError(error)) {
+        return;
+      }
+      this.error = error.message || 'An unexpected error occurred';
+    } finally {
+      this.loading = false;
+    }
+  }
+
   logout() {
     this.authService.logout();
     this.router.navigate(['/login']);
@@ -131,5 +181,10 @@ export class DashboardComponent implements OnInit {
     this.router.navigate(['/file-browser', node.node_id], {
       queryParams: { nodeName: node.label }
     });
+  }
+
+  clearMessages() {
+    this.warning = '';
+    this.error = '';
   }
 }

@@ -9,11 +9,6 @@ import { FormsModule } from '@angular/forms';
 import { formatFileSize, formatDate } from '../utils/utils';
 
 // Interface for breadcrumb path
-interface PathSegment {
-  name: string;
-  chunkId: string;
-}
-
 @Component({
   selector: 'app-file-browser',
   standalone: true,
@@ -25,7 +20,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
   nodeName: string = '';
 
   directoryList: DirectoryItem[] = [];
-  directoryPath: PathSegment[] = [];
+  directoryPath: string[] = [];
 
   loading: boolean = false;
   error: string = '';
@@ -69,6 +64,17 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
         this.initializeFileSystem();
       }
     });
+
+    // Subscribe to directory changes
+    this.directorySub = this.fileService['directory'].subscribe(dir => {
+      if (dir) {
+        this.fileService.getDirectoryContents().then(contents => {
+          this.directoryList = contents;
+        });
+      } else {
+        this.directoryList = [];
+      }
+    });
   }
 
   ngOnDestroy(): void {
@@ -105,7 +111,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
   }
 
   getPath(): string {
-    return "/" + this.directoryPath.map(segment => segment.name).filter(name => name).join('/');
+    return this.directoryPath.join("/") || '/';
   }
 
   async initializeFileSystem() {
@@ -122,12 +128,17 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
       }
 
       // Initialize the file service
-      const chunkId = await this.fileService.initializePage(password, this.nodeId);
+      const result = await this.fileService.initializePage(password, this.nodeId);
 
-      // Set the initial path
-      this.directoryPath = [{ name: '', chunkId: chunkId }];
-
-      this.initialized = true;
+      if (result.success) {
+        // Set the initial path
+        this.directoryPath = [ '' ];
+        
+        this.initialized = true;
+      } else {
+        // Some error occured
+        this.error = result.message || 'Unknown error';
+      }
     } catch (error: any) {    
       // Check if this is a session/authentication error
       if (this.sessionHandler.checkAndHandleSessionError(error)) {
@@ -222,6 +233,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
   //   input.value = '';
   // }
 
+  // TODO: FIX
   async deleteItem(item: DirectoryItem): Promise<void> {
     // Validate the item
     if (!item.chunkId) {
@@ -276,14 +288,17 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
       this.loading = true;
       this.clearMessages();
 
-      await this.fileService.changeDirectory(item.chunkId);
-      
-      // Update breadcrumb path
-      this.directoryPath.push({ name: item.name, chunkId: item.chunkId });
+      const result = await this.fileService.changeDirectory(item.chunkId);
 
-      // Force refresh the directory listing
-      this.updateDirectoryListing();
+      if (result.success) {
+        // Update breadcrumb path
+        this.directoryPath.push(item.name);
 
+        // Force refresh the directory listing
+        this.updateDirectoryListing();
+      } else {
+        this.error = result.message || 'Unknown error';
+      }
     } catch (error: any) {
       // Check if this is a session/authentication error
       if (this.sessionHandler.checkAndHandleSessionError(error)) {
@@ -307,14 +322,17 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
       this.clearMessages();
 
       // Go to parent
-      await this.fileService.leaveDirectory();
+      const result = await this.fileService.leaveDirectory();
 
-      // Update breadcrumb path by removing the last segment
-      this.directoryPath.pop();
+      if (result.success) {
+        // Update breadcrumb path by removing the last segment
+        this.directoryPath.pop();
 
-      // Force refresh the directory listing
-      this.updateDirectoryListing();
-
+        // Force refresh the directory listing
+        this.updateDirectoryListing();
+      } else {
+        this.error = result.message || 'Unknown error';
+      }
     } catch (error: any) {
       
       // Check if this is a session/authentication error
@@ -394,40 +412,20 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
     }
 
     this.loading = true;
-    this.error = '';
+    this.clearMessages();
 
     try {
-      // Check storage space BEFORE attempting directory creation
-      const storageStatus = await this.fileService.checkStorageCapacity();
-      const estimatedSize = await this.fileService.estimateDirectoryMetadataSize(this.newDirectoryName.trim());
+      const result = await this.fileService.createSubdirectory(this.newDirectoryName.trim());
 
-      if (storageStatus.available_space_bytes < estimatedSize) {
-        throw {
-          isStorageWarning: true,
-          requiredSpace: estimatedSize,
-          availableSpace: storageStatus.available_space_bytes,
-        };
+      if (result.success) {
+        this.isCreatingDirectory = false;
+        this.newDirectoryName = '';
+      } else {
+        this.error = result.message || 'Unknown error';
       }
-      
-      // Only proceed with directory creation if storage check passes
-      await this.fileService.createSubdirectory(this.newDirectoryName.trim());
-      
-      // Success - reset the form
-      this.isCreatingDirectory = false;
-      this.newDirectoryName = '';
-      
     } catch (error: any) {
       // Check if this is a session/authentication error
       if (this.sessionHandler.checkAndHandleSessionError(error)) {
-        return;
-      }
-      
-      // Check if this is a storage space warning
-      if (error.isStorageWarning) {
-        const requiredSpace = (error.requiredSpace !== undefined && error.requiredSpace !== null) ? formatFileSize(error.requiredSpace) : 'unknown';
-        const availableSpace = (error.availableSpace !== undefined && error.availableSpace !== null) ? formatFileSize(error.availableSpace) : 'unknown';
-        this.warning = `Insufficient storage space for Directory Creation. Required: ${requiredSpace}, Available: ${availableSpace}.`;
-        this.isCreatingDirectory = false; // Reset creating state
         return;
       }
       

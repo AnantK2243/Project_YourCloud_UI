@@ -9,14 +9,14 @@
   <!-- User's Storage Nodes -->
   <div>
     <h3>Your Storage Nodes</h3>
-    <div *ngIf="loadingNodes">Loading your storage nodes...</div>
-    <div *ngIf="!loadingNodes && userStorageNodes.length === 0">
+    <div *ngIf="loading">Loading your storage nodes...</div>
+    <div *ngIf="!loading && userStorageNodes.length === 0">
       <p>You don't have any storage nodes yet. Click "Register New Node" to create one.</p>
     </div>
-    <div *ngIf="!loadingNodes && userStorageNodes.length > 0">
+    <div *ngIf="!loading && userStorageNodes.length > 0">
       <div *ngFor="let node of userStorageNodes" 
           (click)="node.status === 'online' ? openFileBrowser(node) : null">
-        <p><strong>Name:</strong> {{ node.label }}</p>
+        <p><strong>Name:</strong> {{ node.node_name }}</p>
         <p><strong>Node ID:</strong> {{ node.node_id }}</p>
         <p><strong>Status:</strong> 
           <span>
@@ -35,8 +35,21 @@
         <p *ngIf="node.status === 'online'">
           Click to browse files ->
         </p>
+        <button type="button" [disabled]="loading" (click)="checkNodeStatus(node.node_id); $event.stopPropagation();">
+          Refresh Status
+        </button>
+        <button type="button" [disabled]="loading" (click)="deleteNode(node.node_id); $event.stopPropagation();">
+          Delete Node
+        </button>
       </div>
     </div>
+  </div>
+
+  <div *ngIf="error">
+    <p>Error: {{ error }}</p>
+  </div>  
+  <div *ngIf="warning">
+    <p>{{ warning }}</p>
   </div>
 
   <!-- Node Registration Popup -->

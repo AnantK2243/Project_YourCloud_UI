@@ -143,14 +143,26 @@ class SecureWebSocketManager {
             }
           );
 
+          // Set up connection event handlers
+          this.setupConnectionHandlers(ws, node_id);
+
           // Send authentication success
           ws.send(JSON.stringify({
             type: 'AUTH_SUCCESS',
             message: 'Authentication successful'
           }));
 
-          // Set up connection event handlers
-          this.setupConnectionHandlers(ws, node_id);
+          // Request a status update
+          let id;
+          do {
+            id = 'cmd-' + require('crypto').randomBytes(8).toString('hex');
+          } while (this.pendingCommands.has(id));
+          const command = {
+            command_type: 'STATUS_REQUEST',
+            command_id: id
+          };
+
+          ws.send(JSON.stringify(command));
 
         } catch (error) {
           console.error('WebSocket authentication error:', error);
@@ -237,17 +249,6 @@ class SecureWebSocketManager {
         
       case 'COMMAND_RESULT':
         await this.handleCommandResult(data, ws);
-        break;
-        
-      case 'ICE_CANDIDATE_ANSWER':
-
-      case 'WEB_RTC_ANSWER':
-        if (this.pendingCommands.has(data.command_id)) {
-          const resolve = this.pendingCommands.get(data.command_id);
-          this.pendingCommands.delete(data.command_id);
-          data.success = true;
-          resolve(data);
-        }
         break;
         
       case 'STATUS_REPORT':

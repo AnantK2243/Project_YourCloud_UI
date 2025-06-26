@@ -34,20 +34,20 @@ function generateCommandId(req) {
 }
 
 // Validates user owns the storage node
-// async function validateUserOwnsNode(req, userId, nodeId) {
-//   const user = await User.findById(userId);
-//   if (!user || !user.storage_nodes || !user.storage_nodes.includes(nodeId)) {
-//     throw new Error('User does not own this storage node');
-//   }
+async function validateUserOwnsNode(req, userId, nodeId) {
+  const user = await User.findById(userId);
+  if (!user || !user.storage_nodes || !user.storage_nodes.includes(nodeId)) {
+    throw new Error('User does not own this storage node');
+  }
   
-//   const nodeConnections = getNodeConnections(req);
-//   const ws = nodeConnections.get(nodeId);
-//   if (!ws || ws.readyState !== 1) {
-//     throw new Error(`Storage node ${nodeId} is not connected`);
-//   }
+  const nodeConnections = getNodeConnections(req);
+  const ws = nodeConnections.get(nodeId);
+  if (!ws || ws.readyState !== 1) {
+    throw new Error(`Storage node ${nodeId} is not connected`);
+  }
   
-//   return true;
-// }
+  return true;
+}
 
 // Updates storage node status
 async function updateNodeStatus(req, nodeId) {
@@ -63,10 +63,10 @@ async function updateNodeStatus(req, nodeId) {
 
       if (result && result.type === 'STATUS_REPORT' && result.status) {
         return {
-          status: 'online',
           node_id: nodeId,
-          used_space: result.status.used_space_bytes || 0,
+          status: 'online',
           total_available_space: result.status.max_space_bytes || 0,
+          used_space: result.status.used_space_bytes || 0,
           num_chunks: result.status.current_chunk_count || 0,
           last_seen: null
         };
@@ -75,10 +75,10 @@ async function updateNodeStatus(req, nodeId) {
     // If not connected or failed to get status, fetch from DB
     const nodeInDb = await StorageNode.findOne({ node_id: nodeId });
     return nodeInDb ? {
-      status: 'offline',
       node_id: nodeId,
-      used_space: nodeInDb.used_space || 0,
+      status: 'offline',
       total_available_space: nodeInDb.total_available_space || 0,
+      used_space: nodeInDb.used_space || 0,
       num_chunks: nodeInDb.num_chunks || 0,
       last_seen: nodeInDb.last_seen || null
     } : null;
@@ -108,11 +108,7 @@ async function sendStorageNodeCommand(req, nodeId, command, command_id = null) {
 
     // Set up response handler
     pendingCommands.set(commandId, (result) => {
-      if (result.success) {
-        resolve(result);
-      } else {
-        reject(new Error(result.error || 'Command failed'));
-      }
+      resolve(result);
     });
 
     // Set timeout (30 seconds)
@@ -127,6 +123,64 @@ async function sendStorageNodeCommand(req, nodeId, command, command_id = null) {
       ws.send(JSON.stringify(fullCommand));
     } catch (error) {
       pendingCommands.delete(commandId);
+      reject(error);
+    }
+  });
+}
+
+// Send store command with data
+async function sendStoreCommand(req, nodeId, command, binaryData) {
+  return new Promise(async (resolve, reject) => {
+    const nodeConnections = getNodeConnections(req);
+    const pendingCommands = getPendingCommands(req);
+    const ws = nodeConnections.get(nodeId);
+
+    if (!ws || ws.readyState !== 1) {
+      reject(new Error(`Storage node ${nodeId} is not connected`));
+      return;
+    }
+
+    const commandId = generateCommandId(req);
+    const fullCommand = {
+      ...command,
+      command_id: commandId
+    };
+
+    // Set up response handler
+    pendingCommands.set(commandId, (result) => {
+      resolve(result);
+    });
+
+    // Set timeout (30 seconds)
+    const timeout = setTimeout(() => {
+      if (pendingCommands.has(commandId)) {
+        pendingCommands.delete(commandId);
+        reject(new Error('Command timeout'));
+      }
+    }, 30000);
+
+    try {
+      // Create combined binary message: [4 bytes: json_length][json][binary_data]
+      const jsonString = JSON.stringify(fullCommand);
+      const jsonBytes = Buffer.from(jsonString, 'utf8');
+      
+      // Create combined message buffer
+      const combinedMessage = Buffer.alloc(4 + jsonBytes.length + binaryData.length);
+      
+      // Write JSON length as 4-byte little-endian integer
+      combinedMessage.writeUInt32LE(jsonBytes.length, 0);
+      
+      // Write JSON command
+      jsonBytes.copy(combinedMessage, 4);
+      
+      // Write binary data
+      binaryData.copy(combinedMessage, 4 + jsonBytes.length);
+      
+      // Send as single binary WebSocket message
+      ws.send(combinedMessage);
+    } catch (error) {
+      pendingCommands.delete(commandId);
+      clearTimeout(timeout);
       reject(error);
     }
   });
@@ -163,6 +217,7 @@ router.post('/register-node', authenticateToken, async (req, res) => {
 
     // Create new node with generated node_id and user-provided name
     const node = new StorageNode({
+      node_name: node_name,
       node_id,
       auth_token: hashedAuthToken,
       status: 'offline',
@@ -170,7 +225,6 @@ router.post('/register-node', authenticateToken, async (req, res) => {
       used_space: 0,
       num_chunks: 0,
       last_seen: null,
-      label: node_name,
       owner_user_id: req.user.userId // Associate node with the user
     });
 
@@ -211,7 +265,6 @@ router.post('/register-node', authenticateToken, async (req, res) => {
       message: 'Node registered successfully'
     });
   } catch (error) {
-    console.error('Error registering node:', error);
     res.status(500).json({
       success: false,
       error: "Failed to register node: " + error.message
@@ -234,7 +287,7 @@ router.get('/user/storage-nodes', authenticateToken, async (req, res) => {
     // Get detailed information about each storage node
     const storageNodes = await StorageNode.find({
       node_id: { $in: user.storage_nodes }
-    }).select('-auth_token'); // Exclude auth_token for security
+    }).select('-auth_token').select('-owner_user_id'); // Exclude auth_token and owner_user_id for security
 
     res.json({
       success: true,
@@ -249,131 +302,248 @@ router.get('/user/storage-nodes', authenticateToken, async (req, res) => {
   }
 });
 
-router.post('/turn-credentials', authenticateToken, async (req, res) => {
-    const TURN_TOKEN_ID = process.env.CLOUDFLARE_TURN_TOKEN_ID;
-    const API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
-
-    if (!TURN_TOKEN_ID || !API_TOKEN) {
-        return res.status(500).json({ success: false, message: 'TURN service is not configured on the server.' });
-    }
-
-    const url = `https://rtc.live.cloudflare.com/v1/turn/keys/${TURN_TOKEN_ID}/credentials/generate`;
-    
-    try {
-        const response = await axios.post(
-            url,
-            { ttl: 3600 },
-            {
-                headers: {
-                    'Authorization': `Bearer ${API_TOKEN}`,
-                    'Content-Type': 'application/json',
-                },
-            }
-        );
-
-        // The response from Cloudflare already includes the full iceServers array.
-        if (response.data && response.data.iceServers) {
-            res.status(200).json(response.data);
-        } else {
-            throw new Error('Invalid response from TURN service');
-        }
-    } catch (error) {
-        console.error('Error fetching TURN credentials:', error.response ? error.response.data : error.message);
-        res.status(500).json({ success: false, message: 'Failed to generate TURN credentials.' });
-    }
-});
-
-// WebRTC offer relay endpoint
-router.post('/signal/offer/:nodeId', authenticateToken, async (req, res) => {
-  const { nodeId } = req.params;
-  const { offer } = req.body;
-  try {
-    // Send offer to node and wait for answer
-    const result = await sendStorageNodeCommand(req, nodeId, {
-      command_type: 'WEB_RTC_OFFER',
-      offer
-    });
-    if (result && result.answer) {
-      let answer = result.answer;
-      if (typeof answer === 'string') {
-        try { answer = JSON.parse(answer); } catch (e) {}
-      }
-      return res.json({ 
-        success: true,
-        answer,
-        command_id: result.command_id
-      });
-    } else {
-      return res.status(500).json({ 
-        success: false,
-        message: 'No answer received from node.'
-      });
-    }
-  } catch (error) {
-    const statusCode = error.message?.includes('not connected') ? 404 : 504;
-    res.status(statusCode).json({
-      success: false,
-      message: 'Failed to relay offer: ' + error.message
-    });
-  }
-});
-
-// WebRTC ICE candidate relay endpoint
-router.post('/signal/ice-candidate/:nodeId', authenticateToken, async (req, res) => {
-    const { nodeId } = req.params;
-    const { candidate, command_id } = req.body;
-
-    if (!candidate || !command_id) {
-        return res.status(400).json({ success: false, message: 'Candidate and command_id are required.' });
-    }
-    
-    try {
-        // Fire and forget ICE candidate
-        sendStorageNodeCommand(req, nodeId, {
-          command_type: 'ICE_CANDIDATE',
-          candidate: JSON.stringify(candidate)
-        }, command_id );
-        return res.json({ success: true, message: 'Candidate relayed.' });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        message: 'Failed to relay ICE candidate: ' + error.message
-      });
-    }
-});
-
 // Storage Node Status Check
-router.get('/node/check-status/:nodeId', async (req, res) => {
+router.get('/node/check-status/:nodeId', authenticateToken, async (req, res) => {
   try {
     const { nodeId } = req.params;
     if (!nodeId) {
-      return res.status(400).json({
-        success: false,
-        error: 'nodeId is required'
-      });
+      throw new Error('nodeId is required');
     }
     const nodeStatus = await updateNodeStatus(req, nodeId);
     if (!nodeStatus) {
-      return res.status(500).json({
+      throw new Error(`Failed to update status for node ${nodeId}`);
+    }
+    res.json({
+      success: true,
+      node_status: nodeStatus
+    });
+  } catch (error) {
+    if (error.message.includes('required')) {
+      res.status(400).json({
         success: false,
-        error: `Failed to update status for node ${nodeId}`
+        error: error.message
+      });
+    } else if (error.message.includes('Failed to update status')) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to check node status: ' + error.message
       });
     }
-    return res.json({
+  }
+});
+
+// Delete Storage Node
+router.delete('/node/delete-node/:nodeId', authenticateToken, async (req, res) => {
+  try {
+    const { nodeId } = req.params;
+    if (!nodeId) {
+      throw new Error('nodeId is required');
+    }
+
+    // Find the node in the database
+    const node = await StorageNode.findOne({ node_id: nodeId });
+    if (!node) {
+      return res.status(404).json({
+        success: false,
+        error: 'Node not found'
+      });
+    }
+
+    // Delete the node
+    await StorageNode.deleteOne({ node_id: nodeId });
+
+    // Remove node_id from user's storage_nodes array
+    await User.findByIdAndUpdate(
+      req.user.userId,
+      { $pull: { storage_nodes: nodeId } }
+    );
+
+    res.json({
       success: true,
-      node_id: nodeId,
-      node_status: nodeStatus
+      message: 'Node deleted successfully'
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: 'Failed to check node status: ' + error.message
+      error: 'Failed to delete node: ' + error.message
     });
+  }
+});
+
+// Store chunk
+router.post('/chunks/store/:nodeId/:chunkId', authenticateToken, express.raw({ type: 'application/octet-stream', limit: '64mb' }), async (req, res) => {
+  try {
+    const { nodeId, chunkId } = req.params;
+    if (!nodeId || !chunkId) {
+      throw new Error('Node ID and Chunk ID are required');
+    }
+
+    await validateUserOwnsNode(req, req.user.userId, nodeId);
+
+    const chunkData = req.body;
+    if (!chunkData || chunkData.length === 0) {
+      throw new Error('No data provided');
+    }
+
+    // Send STORE_CHUNK command with binary data
+    const result = await sendStoreCommand(req, nodeId, {
+      command_type: 'STORE_CHUNK',
+      chunk_id: chunkId,
+      data_size: chunkData.length
+    }, chunkData);
+
+    if (result.success && result.chunk_id) {
+      res.json({ success: true, chunk_id: result.chunk_id });
+    } else {
+      throw new Error(result.error || 'Failed to store chunk');
+    }
+  } catch (error) {
+    if (error.message.includes('required')) {
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    } else if (error.message.includes('not connected')) {
+      res.status(503).json({
+        success: false,
+        error: 'Storage node is not available'
+      });
+    } else if (error.message.includes('does not own')) {
+      res.status(403).json({
+        success: false,
+        error: 'Access denied'
+      });
+    } else if (error.message.includes('Chunk ID already exists')) {
+      res.status(409).json({
+        success: false,
+        error: 'Chunk ID already exists'
+      });
+    } else if (error.message.includes('Insufficient disk space.')) {
+      res.status(507).json({
+        success: false,
+        error: error.message
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Internal Server Error'
+      });
+    }
+  }
+});
+
+// Get chunk endpoint
+router.get('/chunks/get/:nodeId/:chunkId', authenticateToken, async (req, res) => {
+  try {
+    const { nodeId, chunkId } = req.params;
+    if (!nodeId || !chunkId) {
+      throw new Error('Node ID and Chunk ID are required');
+    }
+
+    await validateUserOwnsNode(req, req.user.userId, nodeId);
+
+    // Send GET_CHUNK command
+    const result = await sendStorageNodeCommand(req, nodeId, {
+      command_type: 'GET_CHUNK',
+      chunk_id: chunkId
+    });
+
+    if (result.success && result.data) {
+      res.set('Content-Type', 'application/octet-stream');
+      res.set('Content-Length', result.data.length.toString());
+      res.send(result.data);
+    } else {
+      throw new Error(result.error || 'Chunk not found');
+    }
+  } catch (error) {
+    if (error.message.includes('required')) {
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    } else if (error.message.includes('not connected')) {
+      res.status(503).json({
+        success: false,
+        error: 'Storage node is not available'
+      });
+    } else if (error.message.includes('does not own')) {
+      res.status(403).json({
+        success: false,
+        error: 'Access denied'
+      });
+    } else if (error.message.includes('not found')) {
+      res.status(404).json({
+        success: false,
+        error: error.message
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Internal Server Error'
+      });
+    }
+  }
+});
+
+// Delete chunk endpoint
+router.delete('/chunks/delete/:nodeId/:chunkId', authenticateToken, async (req, res) => {
+  try {
+    const { nodeId, chunkId } = req.params;
+    if (!nodeId || !chunkId) {
+      throw new Error('Node ID and Chunk ID are required');
+    }
+
+    await validateUserOwnsNode(req, req.user.userId, nodeId);
+
+    // Send DELETE_CHUNK command to specific storage node
+    const result = await sendStorageNodeCommand(req, nodeId, {
+      command_type: 'DELETE_CHUNK',
+      chunk_id: chunkId
+    });
+
+    if (result.success) {
+      res.json({ success: true, message: 'Chunk deleted successfully' });
+    } else {
+      throw new Error(result.error || 'Failed to delete chunk');
+    }
+  } catch (error) {
+    if (error.message.includes('required')) {
+      res.status(400).json({
+        success: false,
+        error: error.message
+      });
+    } else if (error.message.includes('not connected')) {
+      res.status(503).json({
+        success: false,
+        error: 'Storage node is not available'
+      });
+    } else if (error.message.includes('does not own')) {
+      res.status(403).json({
+        success: false,
+        error: 'Access denied'
+      });
+    } else if (error.message.includes('not found')) {
+      res.status(404).json({
+        success: false,
+        error: error.message
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Internal Server Error'
+      });
+    }
   }
 });
 
 module.exports = {
   router,
+  validateUserOwnsNode,
   updateNodeStatus,
   sendStorageNodeCommand
 };

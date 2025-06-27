@@ -1,3 +1,5 @@
+// src/app/routes/storage.js
+
 // Storage and Node management routes
 const express = require('express');
 const { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");

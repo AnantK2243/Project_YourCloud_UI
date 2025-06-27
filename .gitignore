@@ -1,17 +1,14 @@
-# Angular build outputs
 /dist
 /tmp
 /out-tsc
 /bazel-out
 
-# Node.js dependencies
 /node_modules
 npm-debug.log
 yarn-error.log
 package-lock.json
 yarn.lock
 
-# Angular cache
 /.angular/cache
 .sass-cache/
 /connect.lock
@@ -20,15 +17,12 @@ yarn.lock
 testem.log
 /typings
 
-# Environment variables and secrets
 .env
 
-# SSL certificates
 /ssl/*.pem
 /ssl/*.key
 /ssl/*.crt
 
-# IDE and editor files
 .vscode/
 .idea/
 *.swp
@@ -36,28 +30,18 @@ testem.log
 *~
 .editorconfig
 
-# Logs
 logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
-
-# Cache directories
 .cache
 .eslintcache
 .npm
 .yarn
 
-# Optional npm cache directory
 .npm
 
-# Docker volumes and temp files
 docker-data/
 .docker/

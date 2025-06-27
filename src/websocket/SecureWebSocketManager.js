@@ -1,3 +1,5 @@
+// src/app/websocket/SecureWebSocketManager.js
+
 // WebSocket security and connection management
 const WebSocket = require('ws');
 const bcrypt = require('bcryptjs');

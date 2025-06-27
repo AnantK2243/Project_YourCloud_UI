@@ -1,3 +1,5 @@
+// src/app/file-browser/file-browser.component.ts
+
 import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';

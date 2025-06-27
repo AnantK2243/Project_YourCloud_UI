@@ -1,4 +1,4 @@
-// src/app/utils/api-url.ts
+// src/app/utils/utils.ts
 
 export function formatFileSize(size: number | undefined): string {
   if (size === undefined) return '';

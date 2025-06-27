@@ -1,3 +1,5 @@
+// src/app/routes/auth.js
+
 // Authentication routes and middleware
 const express = require('express');
 const bcrypt = require('bcryptjs');

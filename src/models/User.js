@@ -1,3 +1,5 @@
+// src/app/models/User.js
+
 // Database models
 const mongoose = require('mongoose');
 

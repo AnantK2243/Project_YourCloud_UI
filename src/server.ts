@@ -1,3 +1,5 @@
+// src/server.ts
+
 import {AngularNodeAppEngine, createNodeRequestHandler, isMainModule, writeResponseToNodeResponse} from '@angular/ssr/node';
 import express from 'express';
 import { dirname, resolve } from 'node:path';

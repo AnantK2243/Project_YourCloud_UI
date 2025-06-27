@@ -1,3 +1,5 @@
+// src/app/dashboard/dashboard.component.ts
+
 import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
 import { NodeService, StorageNode } from '../node.service';

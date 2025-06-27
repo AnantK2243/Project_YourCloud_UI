@@ -21,7 +21,7 @@ app.set('trust proxy', 1);
 // Rate limiting configuration
 const authLimiter = rateLimit({
   windowMs: 900000, // 15 minutes
-  max: 25,
+  max: 100,
   message: {
     success: false,
     message: 'Too many authentication attempts, please try again later.'

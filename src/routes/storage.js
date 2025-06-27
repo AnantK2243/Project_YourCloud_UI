@@ -1,11 +1,25 @@
 // Storage and Node management routes
 const express = require('express');
+const { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const bcrypt = require('bcryptjs');
 const { authenticateToken } = require('./auth');
 const { StorageNode, User } = require('../models/User');
+// TODO: IMPLEMENT
 const { validateNodeRegistrationInput, validateChunkId } = require('../utils/validation');
 
 const router = express.Router();
+
+const s3Client = new S3Client({
+    region: "auto",
+    endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+    credentials: {
+        accessKeyId: process.env.R2_ACCESS_KEY_ID,
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+    },
+});
+
+const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
 
 // Helper functions to get WebSocket manager instances
 function getWSManager(req) {
@@ -89,7 +103,7 @@ async function updateNodeStatus(req, nodeId) {
 }
 
 // Send command to storage node and wait for response
-async function sendStorageNodeCommand(req, nodeId, command, command_id = null) {
+async function sendStorageNodeCommand(req, nodeId, command, command_id = null, timeout = true) {
   return new Promise((resolve, reject) => {
     const nodeConnections = getNodeConnections(req);
     const pendingCommands = getPendingCommands(req);
@@ -112,12 +126,14 @@ async function sendStorageNodeCommand(req, nodeId, command, command_id = null) {
     });
 
     // Set timeout (30 seconds)
-    setTimeout(() => {
-      if (pendingCommands.has(commandId)) {
-        pendingCommands.delete(commandId);
-        reject(new Error('Command timeout'));
-      }
-    }, 30000);
+    if (timeout) {
+      setTimeout(() => {
+        if (pendingCommands.has(commandId)) {
+          pendingCommands.delete(commandId);
+          reject(new Error('Command timeout'));
+        }
+      }, 30000);
+    }
 
     try {
       ws.send(JSON.stringify(fullCommand));
@@ -539,6 +555,122 @@ router.delete('/chunks/delete/:nodeId/:chunkId', authenticateToken, async (req, 
       });
     }
   }
+});
+
+router.post('/chunks/prepare-upload/:nodeId', authenticateToken, async (req, res) => {
+    const { nodeId } = req.params;
+    const { data_size } = req.body;
+
+    try {
+        await validateUserOwnsNode(req, req.user.userId, nodeId);
+        const commandId = generateCommandId(req);
+
+        const chunkIdResponse = await sendStorageNodeCommand(req, nodeId, {
+            command_type: 'PREP_UPLOAD',
+            data_size,
+        }, commandId);
+
+        if (!chunkIdResponse || !chunkIdResponse.success || !chunkIdResponse.chunk_id) {
+            throw new Error('Failed to get a valid chunkId from the storage node.');
+        }
+        const { chunk_id: chunkId } = chunkIdResponse;
+
+        const temporaryObjectName = `temp-${commandId}-${chunkId}`;
+
+        const putCommand = new PutObjectCommand({ Bucket: R2_BUCKET_NAME, Key: temporaryObjectName });
+        const uploadUrl = await getSignedUrl(s3Client, putCommand, { expiresIn: 300 });
+
+        res.json({
+            success: true,
+            message: "Ready for upload.",
+            chunkId,
+            uploadUrl,
+            temporaryObjectName
+        });
+
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+router.post('/chunks/complete-upload/:nodeId', authenticateToken, async (req, res) => {
+    const { nodeId } = req.params;
+    const { chunkId, temporaryObjectName } = req.body;
+
+    if (!chunkId || !temporaryObjectName) {
+        return res.status(400).json({ success: false, message: "chunkId and temporaryObjectName are required."});
+    }
+
+    try {
+        await validateUserOwnsNode(req, req.user.userId, nodeId);
+
+        const getCommand = new GetObjectCommand({ Bucket: R2_BUCKET_NAME, Key: temporaryObjectName });
+        const downloadUrl = await getSignedUrl(s3Client, getCommand, { expiresIn: 300 });
+        
+        const storeResult = await sendStorageNodeCommand(req, nodeId, {
+            command_type: 'DOWNLOAD_AND_STORE_CHUNK',
+            chunk_id: chunkId,
+            download_url: downloadUrl
+        });
+
+        if (!storeResult || !storeResult.success) {
+            throw new Error(storeResult.error || 'Rust client failed to store the chunk.');
+        }
+
+        const deleteCommand = new DeleteObjectCommand({ Bucket: R2_BUCKET_NAME, Key: temporaryObjectName });
+        await s3Client.send(deleteCommand);
+
+        res.json({ success: true, message: "Chunk successfully stored and temporary file cleaned up." });
+
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+});
+
+router.get('/chunks/prepare-download/:nodeId/:chunkId', authenticateToken, async (req, res) => {
+    const { nodeId, chunkId } = req.params;
+
+    try {
+        await validateUserOwnsNode(req, req.user.userId, nodeId);
+
+        const commandId = generateCommandId(req);
+
+        const temporaryObjectName = `temp-${commandId}-${chunkId}`;
+
+        const putCommand = new PutObjectCommand({ Bucket: R2_BUCKET_NAME, Key: temporaryObjectName });
+        const uploadUrl = await getSignedUrl(s3Client, putCommand, { expiresIn: 300 });
+
+        // Tell the Rust client to fetch the chunk from its disk and upload it to R2.
+        const uploadConfirmation = await sendStorageNodeCommand(req, nodeId, {
+            command_type: 'RETRIEVE_AND_UPLOAD_CHUNK',
+            chunk_id: chunkId,
+            upload_url: uploadUrl
+        }, commandId, false); // No timeout for this command
+
+        if (!uploadConfirmation || !uploadConfirmation.success) {
+            throw new Error(uploadConfirmation.error || 'Rust client failed to upload the chunk.');
+        }
+
+        // Once the Rust client confirms the upload, create a pre-signed GET URL for the frontend.
+        const getCommand = new GetObjectCommand({ Bucket: R2_BUCKET_NAME, Key: temporaryObjectName });
+        const downloadUrl = await getSignedUrl(s3Client, getCommand, { expiresIn: 300 });
+
+        // Respond to the frontend with the download link.
+        res.json({ success: true, downloadUrl });
+
+        setTimeout(async () => {
+            try {
+                const deleteCommand = new DeleteObjectCommand({ Bucket: R2_BUCKET_NAME, Key: temporaryObjectName });
+                await s3Client.send(deleteCommand);
+                console.log(`Cleaned up temporary download object: ${temporaryObjectName}`);
+            } catch (error) {
+                console.error(`Failed to cleanup temporary download object ${temporaryObjectName}:`, error);
+            }
+        }, 10 * 1000 * 1000); // 10 minute cleanup
+
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
 });
 
 module.exports = {

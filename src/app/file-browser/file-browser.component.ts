@@ -28,14 +28,11 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 
   initialized: boolean = false;
 
-  uploadProgress: number = 0;
   isUploading: boolean = false;
   uploadStatus: string = '';
 
-  downloadProgress: number = 0;
   isDownloading: boolean = false;
   downloadStatus: string = '';
-  downloadingFileId: string = '';
 
   isCreatingDirectory: boolean = false;
   newDirectoryName: string = '';
@@ -159,85 +156,95 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
     });
   }
 
-  // async onFileSelected(event: Event): Promise<void> {
-  //   const input = event.target as HTMLInputElement;
-  //   const browserFile = input.files?.[0];
+  async onFileSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const browserFile = input.files?.[0];
     
-  //   if (!browserFile) {
-  //     return;
-  //   }
+    if (!browserFile) {
+      return;
+    }
 
-  //   // Clear previous warnings and errors
-  //   this.clearMessages();
+    this.clearMessages();
+    this.isUploading = true;
+    this.uploadStatus = `Uploading ${browserFile.name}...`;
 
-  //   try {
-  //     // Calculate total space needed for both file and directory metadata
-  //     const metadataSize = await this.fileService.estimateDirectoryMetadataSizeForFile(browserFile.name, browserFile.size);
-  //     const totalSpaceNeeded = browserFile.size + metadataSize;
+    try {
+      const result = await this.fileService.uploadFile(browserFile, browserFile.name);
 
-  //     // Check total space needed in one go
-  //     await this.fileService.checkStorageCapacity(totalSpaceNeeded, 'file upload and directory metadata');
-
-  //     // Only set upload UI state if storage check passes
-  //     this.isUploading = true;
-  //     this.uploadProgress = 0;
-  //     this.uploadStatus = `Uploading ${browserFile.name}...`;
-  //     this.error = ''; // Clear any previous errors
-  //     this.warning = ''; // Clear any previous warnings
-
-  //     await this.fileService.uploadFileStream(browserFile, (progress) => {
-  //       this.uploadProgress = progress;
-  //     });
-
-  //     this.uploadStatus = `Successfully uploaded ${browserFile.name}`;
-
-  //     // Reset upload state after 1 seconds
-  //     setTimeout(() => {
-  //       this.isUploading = false;
-  //       this.uploadStatus = '';
-  //       this.uploadProgress = 0;
-  //     }, 1000);
-
-  //   } catch (error: any) {
-  //     // Check if this is a session/authentication error
-  //     if (this.sessionHandler.checkAndHandleSessionError(error)) {
-  //       return;
-  //     }
+      if (result.success) {
+        this.uploadStatus = `Successfully uploaded ${browserFile.name}`;
+        this.updateDirectoryListing();
+      } else {
+        this.error = `Upload failed: ${result.message}`;
+        this.uploadStatus = '';
+      }
+    } catch (error: any) {
+      this.error = `Upload failed: ${error.message || 'A critical error occurred.'}`;
+      this.uploadStatus = '';
+    } finally {
+      // Reset the upload UI state after 2 seconds on success/failure
+      setTimeout(() => {
+        this.isUploading = false;
+        this.uploadStatus = '';
+      }, 2000);
       
-  //     // Check if this is a storage space warning
-  //     if (error.isStorageWarning) {
-  //       const requiredSpace = (error.requiredSpace !== undefined && error.requiredSpace !== null) ? this.formatFileSize(error.requiredSpace) : 'unknown';
-  //       const availableSpace = (error.availableSpace !== undefined && error.availableSpace !== null) ? this.formatFileSize(error.availableSpace) : 'unknown';
-  //       const operationName = error.operationName || 'operation';
-  //       this.warning = `Insufficient storage space for ${operationName}. Required: ${requiredSpace}, Available: ${availableSpace}. Upload blocked.`;
-        
-  //       // Ensure upload state is reset for storage warnings
-  //       this.isUploading = false;
-  //       this.uploadStatus = '';
-  //       this.uploadProgress = 0;
-  //       return;
-  //     }
-      
-  //     console.error('Upload failed:', error);
-      
-  //     // Handle other errors normally
-  //     this.error = `Upload failed: ${error.message || 'Unknown error'}`;
-      
-  //     // Ensure upload state is reset on any error
-  //     this.isUploading = false;
-  //     this.uploadStatus = '';
-  //     this.uploadProgress = 0;
-  //   }
+      // Reset the input so the user can select the same file again
+      input.value = '';
+    }
+  }
 
-  //   // Reset the input
-  //   input.value = '';
-  // }
+  async onFileDownload(item: DirectoryItem): Promise<void> {
+    // Only allow downloading files, not directories
+    if (item.type !== 'file') {
+      this.error = 'Cannot download directories';
+      return;
+    }
+
+    this.clearMessages();
+    this.isDownloading = true;
+    this.downloadStatus = `Downloading ${item.name}...`;
+
+    try {
+      const decryptedBlob = await this.fileService.downloadFile(item);
+      if (!(decryptedBlob instanceof Blob)) {
+        throw new Error('Download failed: Not a valid file blob.');
+      }
+      // Create a temporary URL for the Blob and trigger a download
+      const url = window.URL.createObjectURL(decryptedBlob);
+      const a = document.createElement('a');
+      document.body.appendChild(a);
+      a.style.display = 'none';
+      a.href = url;
+      a.download = item.name;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+
+      this.downloadStatus = `Successfully downloaded ${item.name}`;
+    } catch (error: any) {
+        // Check if this is a session/authentication error
+        if (this.sessionHandler.checkAndHandleSessionError(error)) {
+          return;
+        }
+
+        this.error = `Download failed: ${error.message || 'A critical error occurred.'}`;
+    } finally {
+      // Reset the download UI state after 2 seconds
+      setTimeout(() => {
+        this.isDownloading = false;
+        this.downloadStatus = '';
+      }, 2000);
+    }
+  }
 
   // TODO: FIX
   async deleteItem(item: DirectoryItem): Promise<void> {
     // Validate the item
-    if (!item.chunkId) {
-      this.error = 'Cannot delete: Invalid item (missing chunk ID)';
+    if (item.type === 'file' && !item.fileChunks[0]) {
+      this.error = 'Cannot delete: Invalid item (missing file chunk(s))';
+      return;
+    } else if (item.type === 'directory' && !item.chunkId) {
+      this.error = 'Cannot delete: Invalid item (missing directory ID)';
       return;
     }
 
@@ -248,21 +255,11 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 
     // Show loading state
     this.loading = true;
-    this.error = '';
-    this.warning = '';
+    this.clearMessages();
 
     try {      
-      // Call the appropriate delete method
-      if (item.type === 'file') {
-        await this.fileService.deleteFile(item.chunkId);
-      } else if (item.type === 'directory') {
-        const result = await this.fileService.deleteDirectory(item.chunkId);
-        if (!result.success) {
-          this.warning = result.message || 'Failed to delete directory';
-          this.loading = false;
-          return;
-        }
-      }
+      // Call the file service to delete the item
+      await this.fileService.deleteItem(item);
       
       // Refresh the current directory listing after successful deletion
       this.updateDirectoryListing();
@@ -345,58 +342,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
       this.loading = false;
     }
   }
-
-  // async downloadItem(item: DirectoryItem): Promise<void> {
-  //   // Only allow downloading files, not directories
-  //   if (item.type !== 'file') {
-  //     this.error = 'Cannot download directories';
-  //     return;
-  //   }
-
-  //   // Validate the item
-  //   if (!item.chunkId) {
-  //     this.error = 'Cannot download: Invalid item (missing chunk ID)';
-  //     return;
-  //   }
-
-  //   // Show loading state
-  //   this.isDownloading = true;
-  //   this.downloadProgress = 0;
-  //   this.downloadStatus = `Downloading ${item.name}...`;
-  //   this.downloadingFileId = item.chunkId;
-  //   this.error = '';
-
-  //   try {      
-  //     await this.fileService.downloadFileStream(item.chunkId, (progress) => {
-  //       this.downloadProgress = progress;
-  //     });
-      
-  //     this.downloadStatus = `Successfully downloaded ${item.name}`;
-
-  //     // Reset download state after 2 seconds
-  //     setTimeout(() => {
-  //       this.isDownloading = false;
-  //       this.downloadStatus = '';
-  //       this.downloadProgress = 0;
-  //       this.downloadingFileId = '';
-  //     }, 2000);
-
-  //   } catch (error: any) {
-  //     console.error('Download failed:', error);
-      
-  //     // Check if this is a session/authentication error
-  //     if (this.sessionHandler.checkAndHandleSessionError(error)) {
-  //       return;
-  //     }
-      
-  //     // Handle other errors normally
-  //     this.error = `Download failed: ${error.message || 'Unknown error'}`;
-  //     this.isDownloading = false;
-  //     this.downloadStatus = '';
-  //     this.downloadProgress = 0;
-  //     this.downloadingFileId = '';
-  //   }
-  // }
 
   async createNewDirectory(): Promise<void> {
     if (!this.newDirectoryName.trim()) {

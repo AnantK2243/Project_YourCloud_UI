@@ -7,7 +7,7 @@
   
   <!-- File Upload Section -->
   <div *ngIf="initialized && !loading && !error">
-    <!-- <input 
+    <input 
       type="file" 
       id="fileInput" 
       #fileInput
@@ -17,7 +17,7 @@
     />
     <button (click)="triggerFileUpload()" [disabled]="isUploading">
       {{ isUploading ? 'Uploading...' : 'Upload File' }}
-    </button> -->
+    </button>
     
     <!-- Create Directory Button -->
     <button 
@@ -45,13 +45,11 @@
     <!-- Upload Progress -->
     <div *ngIf="isUploading">
       <div>{{ uploadStatus }}</div>
-      <div>{{ uploadProgress }}%</div>
     </div>
 
     <!-- Download Progress -->
     <div *ngIf="isDownloading">
       <div>{{ downloadStatus }}</div>
-      <div>{{ downloadProgress }}%</div>
     </div>
 
     <!-- Breadcrumb Navigation -->
@@ -67,11 +65,6 @@
     <!-- Show Page Status -->
     <div *ngIf="loading">
     <p>Loading...</p>
-  </div>
-
-  <div *ngIf="error">
-    <p>{{ error }}</p>
-    <button (click)="initializeFileSystem()">Retry</button>
   </div>
 
   <!-- Show Directory Content -->
@@ -95,12 +88,12 @@
             </div>
           </div>
           <div *ngIf="item.type === 'file'">
-            <!-- <button 
-              (click)="downloadItem(item)" 
+            <button 
+              (click)="onFileDownload(item)" 
               [disabled]="loading || isDownloading"
               title="Download">
-              {{ (isDownloading && downloadingFileId === item.chunkId) ? 'Downloading...' : 'Download' }}
-            </button> -->
+              {{ (isDownloading) ? 'Downloading...' : 'Download' }}
+            </button>
             <button 
               (click)="deleteItem(item)" 
               [disabled]="loading || isDownloading"
@@ -127,7 +120,9 @@
     </ul>
   </div>
 
-  <!-- Non-critical errors/warnings -->
   <div *ngIf="warning">
     {{ warning }}
+  </div>
+  <div *ngIf="error">
+    <p>{{ error }}</p>
   </div>

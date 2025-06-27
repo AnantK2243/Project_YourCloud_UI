@@ -1,11 +1,10 @@
-import { Component, OnInit, Inject, PLATFORM_ID, afterNextRender } from '@angular/core';
+import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
-import { NodeService } from '../node.service';
+import { NodeService, StorageNode } from '../node.service';
 import { AuthService } from '../auth.service';
 import { SessionHandlerService } from '../session-handler.service';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 
 @Component({
   selector: 'app-dashboard',
@@ -24,7 +23,7 @@ export class DashboardComponent implements OnInit {
   registerMessage: string = '';
   registrationResult: any = null;
 
-  userStorageNodes: any[] = [];
+  userStorageNodes: StorageNode[] = [];
   private userStorageNodesSub: any;
 
   constructor(

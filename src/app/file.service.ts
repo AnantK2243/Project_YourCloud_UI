@@ -1,22 +1,13 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable, BehaviorSubject, isObservable } from 'rxjs';
+import { BehaviorSubject } from 'rxjs';
 import { AuthService } from './auth.service';
 import { CryptoService } from './crypto.service';
 import { firstValueFrom } from 'rxjs';
 
-export interface File {
-  chunkId: string;
-  name: string;
-  size: number;
-  createdAt: string;
-  iv: string;
-  fileChunks: string[];
-}
-
 export interface Directory {
-  chunkId: string;
   name: string;
+  chunkId: string;
   parentId: string;
   contents: DirectoryItem[];
 }
@@ -30,7 +21,7 @@ export type DirectoryItem = {
   name: string;
   size: number;
   createdAt: string;
-  chunkId: string;
+  fileChunks: string[];
 };
 
 @Injectable({
@@ -49,6 +40,8 @@ export class FileService {
   public peerConnection: RTCPeerConnection | null = null;
   public dataChannel: RTCDataChannel | null = null;
   public webrtcReady: boolean = false;
+
+  private readonly CHUNK_SIZE = 256 * 1024 * 1024; // 256 MB
 
   constructor(
     private http: HttpClient,
@@ -79,7 +72,6 @@ export class FileService {
         const clonedDirectory = structuredClone(directoryData);
         this.directory.next(clonedDirectory);
       }
-
       return { success: true };
     } catch (error: any) {
       if (error?.status === 404 && error.message?.includes('not found')) {
@@ -168,63 +160,6 @@ export class FileService {
 
     // Return the directory if there was an update to chunkID
     return directory;
-  }
-
-  public async deleteDirectory(directoryChunkId: string): Promise<{success: boolean, message?: string}> {
-    if (!this.storageNodeId) {
-      return {
-        success: false,
-        message: 'Node ID not available'
-      };
-    }
-    
-    const currentDirectory = this.directory.getValue();
-    if (!currentDirectory) {
-      return {
-        success: false,
-        message: 'Current directory is not initialized'
-      };
-    }
-
-    // Find the directory to delete
-    const directoryToDelete = currentDirectory.contents.find(item => item.type === 'directory' && item.chunkId === directoryChunkId) as DirectoryItem | undefined;
-
-    if (!directoryToDelete) {
-      return {
-        success: false,
-        message: 'Directory not found in current directory'
-      };
-    }
-
-    try {
-      // First, fetch the directory to check if it's empty
-      const targetDirectory = JSON.parse(await this.fetchAndDecryptChunk(directoryChunkId)) as Directory;
-
-      // Check if directory is empty
-      if (targetDirectory.contents.length > 0) {
-        return {
-          success: false,
-          message: `Cannot delete "${directoryToDelete.name}": Directory is not empty. Please delete all files and subdirectories first.`
-        };
-      }
-      
-      // Delete the directory chunk from storage
-      await this.deleteChunk(directoryChunkId);
-      
-      // Remove the directory from the parent directory
-      currentDirectory.contents = currentDirectory.contents.filter(item => item.chunkId !== directoryToDelete.chunkId);
-      
-      // Update the parent directory metadata
-      await this.updateDirectory();
-      
-      return { success: true };
-      
-    } catch (error) {
-      return {
-        success: false,
-        message: `Error deleting directory: ${error}`
-      };
-    }
   }
 
   public async createSubdirectory(name: string): Promise<{success: boolean, message?: string}> {
@@ -395,14 +330,14 @@ export class FileService {
     }
   }
 
-  private async encryptAndStoreChunk(data: string, chunkId: string, iv?: Uint8Array): Promise<void> {
+  private async encryptAndStoreChunk(data: string, chunkId: string): Promise<void> {
     if (!this.storageNodeId) {
       throw new Error('Node ID not available');
     }
 
     // Encrypt the chunk data
     const dataBuffer = new TextEncoder().encode(data);
-    const { encryptedData, iv: encryptionIv } = await this.cryptoService.encryptData(dataBuffer, iv);
+    const { encryptedData, iv: encryptionIv } = await this.cryptoService.encryptData(dataBuffer);
     
     // Prepend IV to encrypted data
     const finalData = new ArrayBuffer(encryptionIv.length + encryptedData.byteLength);
@@ -439,7 +374,7 @@ export class FileService {
     }
   }
 
-  public async deleteFile(fileChunkId: string): Promise<void> {
+  public async deleteItem(item: DirectoryItem): Promise<{success: boolean, message?: string}> {
     if (!this.storageNodeId) {
       throw new Error('Node ID not available');
     }
@@ -449,127 +384,286 @@ export class FileService {
       throw new Error('Current directory is not initialized');
     }
 
-    // Find the file to delete
-    const fileToDelete = currentDirectory.contents.find(item => item.type === 'file' && item.chunkId === fileChunkId)  as File | undefined;
-    if (!fileToDelete) {
-      throw new Error('File not found in current directory');
+    // Check if item exists in the current directory
+    const existingItem = currentDirectory.contents.find(i => i === item);
+    if (!existingItem) {
+      return {
+        success: false,
+        message: 'Item not found in current directory'
+      };
     }
 
-    try {
-      // Delete all data chunks that make up this file
-      for (const dataChunkId of fileToDelete.fileChunks) {
-        await this.deleteChunk(dataChunkId);
+    if (item.type === 'file') {
+      try {
+        // Delete all data chunks that make up this file
+        for (const dataChunkId of item.fileChunks) {
+          await this.deleteChunk(dataChunkId);
+        }
+
+        // Remove the file from the directory
+        currentDirectory.contents = currentDirectory.contents.filter(
+          item => !(item.type === 'file' && item.fileChunks[0] === item.fileChunks[0])
+        );
+
+        // Update the directory metadata
+        await this.updateDirectory();
+
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          message: `Error deleting file: ${error}`
+        };
       }
+    } else if (item.type === 'directory') {
+      // Delete the directory and all its contents
+      try {
+        // First, fetch the directory to check if it's empty
+        const targetDirectory = JSON.parse(await this.fetchAndDecryptChunk(item.chunkId)) as Directory;
 
-      // Remove the file from the directory
-      currentDirectory.contents = currentDirectory.contents.filter(item => item.chunkId !== fileToDelete.chunkId);
+        // Check if directory is empty
+        if (targetDirectory.contents.length > 0) {
+          return {
+            success: false,
+            message: `Cannot delete "${item.name}": Directory is not empty. Please delete all files and subdirectories first.`
+          };
+        }
+        
+        // Delete the directory chunk from storage
+        await this.deleteChunk(item.chunkId);
 
-      // Update the directory metadata
-      await this.updateDirectory();
-      
-    } catch (error) {
-      console.error(`Error deleting file ${fileToDelete.name}:`, error);
-      throw error;
+        // Remove the directory from the parent directory
+        currentDirectory.contents = currentDirectory.contents.filter(
+          item => !(item.type === 'directory' && item.chunkId === (item as { chunkId: string }).chunkId)
+        );
+        
+        // Update the parent directory metadata
+        await this.updateDirectory();
+        
+        return { success: true };
+        
+      } catch (error) {
+        return {
+          success: false,
+          message: `Error deleting directory: ${error}`
+        };
+      }
+    } else {
+      return {
+        success: false,
+        message: 'Unknown item type. Cannot delete.'
+      };
     }
   }
 
-  // // Check storage capacity of a storage node
-  // async checkStorageCapacity(): Promise<{
-  //   used_space_bytes: number;
-  //   max_space_bytes: number;
-  //   available_space_bytes: number;
-  //   current_chunk_count: number;
-  // }> {
-  //   if (!this.storageNodeId) {
-  //     throw new Error('Node ID not available');
-  //   }
+  public async uploadFile(file: globalThis.File, fileName: string): Promise<{success: boolean, message?: string}> {
+    if (!this.storageNodeId) {
+        return { success: false, message: 'No active storage node selected.' };
+    }
+    if (!file) {
+        return { success: false, message: 'No file provided for upload.'};
+    }
 
-  //   const response = await this.http.get(
-  //     `${this.apiUrl}/node/check-status/${this.storageNodeId}`,
-  //     { headers: this.apiHeaders }
-  //   ).toPromise() as any;
+    try {
+        const currentDirectory = this.directory.getValue();
+        if (!currentDirectory) {
+            return { success: false, message: 'Current directory is not initialized' };
+        }
 
-  //   if (!response || !response.success) {
-  //     throw new Error('Failed to get storage status');
-  //   }
+        const metadataSizeEstimate = await this.estimateFileMetadataSize(fileName, file.size);
+        const fileBuffer = await file.arrayBuffer();
+        const totalSize = fileBuffer.byteLength;
+        const numChunks = Math.ceil(totalSize / this.CHUNK_SIZE);
+        const chunkIds: string[] = [];
 
-  //   const storageStatus = {
-  //     used_space_bytes: response.used_space_bytes,
-  //     max_space_bytes: response.max_space_bytes,
-  //     available_space_bytes: response.available_space_bytes,
-  //     current_chunk_count: response.current_chunk_count
-  //   };
+        for (let i = 0; i < numChunks; i++) {
+            const start = i * this.CHUNK_SIZE;
+            const end = Math.min(start + this.CHUNK_SIZE, totalSize);
+            const chunkData = fileBuffer.slice(start, end);
 
-  //   return storageStatus;
-  // }
+            const dataReservationSize = (i === 0) ? metadataSizeEstimate + totalSize: 0;
 
-  // // Estimate the size of directory metadata after adding a new directory
-  // async estimateDirectoryMetadataSize(newDirectoryName: string): Promise<number> {
-  //   const currentDirectory = this.directory.getValue();
-  //   if (!currentDirectory) {
-  //     throw new Error('Current directory is not initialized');
-  //   }
+            const chunkId = await this.uploadFileChunk(chunkData, dataReservationSize);
+            chunkIds.push(chunkId);
+        }
 
-  //   // Create a mock directory structure with the new directory added
-  //   const mockDirectory= {
-  //     ...currentDirectory,
-  //     contents: [
-  //       ...currentDirectory.contents,
-  //       {
-  //         type: 'directory',
-  //         name: newDirectoryName,
-  //         chunkId: 'temp-mock-dir-id-00000000-mock-uuid' // 36 characters like real UUID
-  //       }
-  //     ]
-  //   };
+        // // After all data chunks are uploaded, create and upload the file metadata
+        // let fileMetadataChunkId = this.cryptoService.generateUUID();
+        // const newFile: FileItem = {
+        //     chunkId: fileMetadataChunkId,
+        //     name: fileName,
+        //     size: file.size,
+        //     createdAt: new Date().toISOString(),
+        //     fileChunks: chunkIds
+        // };
+
+        // // Store file Metadata chunk with retry
+        // do {
+        //     try {
+        //         await this.encryptAndStoreChunk(JSON.stringify(newFile), fileMetadataChunkId);
+        //         break;
+        //     } catch (error: any) {
+        //         // If chunk ID conflict, generate a new one and retry
+        //         if (error?.status === 409) {
+        //             fileMetadataChunkId = this.cryptoService.generateUUID();
+        //             newFile.chunkId = fileMetadataChunkId;
+        //         } else {
+        //             throw error; // Propagate other errors
+        //         }
+        //     }
+        // } while (true);
+
+        // Update the current directory to include the new file reference
+        currentDirectory.contents.push({
+            type: 'file',
+            name: fileName,
+            size: file.size,
+            createdAt: new Date().toISOString(),
+            fileChunks: chunkIds
+        });
+
+        await this.updateDirectory();
+
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, message: error.message || 'An error occurred during file upload.' };
+    }
+  }
+
+  private async uploadFileChunk(data: ArrayBuffer, data_size: number): Promise<string> {
+    if (!this.storageNodeId) throw new Error('No active storage node selected.');
+
+    const prepareResponse = await firstValueFrom(this.http.post<any>(
+        `${this.apiUrl}/chunks/prepare-upload/${this.storageNodeId}`,
+        { data_size: data_size },
+        { headers: this.apiHeaders }
+    ));
+
+    if (!prepareResponse.success) throw new Error(prepareResponse.message || 'Failed to prepare upload.');
     
-  //   // Calculate the size difference
-  //   const currentJsonString = JSON.stringify(currentDirectory);
-  //   const mockJsonString = JSON.stringify(mockDirectory);
-    
-  //   const currentSize = new TextEncoder().encode(currentJsonString).length;
-  //   const mockSize = new TextEncoder().encode(mockJsonString).length;
-    
-  //   // Calculate the difference + encryption overhead for the additional data
-  //   const sizeDifference = mockSize - currentSize;
-  //   const estimatedSize = sizeDifference + 128;
-    
-  //   return Math.max(estimatedSize, 200); // Minimum 200 bytes for any directory creation
-  // }
+    const { chunkId, uploadUrl, temporaryObjectName } = prepareResponse;
+    const { encryptedData, iv } = await this.cryptoService.encryptData(new Uint8Array(data));
 
-  // // Estimate the size of directory metadata after adding a new file
-  // async estimateFileMetadataSize(fileName: string, fileSize: number): Promise<number> {
-  //   const currentDirectory = this.directory.getValue();
-  //   if (!currentDirectory) {
-  //     throw new Error('Current directory is not initialized');
-  //   }
+    const finalPayload = new Uint8Array(iv.length + encryptedData.byteLength);
+    finalPayload.set(iv);
+    finalPayload.set(new Uint8Array(encryptedData), iv.length);
 
-  //   // Create a mock file
-  //   const mockFile: DirectoryItem = {
-  //     type: 'file',
-  //     name: fileName,
-  //     size: fileSize,
-  //     createdAt: new Date().toISOString(),
-  //     chunkId: 'temp-mock-file-id-00000000-mock-uuid'
-  //   };
+    // Use Blob to ensure binary integrity
+    await firstValueFrom(this.http.put(uploadUrl, new Blob([finalPayload]), {
+        headers: { 'Content-Type': 'application/octet-stream' }
+    }));
 
-  //   // Create a mock directory structure with the new file added
-  //   const mockDirectory = {
-  //     ...currentDirectory,
-  //     contents: [...currentDirectory.contents, mockFile]
-  //   };
+    const completeResponse = await firstValueFrom(this.http.post<any>(
+        `${this.apiUrl}/chunks/complete-upload/${this.storageNodeId}`,
+        { chunkId, temporaryObjectName },
+        { headers: this.apiHeaders }
+    ));
 
-  //   // Calculate the size difference more accurately
-  //   const currentJsonString = JSON.stringify(currentDirectory);
-  //   const mockJsonString = JSON.stringify(mockDirectory);
+    if (!completeResponse.success) throw new Error(completeResponse.message || 'Backend failed to complete the transfer.');
+    return chunkId;
+  }
+
+  public async downloadFile(item: DirectoryItem): Promise<Blob> {
+    if (!this.storageNodeId) {
+      throw new Error('No active storage node selected.');
+    }
+
+    const currentDirectory = this.directory.getValue();
+    if (!currentDirectory) {
+      throw new Error('Current directory is not initialized');
+    }
+
+    if (item.type !== 'file') {
+      throw new Error('Selected item is not a file.');
+    }
+
+    // Download and decrypt all the data chunks listed in the metadata.
+    const decryptedChunks: ArrayBuffer[] = [];
+    for (const dataChunkId of item.fileChunks) {
+        const decryptedChunk = await this.downloadFileChunk(dataChunkId);
+        decryptedChunks.push(decryptedChunk);
+    }
+
+    // Reassemble the decrypted chunks into a single buffer.
+    const totalSize = item.size;
+    const reassembledBuffer = new Uint8Array(totalSize);
+    let offset = 0;
+    for (const chunk of decryptedChunks) {
+        reassembledBuffer.set(new Uint8Array(chunk), offset);
+        offset += chunk.byteLength;
+    }
     
-  //   const currentSize = new TextEncoder().encode(currentJsonString).length;
-  //   const mockSize = new TextEncoder().encode(mockJsonString).length;
-    
-  //   // Calculate the difference + encryption overhead for the additional data
-  //   const sizeDifference = mockSize - currentSize;
-  //   const estimatedSize = sizeDifference + 128;
+    // Return the final reassembled file as a Blob.
+    return new Blob([reassembledBuffer]);
+  }
 
-  //   return Math.max(estimatedSize, 300); // Minimum 300 bytes for any file addition
-  // }
+  private async downloadFileChunk(chunkId: string): Promise<ArrayBuffer> {
+    if (!this.storageNodeId) {
+        throw new Error('No active storage node selected.');
+    }
+    try {
+        const prepareResponse = await firstValueFrom(this.http.get<any>(
+            `${this.apiUrl}/chunks/prepare-download/${this.storageNodeId}/${chunkId}`,
+            { headers: this.apiHeaders }
+        ));
+        if (!prepareResponse.success) throw new Error(prepareResponse.message || 'Failed to prepare download.');
+        
+        const { downloadUrl } = prepareResponse;
+        const encryptedFileBuffer = await firstValueFrom(this.http.get(downloadUrl, {
+            responseType: 'arraybuffer'
+        }));
+
+        const encryptedDataWithIv = new Uint8Array(encryptedFileBuffer);
+        if (encryptedDataWithIv.length < 12) throw new Error('Downloaded data is too short to be valid.');
+
+        const iv = encryptedDataWithIv.slice(0, 12);
+        const encryptedContent = encryptedDataWithIv.slice(12);
+
+        return await this.cryptoService.decryptData(encryptedContent.buffer, iv);
+    } catch (error: any) {
+        throw new Error(error.message || `An unknown error occurred during download of chunk ${chunkId}.`);
+    }
+  }
+
+  async estimateFileMetadataSize(fileName: string, fileSize: number): Promise<number> {
+    // Estimate the storage delta of a file upload
+    const currentDirectory = this.directory.getValue();
+    if (!currentDirectory) {
+      throw new Error('Current directory is not initialized');
+    }
+
+    const num_chunks = fileSize / this.CHUNK_SIZE;
+
+    const chunkIdArr = Array.from({ length: num_chunks }, (_, i) => {
+      return `temp-mock-file-id-${i.toString().padStart(8, '0')}-mock-uuid`;
+    });
+
+    // Create a mock file
+    const mockFileItem: DirectoryItem = {
+      type: 'file',
+      name: fileName,
+      size: fileSize,
+      createdAt: new Date().toISOString(),
+      fileChunks: chunkIdArr
+    };
+
+    // Create a mock directory structure with the new file added
+    const mockDirectory = {
+      ...currentDirectory,
+      contents: [...currentDirectory.contents, mockFileItem]
+    };
+
+    // Calculate the size difference more accurately
+    const currentJsonString = JSON.stringify(currentDirectory);
+    const mockJsonString = JSON.stringify(mockDirectory);
+    
+    const currentSize = new TextEncoder().encode(currentJsonString).length;
+    const mockSize = new TextEncoder().encode(mockJsonString).length;
+
+    // Calculate the difference + encryption overhead for the additional data
+    const sizeDifference = mockSize - currentSize;
+    const estimatedSize = sizeDifference + 32;
+
+    return Math.max(estimatedSize, 300); // Minimum 300 bytes for any file addition
+  }
 }

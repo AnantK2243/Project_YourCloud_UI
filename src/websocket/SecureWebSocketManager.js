@@ -250,7 +250,7 @@ class SecureWebSocketManager {
       case 'COMMAND_RESULT':
         await this.handleCommandResult(data, ws);
         break;
-        
+
       case 'STATUS_REPORT':
         // Handle status reports from storage client
         if (data.status && ws.nodeId) {

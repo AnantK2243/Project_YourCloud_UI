@@ -1,31 +1,31 @@
 services:
-  project-yourcloud.me:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: project-yourcloud.me
-    ports:
-      - "${APP_PORT:-4200}:${APP_PORT:-4200}"
-    env_file:
-      - .env
-    volumes:
-      - ./ssl:/app/ssl:ro
-    restart: unless-stopped
-    networks:
-      - yourcloud-network
+    project-yourcloud.me:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: project-yourcloud.me
+        ports:
+            - "${APP_PORT:-4200}:${APP_PORT:-4200}"
+        env_file:
+            - .env
+        volumes:
+            - ./ssl:/app/ssl:ro
+        restart: unless-stopped
+        networks:
+            - yourcloud-network
 
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: yourcloud-tunnel
-    command: tunnel --no-autoupdate run
-    environment:
-      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
-    restart: unless-stopped
-    depends_on:
-      - project-yourcloud.me
-    networks:
-      - yourcloud-network
+    cloudflared:
+        image: cloudflare/cloudflared:latest
+        container_name: yourcloud-tunnel
+        command: tunnel --no-autoupdate run
+        environment:
+            - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+        restart: unless-stopped
+        depends_on:
+            - project-yourcloud.me
+        networks:
+            - yourcloud-network
 
 networks:
-  yourcloud-network:
-    driver: bridge
+    yourcloud-network:
+        driver: bridge

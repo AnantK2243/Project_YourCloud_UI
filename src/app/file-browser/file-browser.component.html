@@ -1,128 +1,137 @@
 <div>
-  <div>
-    <h2>{{ nodeName }}</h2>
-    <button (click)="goBack()"><- Back to Dashboard</button>
-  </div>
+	<div>
+		<h2>{{ nodeName }}</h2>
+		<button (click)="goBack()"><- Back to Dashboard</button>
+	</div>
 
-  
-  <!-- File Upload Section -->
-  <div *ngIf="initialized && !loading && !error">
-    <input 
-      type="file" 
-      id="fileInput" 
-      #fileInput
-      (change)="onFileSelected($event)" 
-      style="display: none;"
-      [disabled]="isUploading"
-    />
-    <button (click)="triggerFileUpload()" [disabled]="isUploading">
-      {{ isUploading ? 'Uploading...' : 'Upload File' }}
-    </button>
-    
-    <!-- Create Directory Button -->
-    <button 
-      (click)="startCreatingDirectory()" 
-      [disabled]="isUploading || isCreatingDirectory">
-      Create Directory
-    </button>
-    
-    <!-- Directory Creation Form -->
-    <div *ngIf="isCreatingDirectory">
-      <input 
-        type="text" 
-        [(ngModel)]="newDirectoryName"
-        placeholder="Enter directory name"
-        (keyup.enter)="createNewDirectory()"
-      />
-      <button (click)="createNewDirectory()" [disabled]="loading">
-        {{ loading ? 'Creating...' : 'Create' }}
-      </button>
-      <button (click)="cancelCreateDirectory()" [disabled]="loading">
-        Cancel
-      </button>
-    </div>
-    
-    <!-- Upload Progress -->
-    <div *ngIf="isUploading">
-      <div>{{ uploadStatus }}</div>
-    </div>
+	<!-- File Upload Section -->
+	<div *ngIf="initialized && !loading && !error">
+		<input
+			type="file"
+			id="fileInput"
+			#fileInput
+			(change)="onFileSelected($event)"
+			style="display: none"
+			[disabled]="isUploading"
+		/>
+		<button (click)="triggerFileUpload()" [disabled]="isUploading">
+			{{ isUploading ? "Uploading..." : "Upload File" }}
+		</button>
 
-    <!-- Download Progress -->
-    <div *ngIf="isDownloading">
-      <div>{{ downloadStatus }}</div>
-    </div>
+		<!-- Create Directory Button -->
+		<button
+			(click)="startCreatingDirectory()"
+			[disabled]="isUploading || isCreatingDirectory"
+		>
+			Create Directory
+		</button>
 
-    <!-- Breadcrumb Navigation -->
-    <div *ngIf="initialized">
-      <span>Path: </span> {{ getPath() }}
-    </div>
+		<!-- Directory Creation Form -->
+		<div *ngIf="isCreatingDirectory">
+			<input
+				type="text"
+				[(ngModel)]="newDirectoryName"
+				placeholder="Enter directory name"
+				(keyup.enter)="createNewDirectory()"
+			/>
+			<button (click)="createNewDirectory()" [disabled]="loading">
+				{{ loading ? "Creating..." : "Create" }}
+			</button>
+			<button (click)="cancelCreateDirectory()" [disabled]="loading">
+				Cancel
+			</button>
+		</div>
 
-    <!-- Go to parent -->
-    <button (click)="leaveDirectory()" [disabled]="loading">
-      Back
-    </button>
+		<!-- Upload Progress -->
+		<div *ngIf="isUploading">
+			<div>{{ uploadStatus }}</div>
+		</div>
 
-    <!-- Show Page Status -->
-    <div *ngIf="loading">
-    <p>Loading...</p>
-  </div>
+		<!-- Download Progress -->
+		<div *ngIf="isDownloading">
+			<div>{{ downloadStatus }}</div>
+		</div>
 
-  <!-- Show Directory Content -->
-  <div *ngIf="initialized && !loading && !error">
-    <div *ngIf="directoryList.length === 0">
-      <p>This directory is empty.</p>
-    </div>
+		<!-- Breadcrumb Navigation -->
+		<div *ngIf="initialized"><span>Path: </span> {{ getPath() }}</div>
 
-    <ul *ngIf="directoryList.length > 0">
-      <li *ngFor="let item of directoryList">
-        <div>
-          <div>
-            <span *ngIf="item.type === 'directory'">
-              {{item.type }} - {{ item.name }}
-            </span>
-            <span *ngIf="item.type === 'file'">
-              {{item.type }} - {{ item.name }}
-            </span>
-            <div *ngIf="item.type === 'file'">
-              <span>{{ formatFileSize(item.size) }} - {{ formatDate(item.createdAt) }}</span>
-            </div>
-          </div>
-          <div *ngIf="item.type === 'file'">
-            <button 
-              (click)="onFileDownload(item)" 
-              [disabled]="loading || isDownloading"
-              title="Download">
-              {{ (isDownloading) ? 'Downloading...' : 'Download' }}
-            </button>
-            <button 
-              (click)="deleteItem(item)" 
-              [disabled]="loading || isDownloading"
-              title="Delete File">
-              {{ loading ? 'Deleting...' : 'Delete' }}
-            </button>
-          </div>
-          <div *ngIf="item.type === 'directory'">
-            <button
-              (click)="enterDirectory(item)"
-              [disabled]="loading || isDownloading"
-              title="Navigate to Directory">
-              Enter
-            </button>
-            <button 
-              (click)="deleteItem(item)" 
-              [disabled]="loading || isDownloading"
-              title="Delete Directory">
-              {{ loading ? 'Deleting...' : 'Delete' }}
-            </button>
-          </div>
-        </div>
-      </li>
-    </ul>
-  </div>
+		<!-- Go to parent -->
+		<button (click)="leaveDirectory()" [disabled]="loading">Back</button>
 
-  <div *ngIf="warning">
-    {{ warning }}
-  </div>
-  <div *ngIf="error">
-    <p>{{ error }}</p>
-  </div>
+		<!-- Show Page Status -->
+		<div *ngIf="loading">
+			<p>Loading...</p>
+		</div>
+
+		<!-- Show Directory Content -->
+		<div *ngIf="initialized && !loading && !error">
+			<div *ngIf="directoryList.length === 0">
+				<p>This directory is empty.</p>
+			</div>
+
+			<ul *ngIf="directoryList.length > 0">
+				<li *ngFor="let item of directoryList">
+					<div>
+						<div>
+							<span *ngIf="item.type === 'directory'">
+								{{ item.type }} - {{ item.name }}
+							</span>
+							<span *ngIf="item.type === 'file'">
+								{{ item.type }} - {{ item.name }}
+							</span>
+							<div *ngIf="item.type === 'file'">
+								<span
+									>{{ formatFileSize(item.size) }} -
+									{{ formatDate(item.createdAt) }}</span
+								>
+							</div>
+						</div>
+						<div *ngIf="item.type === 'file'">
+							<button
+								(click)="onFileDownload(item)"
+								[disabled]="loading || isDownloading"
+								title="Download"
+							>
+								{{
+									isDownloading
+										? "Downloading..."
+										: "Download"
+								}}
+							</button>
+							<button
+								(click)="deleteItem(item)"
+								[disabled]="loading || isDownloading"
+								title="Delete File"
+							>
+								{{ loading ? "Deleting..." : "Delete" }}
+							</button>
+						</div>
+						<div *ngIf="item.type === 'directory'">
+							<button
+								(click)="enterDirectory(item)"
+								[disabled]="loading || isDownloading"
+								title="Navigate to Directory"
+							>
+								Enter
+							</button>
+							<button
+								(click)="deleteItem(item)"
+								[disabled]="loading || isDownloading"
+								title="Delete Directory"
+							>
+								{{ loading ? "Deleting..." : "Delete" }}
+							</button>
+						</div>
+					</div>
+				</li>
+			</ul>
+		</div>
+
+		<div *ngIf="warning">
+			{{ warning }}
+		</div>
+		<div *ngIf="error">
+			<p>{{ error }}</p>
+		</div>
+	</div>
+</div>

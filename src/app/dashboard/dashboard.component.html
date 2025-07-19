@@ -1,92 +1,154 @@
 <div>
-  <h1>Project YourCloud Dashboard</h1>
+	<h1>Project YourCloud Dashboard</h1>
 
-  <div>
-    <button (click)="logout()">Logout</button>
-    <button (click)="showNodeRegistrationPopup()">Register New Node</button>
-  </div>
+	<div>
+		<button (click)="logout()">Logout</button>
+		<button (click)="showNodeRegistrationPopup()">Register New Node</button>
+	</div>
 
-  <!-- User's Storage Nodes -->
-  <div>
-    <h3>Your Storage Nodes</h3>
-    <div *ngIf="loading">Loading your storage nodes...</div>
-    <div *ngIf="!loading && userStorageNodes.length === 0">
-      <p>You don't have any storage nodes yet. Click "Register New Node" to create one.</p>
-    </div>
-    <div *ngIf="!loading && userStorageNodes.length > 0">
-      <div *ngFor="let node of userStorageNodes" 
-          (click)="node.status === 'online' ? openFileBrowser(node) : null">
-        <p><strong>Name:</strong> {{ node.node_name }}</p>
-        <p><strong>Node ID:</strong> {{ node.node_id }}</p>
-        <p><strong>Status:</strong> 
-          <span>
-            {{ node.status }}
-          </span>
-        </p>
-        <p><strong>Storage:</strong> 
-          <span *ngIf="node.total_available_space > 0">
-            {{ (node.used_space / (1024*1024*1024)) | number:'1.2-2' }} GB / 
-            {{ (node.total_available_space / (1024*1024*1024)) | number:'1.2-2' }} GB used
-          </span>
-          <span *ngIf="node.total_available_space <= 0">Not available</span>
-        </p>
-        <p><strong>Chunks:</strong> {{ node.num_chunks || 0 }}</p>
-        <p *ngIf="node.last_seen"><strong>Last Seen:</strong> {{ node.last_seen | date:'short' }}</p>
-        <p *ngIf="node.status === 'online'">
-          Click to browse files ->
-        </p>
-        <button type="button" [disabled]="loading" (click)="checkNodeStatus(node.node_id); $event.stopPropagation();">
-          Refresh Status
-        </button>
-        <button type="button" [disabled]="loading" (click)="deleteNode(node.node_id); $event.stopPropagation();">
-          Delete Node
-        </button>
-      </div>
-    </div>
-  </div>
+	<!-- User's Storage Nodes -->
+	<div>
+		<h3>Your Storage Nodes</h3>
+		<div *ngIf="loading">Loading your storage nodes...</div>
+		<div *ngIf="!loading && userStorageNodes.length === 0">
+			<p>
+				You don't have any storage nodes yet. Click "Register New Node"
+				to create one.
+			</p>
+		</div>
+		<div *ngIf="!loading && userStorageNodes.length > 0">
+			<div
+				*ngFor="let node of userStorageNodes"
+				(click)="
+					node.status === 'online' ? openFileBrowser(node) : null
+				"
+			>
+				<p><strong>Name:</strong> {{ node.node_name }}</p>
+				<p><strong>Node ID:</strong> {{ node.node_id }}</p>
+				<p>
+					<strong>Status:</strong>
+					<span>
+						{{ node.status }}
+					</span>
+				</p>
+				<p>
+					<strong>Storage:</strong>
+					<span *ngIf="node.total_available_space > 0">
+						{{
+							node.used_space / (1024 * 1024 * 1024)
+								| number : "1.2-2"
+						}}
+						GB /
+						{{
+							node.total_available_space / (1024 * 1024 * 1024)
+								| number : "1.2-2"
+						}}
+						GB used
+					</span>
+					<span *ngIf="node.total_available_space <= 0"
+						>Not available</span
+					>
+				</p>
+				<p><strong>Chunks:</strong> {{ node.num_chunks || 0 }}</p>
+				<p *ngIf="node.last_seen">
+					<strong>Last Seen:</strong>
+					{{ node.last_seen | date : "short" }}
+				</p>
+				<p *ngIf="node.status === 'online'">Click to browse files -></p>
+				<button
+					type="button"
+					[disabled]="loading"
+					(click)="
+						checkNodeStatus(node.node_id); $event.stopPropagation()
+					"
+				>
+					Refresh Status
+				</button>
+				<button
+					type="button"
+					[disabled]="loading"
+					(click)="deleteNode(node.node_id); $event.stopPropagation()"
+				>
+					Delete Node
+				</button>
+			</div>
+		</div>
+	</div>
 
-  <div *ngIf="error">
-    <p>Error: {{ error }}</p>
-  </div>  
-  <div *ngIf="warning">
-    <p>{{ warning }}</p>
-  </div>
+	<div *ngIf="error">
+		<p>Error: {{ error }}</p>
+	</div>
+	<div *ngIf="warning">
+		<p>{{ warning }}</p>
+	</div>
 
-  <!-- Node Registration Popup -->
-  <div *ngIf="showRegisterPopup" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000;">
-    <div style="background: white; padding: 20px; border-radius: 8px; max-width: 500px; width: 90%; max-height: 80%; overflow-y: auto;">
-      <h3>Register New Storage Node</h3>
-      
-      <div>
-        <label>Node Name:</label>
-        <input 
-          type="text" 
-          [(ngModel)]="registerNodeName" 
-          placeholder="Enter a descriptive name for your node"
-        />
-      </div>
-      
-      <div>
-        <button (click)="registerNode()">Register Node</button>
-        <button (click)="hideNodeRegistrationPopup()">Cancel</button>
-      </div>
-      
-      <div *ngIf="registerMessage">
-        <p>{{ registerMessage }}</p>
-      </div>
-      
-      <div *ngIf="registrationResult">
-        <h4>Registration Successful!</h4>
-        <p><strong>Node Name:</strong> {{ registrationResult.node_name }}</p>
-        <p><strong>Generated Node ID:</strong> {{ registrationResult.node_id }}</p>
-        <p><strong>Auth Token:</strong></p>
-        <textarea 
-          readonly 
-        >{{ registrationResult.auth_token }}</textarea>
-        <p>
-          <strong>Important:</strong> Add Node ID and Auth Token to config file. Default location is ~/.config/Project_YourCloud/config.toml.
-        </p>
-      </div>
-    </div>
-  </div>
+	<!-- Node Registration Popup -->
+	<div
+		*ngIf="showRegisterPopup"
+		style="
+			position: fixed;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			background: rgba(0, 0, 0, 0.5);
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			z-index: 1000;
+		"
+	>
+		<div
+			style="
+				background: white;
+				padding: 20px;
+				border-radius: 8px;
+				max-width: 500px;
+				width: 90%;
+				max-height: 80%;
+				overflow-y: auto;
+			"
+		>
+			<h3>Register New Storage Node</h3>
+
+			<div>
+				<label>Node Name:</label>
+				<input
+					type="text"
+					[(ngModel)]="registerNodeName"
+					placeholder="Enter a descriptive name for your node"
+				/>
+			</div>
+
+			<div>
+				<button (click)="registerNode()">Register Node</button>
+				<button (click)="hideNodeRegistrationPopup()">Cancel</button>
+			</div>
+
+			<div *ngIf="registerMessage">
+				<p>{{ registerMessage }}</p>
+			</div>
+
+			<div *ngIf="registrationResult">
+				<h4>Registration Successful!</h4>
+				<p>
+					<strong>Node Name:</strong>
+					{{ registrationResult.node_name }}
+				</p>
+				<p>
+					<strong>Generated Node ID:</strong>
+					{{ registrationResult.node_id }}
+				</p>
+				<p><strong>Auth Token:</strong></p>
+				<textarea readonly>{{
+					registrationResult.auth_token
+				}}</textarea>
+				<p>
+					<strong>Important:</strong> Add Node ID and Auth Token to
+					config file. Default location is
+					~/.config/Project_YourCloud/config.toml.
+				</p>
+			</div>
+		</div>
+	</div>
 </div>

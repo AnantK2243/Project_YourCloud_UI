@@ -38,9 +38,7 @@ export class NodeService {
 		this.apiHeaders = this.authService.getAuthHeaders();
 	}
 
-	async registerNode(
-		node_name: string
-	): Promise<{
+	async registerNode(node_name: string): Promise<{
 		success: boolean;
 		registration_result?: RegistrationResult;
 		message?: string;
@@ -59,7 +57,7 @@ export class NodeService {
 		try {
 			const response = (await firstValueFrom(
 				this.http.post(
-					`${this.apiUrl}/register-node`,
+					`${this.apiUrl}/nodes`,
 					{ node_name },
 					{
 						headers: this.apiHeaders,
@@ -68,9 +66,9 @@ export class NodeService {
 			)) as any;
 			if (response && response.success) {
 				const result: RegistrationResult = {
-					node_name: response.node_name,
-					node_id: response.node_id,
-					auth_token: response.auth_token,
+					node_name: response.data.nodeName,
+					node_id: response.data.nodeId,
+					auth_token: response.data.authToken,
 				};
 				return { success: true, registration_result: result };
 			} else
@@ -92,12 +90,12 @@ export class NodeService {
 	}> {
 		try {
 			const response = (await firstValueFrom(
-				this.http.get(`${this.apiUrl}/user/storage-nodes`, {
+				this.http.get(`${this.apiUrl}/nodes`, {
 					headers: this.apiHeaders,
 				})
 			)) as any;
 			if (response && response.success) {
-				const nodes = (response.storage_nodes || []).map((n: any) => ({
+				const nodes = (response.data || []).map((n: any) => ({
 					node_name: n.node_name,
 					node_id: n.node_id,
 					status: n.status,
@@ -129,22 +127,22 @@ export class NodeService {
 	): Promise<{ success: boolean; message?: string }> {
 		try {
 			const response = (await firstValueFrom(
-				this.http.get(`${this.apiUrl}/node/check-status/${nodeId}`, {
+				this.http.get(`${this.apiUrl}/nodes/${nodeId}/status`, {
 					headers: this.apiHeaders,
 				})
 			)) as any;
-			if (response && response.success && response.node_status) {
+			if (response && response.success && response.data) {
 				// Update the node in the subject
 				const nodes = this.userStorageNodes.value.map((node) => {
 					if (node.node_id === nodeId) {
 						return {
 							...node,
-							status: response.node_status.status,
+							status: response.data.status,
 							total_available_space:
-								response.node_status.total_available_space,
-							used_space: response.node_status.used_space,
-							num_chunks: response.node_status.num_chunks,
-							last_seen: response.node_status.last_seen,
+								response.data.total_available_space,
+							used_space: response.data.used_space,
+							num_chunks: response.data.num_chunks,
+							last_seen: response.data.last_seen,
 						};
 					}
 					return node;
@@ -172,7 +170,7 @@ export class NodeService {
 	): Promise<{ success: boolean; message?: string }> {
 		try {
 			const response = (await firstValueFrom(
-				this.http.delete(`${this.apiUrl}/node/delete-node/${nodeId}`, {
+				this.http.delete(`${this.apiUrl}/nodes/${nodeId}`, {
 					headers: this.apiHeaders,
 				})
 			)) as any;

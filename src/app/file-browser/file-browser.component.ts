@@ -281,7 +281,15 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 
 		try {
 			// Call the file service to delete the item
-			await this.fileService.deleteItem(item);
+			const result = await this.fileService.deleteItem(item);
+
+			if (!result.success) {
+				// Check if error is about empty directory
+				if (result.message?.includes("Directory is not empty")) {
+					this.warning = "Cannot delete non-empty directory";
+					return;
+				}
+			}
 
 			// Refresh the current directory listing after successful deletion
 			this.updateDirectoryListing();
@@ -291,7 +299,9 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 				return;
 			}
 
-			throw error;
+			// Show error message for unexpected errors
+			this.error =
+				error.message || "An unexpected error occurred while deleting";
 		} finally {
 			this.loading = false;
 		}

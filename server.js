@@ -200,8 +200,8 @@ async function startServer() {
 		}, 5 * 60 * 1000);
 
 		// Start listening
-		server.listen(APP_PORT, () => {
-			console.log(`YourCloud server is running on https://localhost:${APP_PORT}`);
+		server.listen(APP_PORT, '127.0.0.1', () => {
+			console.log(`YourCloud server is running on https://127.0.0.1:${APP_PORT}`);
 		});
 
 		// Graceful shutdown

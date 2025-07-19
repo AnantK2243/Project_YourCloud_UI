@@ -309,7 +309,7 @@ export class FileService {
 		try {
 			const response: any = await firstValueFrom(
 				this.http.get(
-					`${this.apiUrl}/chunks/get/${this.storageNodeId}/${chunkId}`,
+					`${this.apiUrl}/nodes/${this.storageNodeId}/chunks/${chunkId}`,
 					{
 						headers: this.apiHeaders,
 						responseType: "arraybuffer" as "arraybuffer",
@@ -402,7 +402,7 @@ export class FileService {
 		try {
 			await firstValueFrom(
 				this.http.post(
-					`${this.apiUrl}/chunks/store/${this.storageNodeId}/${chunkId}`,
+					`${this.apiUrl}/nodes/${this.storageNodeId}/chunks/${chunkId}`,
 					new Blob([finalData]),
 					{
 						headers: this.apiHeaders.set(
@@ -424,7 +424,7 @@ export class FileService {
 		try {
 			await firstValueFrom(
 				this.http.delete(
-					`${this.apiUrl}/chunks/delete/${this.storageNodeId}/${chunkId}`,
+					`${this.apiUrl}/nodes/${this.storageNodeId}/chunks/${chunkId}`,
 					{ headers: this.apiHeaders }
 				)
 			);
@@ -437,12 +437,18 @@ export class FileService {
 		item: DirectoryItem
 	): Promise<{ success: boolean; message?: string }> {
 		if (!this.storageNodeId) {
-			throw new Error("Node ID not available");
+			return {
+				success: false,
+				message: "Node ID not available",
+			};
 		}
 
 		const currentDirectory = this.directory.getValue();
 		if (!currentDirectory) {
-			throw new Error("Current directory is not initialized");
+			return {
+				success: false,
+				message: "Current directory is not initialized",
+			};
 		}
 
 		// Check if item exists in the current directory
@@ -463,11 +469,7 @@ export class FileService {
 
 				// Remove the file from the directory
 				currentDirectory.contents = currentDirectory.contents.filter(
-					(item) =>
-						!(
-							item.type === "file" &&
-							item.fileChunks[0] === item.fileChunks[0]
-						)
+					(dirItem) => !(dirItem.type === "file" && dirItem === item)
 				);
 
 				// Update the directory metadata
@@ -501,11 +503,10 @@ export class FileService {
 
 				// Remove the directory from the parent directory
 				currentDirectory.contents = currentDirectory.contents.filter(
-					(item) =>
+					(dirItem) =>
 						!(
-							item.type === "directory" &&
-							item.chunkId ===
-								(item as { chunkId: string }).chunkId
+							dirItem.type === "directory" &&
+							dirItem.chunkId === item.chunkId
 						)
 				);
 
@@ -630,7 +631,7 @@ export class FileService {
 
 		const prepareResponse = await firstValueFrom(
 			this.http.post<any>(
-				`${this.apiUrl}/chunks/prepare-upload/${this.storageNodeId}`,
+				`${this.apiUrl}/nodes/${this.storageNodeId}/chunks/upload-sessions`,
 				{ data_size: data_size },
 				{ headers: this.apiHeaders }
 			)
@@ -638,10 +639,11 @@ export class FileService {
 
 		if (!prepareResponse.success)
 			throw new Error(
-				prepareResponse.message || "Failed to prepare upload."
+				prepareResponse.error || "Failed to prepare upload."
 			);
 
-		const { chunkId, uploadUrl, temporaryObjectName } = prepareResponse;
+		const { chunkId, uploadUrl, temporaryObjectName } =
+			prepareResponse.data;
 		const { encryptedData, iv } = await this.cryptoService.encryptData(
 			new Uint8Array(data)
 		);
@@ -660,16 +662,16 @@ export class FileService {
 		);
 
 		const completeResponse = await firstValueFrom(
-			this.http.post<any>(
-				`${this.apiUrl}/chunks/complete-upload/${this.storageNodeId}`,
-				{ chunkId, temporaryObjectName },
+			this.http.put<any>(
+				`${this.apiUrl}/nodes/${this.storageNodeId}/chunks/${chunkId}`,
+				{ temporaryObjectName },
 				{ headers: this.apiHeaders }
 			)
 		);
 
 		if (!completeResponse.success)
 			throw new Error(
-				completeResponse.message ||
+				completeResponse.error ||
 					"Backend failed to complete the transfer."
 			);
 		return chunkId;
@@ -715,17 +717,18 @@ export class FileService {
 		}
 		try {
 			const prepareResponse = await firstValueFrom(
-				this.http.get<any>(
-					`${this.apiUrl}/chunks/prepare-download/${this.storageNodeId}/${chunkId}`,
+				this.http.post<any>(
+					`${this.apiUrl}/nodes/${this.storageNodeId}/chunks/${chunkId}/download-sessions`,
+					{},
 					{ headers: this.apiHeaders }
 				)
 			);
 			if (!prepareResponse.success)
 				throw new Error(
-					prepareResponse.message || "Failed to prepare download."
+					prepareResponse.error || "Failed to prepare download."
 				);
 
-			const { downloadUrl } = prepareResponse;
+			const { downloadUrl, temporaryObjectName } = prepareResponse.data;
 			const encryptedFileBuffer = await firstValueFrom(
 				this.http.get(downloadUrl, {
 					responseType: "arraybuffer",
@@ -739,10 +742,31 @@ export class FileService {
 			const iv = encryptedDataWithIv.slice(0, 12);
 			const encryptedContent = encryptedDataWithIv.slice(12);
 
-			return await this.cryptoService.decryptData(
+			const decryptedData = await this.cryptoService.decryptData(
 				encryptedContent.buffer,
 				iv
 			);
+
+			// Cleanup the temporary object after successful download
+			try {
+				await firstValueFrom(
+					this.http.delete(
+						`${this.apiUrl}/nodes/${this.storageNodeId}/chunks/${chunkId}/download-sessions`,
+						{
+							headers: this.apiHeaders,
+							body: { temporaryObjectName },
+						}
+					)
+				);
+			} catch (cleanupError) {
+				// Log cleanup error but don't fail the download
+				console.warn(
+					`Failed to cleanup temporary object ${temporaryObjectName}:`,
+					cleanupError
+				);
+			}
+
+			return decryptedData;
 		} catch (error: any) {
 			throw new Error(
 				error.message ||

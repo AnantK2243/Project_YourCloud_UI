@@ -204,8 +204,8 @@ async function sendStoreCommand(req, nodeId, command, binaryData) {
 	});
 }
 
-// Register a new storage node
-router.post('/register-node', authenticateToken, async (req, res) => {
+// POST /api/nodes - Register a new storage node
+router.post('/nodes', authenticateToken, async (req, res) => {
 	try {
 		const { node_name } = req.body;
 
@@ -275,12 +275,13 @@ router.post('/register-node', authenticateToken, async (req, res) => {
 			{ new: true }
 		);
 
-		res.json({
+		res.status(201).json({
 			success: true,
-			node_id,
-			auth_token,
-			node_name: node_name.trim(),
-			message: 'Node registered successfully'
+			data: {
+				nodeId: node_id,
+				authToken: auth_token,
+				nodeName: node_name.trim()
+			}
 		});
 	} catch (error) {
 		res.status(500).json({
@@ -290,8 +291,8 @@ router.post('/register-node', authenticateToken, async (req, res) => {
 	}
 });
 
-// Get user's storage nodes from database
-router.get('/user/storage-nodes', authenticateToken, async (req, res) => {
+// GET /api/nodes - Get user's storage nodes
+router.get('/nodes', authenticateToken, async (req, res) => {
 	try {
 		const user = await User.findById(req.user.userId);
 
@@ -309,7 +310,7 @@ router.get('/user/storage-nodes', authenticateToken, async (req, res) => {
 
 		res.json({
 			success: true,
-			storage_nodes: storageNodes
+			data: storageNodes
 		});
 
 	} catch (error) {
@@ -320,8 +321,8 @@ router.get('/user/storage-nodes', authenticateToken, async (req, res) => {
 	}
 });
 
-// Storage Node Status Check
-router.get('/node/check-status/:nodeId', authenticateToken, async (req, res) => {
+// GET /api/nodes/:nodeId/status - Check storage node status
+router.get('/nodes/:nodeId/status', authenticateToken, async (req, res) => {
 	try {
 		const { nodeId } = req.params;
 		if (!nodeId) {
@@ -333,7 +334,7 @@ router.get('/node/check-status/:nodeId', authenticateToken, async (req, res) => 
 		}
 		res.json({
 			success: true,
-			node_status: nodeStatus
+			data: nodeStatus
 		});
 	} catch (error) {
 		if (error.message.includes('required')) {
@@ -355,8 +356,8 @@ router.get('/node/check-status/:nodeId', authenticateToken, async (req, res) => 
 	}
 });
 
-// Delete Storage Node
-router.delete('/node/delete-node/:nodeId', authenticateToken, async (req, res) => {
+// DELETE /api/nodes/:nodeId - Delete storage node
+router.delete('/nodes/:nodeId', authenticateToken, async (req, res) => {
 	try {
 		const { nodeId } = req.params;
 		if (!nodeId) {
@@ -383,7 +384,10 @@ router.delete('/node/delete-node/:nodeId', authenticateToken, async (req, res) =
 
 		res.json({
 			success: true,
-			message: 'Node deleted successfully'
+			data: {
+				nodeId,
+				status: 'deleted'
+			}
 		});
 	} catch (error) {
 		res.status(500).json({
@@ -393,8 +397,50 @@ router.delete('/node/delete-node/:nodeId', authenticateToken, async (req, res) =
 	}
 });
 
-// Store chunk
-router.post('/chunks/store/:nodeId/:chunkId', authenticateToken, express.raw({ type: 'application/octet-stream', limit: '64mb' }), async (req, res) => {
+// POST /api/nodes/:nodeId/chunks/upload-sessions - Create upload session
+router.post('/nodes/:nodeId/chunks/upload-sessions', authenticateToken, async (req, res) => {
+	const { nodeId } = req.params;
+	const { data_size } = req.body;
+
+	try {
+		await validateUserOwnsNode(req, req.user.userId, nodeId);
+		const commandId = generateCommandId(req);
+
+		const chunkIdResponse = await sendStorageNodeCommand(req, nodeId, {
+			command_type: 'PREP_UPLOAD',
+			data_size,
+		}, commandId);
+
+		if (!chunkIdResponse || !chunkIdResponse.success || !chunkIdResponse.chunk_id) {
+			throw new Error('Failed to get a valid chunkId from the storage node.');
+		}
+		const { chunk_id: chunkId } = chunkIdResponse;
+
+		const temporaryObjectName = `temp-${commandId}-${chunkId}`;
+
+		const putCommand = new PutObjectCommand({ Bucket: R2_BUCKET_NAME, Key: temporaryObjectName });
+		const uploadUrl = await getSignedUrl(s3Client, putCommand, { expiresIn: 300 });
+
+		res.status(201).json({
+			success: true,
+			data: {
+				sessionId: commandId,
+				chunkId,
+				uploadUrl,
+				temporaryObjectName,
+				expiresIn: 300
+			}
+		});
+
+	} catch (error) {
+		console.error('[ERROR] Upload session creation failed:', error);
+		console.error('[ERROR] Error stack:', error.stack);
+		res.status(500).json({ success: false, error: error.message });
+	}
+});
+
+// POST /api/nodes/:nodeId/chunks/:chunkId - Store chunk (direct binary upload)
+router.post('/nodes/:nodeId/chunks/:chunkId', authenticateToken, express.raw({ type: 'application/octet-stream', limit: '64mb' }), async (req, res) => {
 	try {
 		const { nodeId, chunkId } = req.params;
 		if (!nodeId || !chunkId) {
@@ -416,7 +462,13 @@ router.post('/chunks/store/:nodeId/:chunkId', authenticateToken, express.raw({ t
 		}, chunkData);
 
 		if (result.success && result.chunk_id) {
-			res.json({ success: true, chunk_id: result.chunk_id });
+			res.status(201).json({
+				success: true,
+				data: {
+					chunkId: result.chunk_id,
+					status: 'stored'
+				}
+			});
 		} else {
 			throw new Error(result.error || 'Failed to store chunk');
 		}
@@ -455,8 +507,8 @@ router.post('/chunks/store/:nodeId/:chunkId', authenticateToken, express.raw({ t
 	}
 });
 
-// Get chunk endpoint
-router.get('/chunks/get/:nodeId/:chunkId', authenticateToken, async (req, res) => {
+// GET /api/nodes/:nodeId/chunks/:chunkId - Get chunk data
+router.get('/nodes/:nodeId/chunks/:chunkId', authenticateToken, async (req, res) => {
 	try {
 		const { nodeId, chunkId } = req.params;
 		if (!nodeId || !chunkId) {
@@ -508,8 +560,8 @@ router.get('/chunks/get/:nodeId/:chunkId', authenticateToken, async (req, res) =
 	}
 });
 
-// Delete chunk endpoint
-router.delete('/chunks/delete/:nodeId/:chunkId', authenticateToken, async (req, res) => {
+// DELETE /api/nodes/:nodeId/chunks/:chunkId - Delete chunk
+router.delete('/nodes/:nodeId/chunks/:chunkId', authenticateToken, async (req, res) => {
 	try {
 		const { nodeId, chunkId } = req.params;
 		if (!nodeId || !chunkId) {
@@ -525,7 +577,13 @@ router.delete('/chunks/delete/:nodeId/:chunkId', authenticateToken, async (req, 
 		});
 
 		if (result.success) {
-			res.json({ success: true, message: 'Chunk deleted successfully' });
+			res.json({
+				success: true,
+				data: {
+					chunkId,
+					status: 'deleted'
+				}
+			});
 		} else {
 			throw new Error(result.error || 'Failed to delete chunk');
 		}
@@ -559,48 +617,16 @@ router.delete('/chunks/delete/:nodeId/:chunkId', authenticateToken, async (req, 
 	}
 });
 
-router.post('/chunks/prepare-upload/:nodeId', authenticateToken, async (req, res) => {
-	const { nodeId } = req.params;
-	const { data_size } = req.body;
-
-	try {
-		await validateUserOwnsNode(req, req.user.userId, nodeId);
-		const commandId = generateCommandId(req);
-
-		const chunkIdResponse = await sendStorageNodeCommand(req, nodeId, {
-			command_type: 'PREP_UPLOAD',
-			data_size,
-		}, commandId);
-
-		if (!chunkIdResponse || !chunkIdResponse.success || !chunkIdResponse.chunk_id) {
-			throw new Error('Failed to get a valid chunkId from the storage node.');
-		}
-		const { chunk_id: chunkId } = chunkIdResponse;
-
-		const temporaryObjectName = `temp-${commandId}-${chunkId}`;
-
-		const putCommand = new PutObjectCommand({ Bucket: R2_BUCKET_NAME, Key: temporaryObjectName });
-		const uploadUrl = await getSignedUrl(s3Client, putCommand, { expiresIn: 300 });
-
-		res.json({
-			success: true,
-			message: "Ready for upload.",
-			chunkId,
-			uploadUrl,
-			temporaryObjectName
-		});
-
-	} catch (error) {
-		res.status(500).json({ success: false, message: error.message });
-	}
-});
-
-router.post('/chunks/complete-upload/:nodeId', authenticateToken, async (req, res) => {
-	const { nodeId } = req.params;
-	const { chunkId, temporaryObjectName } = req.body;
+// PUT /api/nodes/:nodeId/chunks/:chunkId - Complete upload and store chunk
+router.put('/nodes/:nodeId/chunks/:chunkId', authenticateToken, async (req, res) => {
+	const { nodeId, chunkId } = req.params;
+	const { temporaryObjectName } = req.body;
 
 	if (!chunkId || !temporaryObjectName) {
-		return res.status(400).json({ success: false, message: "chunkId and temporaryObjectName are required." });
+		return res.status(400).json({
+			success: false,
+			error: "chunkId and temporaryObjectName are required."
+		});
 	}
 
 	try {
@@ -616,33 +642,39 @@ router.post('/chunks/complete-upload/:nodeId', authenticateToken, async (req, re
 		});
 
 		if (!storeResult || !storeResult.success) {
-			throw new Error(storeResult.error || 'Rust client failed to store the chunk.');
+			throw new Error(storeResult.error || 'Storage node failed to store the chunk.');
 		}
 
 		const deleteCommand = new DeleteObjectCommand({ Bucket: R2_BUCKET_NAME, Key: temporaryObjectName });
 		await s3Client.send(deleteCommand);
 
-		res.json({ success: true, message: "Chunk successfully stored and temporary file cleaned up." });
+		res.json({
+			success: true,
+			data: {
+				chunkId,
+				status: 'stored'
+			}
+		});
 
 	} catch (error) {
-		res.status(500).json({ success: false, message: error.message });
+		res.status(500).json({ success: false, error: error.message });
 	}
 });
 
-router.get('/chunks/prepare-download/:nodeId/:chunkId', authenticateToken, async (req, res) => {
+// POST /api/nodes/:nodeId/chunks/:chunkId/download-sessions - Create download session
+router.post('/nodes/:nodeId/chunks/:chunkId/download-sessions', authenticateToken, async (req, res) => {
 	const { nodeId, chunkId } = req.params;
 
 	try {
 		await validateUserOwnsNode(req, req.user.userId, nodeId);
 
 		const commandId = generateCommandId(req);
-
 		const temporaryObjectName = `temp-${commandId}-${chunkId}`;
 
 		const putCommand = new PutObjectCommand({ Bucket: R2_BUCKET_NAME, Key: temporaryObjectName });
 		const uploadUrl = await getSignedUrl(s3Client, putCommand, { expiresIn: 300 });
 
-		// Tell the Rust client to fetch the chunk from its disk and upload it to R2.
+		// Tell the storage node to fetch the chunk from its disk and upload it to R2
 		const uploadConfirmation = await sendStorageNodeCommand(req, nodeId, {
 			command_type: 'RETRIEVE_AND_UPLOAD_CHUNK',
 			chunk_id: chunkId,
@@ -650,16 +682,25 @@ router.get('/chunks/prepare-download/:nodeId/:chunkId', authenticateToken, async
 		}, commandId, false); // No timeout for this command
 
 		if (!uploadConfirmation || !uploadConfirmation.success) {
-			throw new Error(uploadConfirmation.error || 'Rust client failed to upload the chunk.');
+			throw new Error(uploadConfirmation.error || 'Storage node failed to upload the chunk.');
 		}
 
-		// Once the Rust client confirms the upload, create a pre-signed GET URL for the frontend.
+		// Once the storage node confirms the upload, create a pre-signed GET URL for the frontend
 		const getCommand = new GetObjectCommand({ Bucket: R2_BUCKET_NAME, Key: temporaryObjectName });
 		const downloadUrl = await getSignedUrl(s3Client, getCommand, { expiresIn: 300 });
 
-		// Respond to the frontend with the download link.
-		res.json({ success: true, downloadUrl });
+		// Respond to the frontend with the download link
+		res.status(201).json({
+			success: true,
+			data: {
+				sessionId: commandId,
+				downloadUrl,
+				temporaryObjectName,
+				expiresIn: 300
+			}
+		});
 
+		// Schedule cleanup after 10 minutes
 		setTimeout(async () => {
 			try {
 				const deleteCommand = new DeleteObjectCommand({ Bucket: R2_BUCKET_NAME, Key: temporaryObjectName });
@@ -668,10 +709,50 @@ router.get('/chunks/prepare-download/:nodeId/:chunkId', authenticateToken, async
 			} catch (error) {
 				console.error(`Failed to cleanup temporary download object ${temporaryObjectName}:`, error);
 			}
-		}, 10 * 1000 * 1000); // 10 minute cleanup
+		}, 10 * 60 * 1000); // 10 minute cleanup
 
 	} catch (error) {
-		res.status(500).json({ success: false, message: error.message });
+		res.status(500).json({ success: false, error: error.message });
+	}
+});
+
+// DELETE /api/nodes/:nodeId/chunks/:chunkId/download-sessions - Complete download and cleanup
+router.delete('/nodes/:nodeId/chunks/:chunkId/download-sessions', authenticateToken, async (req, res) => {
+	const { nodeId, chunkId } = req.params;
+	const { temporaryObjectName } = req.body;
+
+	if (!temporaryObjectName) {
+		return res.status(400).json({
+			success: false,
+			error: "temporaryObjectName is required."
+		});
+	}
+
+	try {
+		await validateUserOwnsNode(req, req.user.userId, nodeId);
+
+		// Delete the temporary object from R2
+		const deleteCommand = new DeleteObjectCommand({
+			Bucket: R2_BUCKET_NAME,
+			Key: temporaryObjectName
+		});
+
+		await s3Client.send(deleteCommand);
+
+		res.json({
+			success: true,
+			data: {
+				chunkId,
+				status: 'download_session_completed'
+			}
+		});
+
+	} catch (error) {
+		// Cleanup is non-critical as it will automatically be cleaned up later
+		res.status(500).json({
+			success: false,
+			error: `Failed to cleanup temporary object: ${error.message}`
+		});
 	}
 });
 

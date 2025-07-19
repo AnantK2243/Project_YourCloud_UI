@@ -136,14 +136,16 @@ class SecureWebSocketManager {
 						lastPing: new Date()
 					});
 
-					// Update node status in database
-					await StorageNode.findOneAndUpdate(
+					// Update node status in database (non-blocking)
+					StorageNode.findOneAndUpdate(
 						{ node_id },
 						{
 							status: 'online',
 							last_seen: new Date()
 						}
-					);
+					).catch(error => {
+						console.error(`Error updating node ${node_id} status:`, error);
+					});
 
 					// Set up connection event handlers
 					this.setupConnectionHandlers(ws, node_id);
@@ -197,17 +199,15 @@ class SecureWebSocketManager {
 		// Handle connection close
 		ws.on('close', async (code, reason) => {
 			// Update node status in database
-			try {
-				await StorageNode.findOneAndUpdate(
-					{ node_id: nodeId },
-					{
-						status: 'offline',
-						last_seen: new Date()
-					}
-				);
-			} catch (error) {
+			StorageNode.findOneAndUpdate(
+				{ node_id: nodeId },
+				{
+					status: 'offline',
+					last_seen: new Date()
+				}
+			).catch(error => {
 				console.error('Error updating node status on disconnect:', error);
-			}
+			});
 
 			// Remove from connections
 			this.connections.delete(nodeId);
@@ -257,21 +257,19 @@ class SecureWebSocketManager {
 				// Handle status reports from storage client
 				if (data.status && ws.nodeId) {
 					// Update node status in database with fresh data
-					try {
-						await StorageNode.findOneAndUpdate(
-							{ node_id: ws.nodeId },
-							{
-								status: 'online',
-								used_space: data.status.used_space_bytes || 0,
-								total_available_space: data.status.max_space_bytes || 0,
-								num_chunks: data.status.current_chunk_count || 0,
-								last_seen: null
-							},
-							{ new: true }
-						);
-					} catch (error) {
+					StorageNode.findOneAndUpdate(
+						{ node_id: ws.nodeId },
+						{
+							status: 'online',
+							used_space: data.status.used_space_bytes || 0,
+							total_available_space: data.status.max_space_bytes || 0,
+							num_chunks: data.status.current_chunk_count || 0,
+							last_seen: null
+						},
+						{ new: true }
+					).catch(error => {
 						console.error(`Error updating node ${ws.nodeId} storage status:`, error);
-					}
+					});
 				}
 				// Resolve any pending commands waiting for this status report
 				if (this.pendingCommands.has(data.command_id)) {
@@ -391,27 +389,25 @@ class SecureWebSocketManager {
 
 		// Update storage node metrics for successful operations with storage impact
 		if (data.success && ws.nodeId && data.storage_delta !== undefined && data.storage_delta !== null) {
-			try {
-				const storageDelta = data.storage_delta;
-				const chunkDelta = storageDelta > 0 ? 1 : (storageDelta < 0 ? -1 : 0);
+			const storageDelta = data.storage_delta;
+			const chunkDelta = storageDelta > 0 ? 1 : (storageDelta < 0 ? -1 : 0);
 
-				if (storageDelta !== 0 || chunkDelta !== 0) {
-					const updateFields = {};
-					if (storageDelta !== 0) {
-						updateFields.used_space = storageDelta;
-					}
-					if (chunkDelta !== 0) {
-						updateFields.num_chunks = chunkDelta;
-					}
-
-					await StorageNode.findOneAndUpdate(
-						{ node_id: ws.nodeId },
-						{ $inc: updateFields },
-						{ new: true }
-					);
+			if (storageDelta !== 0 || chunkDelta !== 0) {
+				const updateFields = {};
+				if (storageDelta !== 0) {
+					updateFields.used_space = storageDelta;
 				}
-			} catch (error) {
-				console.error(`Error updating node ${ws.nodeId} metrics:`, error);
+				if (chunkDelta !== 0) {
+					updateFields.num_chunks = chunkDelta;
+				}
+
+				StorageNode.findOneAndUpdate(
+					{ node_id: ws.nodeId },
+					{ $inc: updateFields },
+					{ new: true }
+				).catch(error => {
+					console.error(`Error updating node ${ws.nodeId} metrics:`, error);
+				});
 			}
 		}
 

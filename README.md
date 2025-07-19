@@ -66,17 +66,23 @@ server.js                    # Main entry point & configuration
 
 ### **Storage Node Management**
 
--   `GET /api/user/storage-nodes` - Get user's registered storage nodes
--   `POST /api/register-node` - Register new storage node with auto-generated credentials
--   `POST /api/check-status` - Check storage node status and connectivity
--   `GET /api/node/:nodeId/initialize-root` - Mark node root directory as initialized
+-   `GET /api/nodes` - Get user's registered storage nodes
+-   `POST /api/nodes` - Register new storage node with auto-generated credentials
+-   `GET /api/nodes/:nodeId/status` - Check storage node status and connectivity
+-   `DELETE /api/nodes/:nodeId` - Delete storage node
 
 ### **Chunk Operations**
 
--   `GET /api/chunks/chunk-avail/:nodeId/:chunkId` - Check chunk availability
--   `POST /api/chunks/store/:nodeId/:chunkId` - Store file chunks (supports large files)
--   `GET /api/chunks/get/:nodeId/:chunkId` - Retrieve file chunks
--   `DELETE /api/chunks/delete/:nodeId/:chunkId` - Delete file chunks
+-   `POST /api/nodes/:nodeId/chunks/:chunkId` - Store file chunks (direct binary upload)
+-   `GET /api/nodes/:nodeId/chunks/:chunkId` - Retrieve file chunks
+-   `DELETE /api/nodes/:nodeId/chunks/:chunkId` - Delete file chunks
+
+### **Upload/Download Sessions**
+
+-   `POST /api/nodes/:nodeId/chunks/upload-sessions` - Create upload session
+-   `PUT /api/nodes/:nodeId/chunks/:chunkId` - Complete upload and store chunk
+-   `POST /api/nodes/:nodeId/chunks/:chunkId/download-sessions` - Create download session
+-   `DELETE /api/nodes/:nodeId/chunks/:chunkId/download-sessions` - Complete download and cleanup
 
 ### **System Health**
 

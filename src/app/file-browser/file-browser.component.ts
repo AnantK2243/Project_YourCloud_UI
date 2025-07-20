@@ -9,7 +9,12 @@ import {
 } from "@angular/core";
 import { ActivatedRoute, Router } from "@angular/router";
 import { Subscription } from "rxjs";
-import { FileService, DirectoryItem } from "../file.service";
+import {
+	FileService,
+	DirectoryItem,
+	DeleteResult,
+	UploadResult,
+} from "../file.service";
 import { AuthService } from "../auth.service";
 import { SessionHandlerService } from "../session-handler.service";
 import { CommonModule } from "@angular/common";
@@ -50,6 +55,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 	newDirectoryName: string = "";
 
 	@ViewChild("fileInput") fileInput!: ElementRef<HTMLInputElement>;
+	@ViewChild("directoryInput") directoryInput!: ElementRef<HTMLInputElement>;
 
 	private routeSub: Subscription | undefined;
 	private directorySub: Subscription | undefined;
@@ -151,6 +157,10 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 		this.fileInput.nativeElement.click();
 	}
 
+	triggerDirectoryUpload(): void {
+		this.directoryInput.nativeElement.click();
+	}
+
 	startCreatingDirectory(): void {
 		this.isCreatingDirectory = true;
 		this.newDirectoryName = "";
@@ -223,21 +233,26 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 		});
 	}
 
-	async onFileSelected(event: Event): Promise<void> {
+	async onFilesSelected(event: Event): Promise<void> {
 		const input = event.target as HTMLInputElement;
-		const browserFile = input.files?.[0];
+		const files = input.files;
 
-		if (!browserFile) {
+		if (!files || files.length === 0) {
 			return;
 		}
 
 		this.clearMessages();
 
 		try {
-			const result = await this.fileService.uploadFile(
-				browserFile,
-				browserFile.name
-			);
+			let result;
+
+			if (files.length === 1) {
+				// Single file upload with confirmation
+				result = await this.handleSingleFileUpload(files[0]);
+			} else {
+				// Multiple files upload with confirmation
+				result = await this.handleMultipleFilesUpload(files);
+			}
 
 			if (result.success) {
 				this.updateDirectoryListing();
@@ -249,7 +264,99 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 				error.message || "A critical error occurred."
 			}`;
 		} finally {
-			// Reset the input so the user can select the same file again
+			// Reset the input so the user can select the same files again
+			input.value = "";
+		}
+	}
+
+	private async handleSingleFileUpload(file: File): Promise<UploadResult> {
+		// First, try to upload without overwrite
+		let result = await this.fileService.uploadFile(file, file.name, false);
+
+		// If it requires confirmation (file exists), ask user
+		if (!result.success && result.requiresConfirmation) {
+			if (
+				confirm(
+					`File "${file.name}" already exists. Do you want to overwrite it?`
+				)
+			) {
+				// User confirmed overwrite
+				result = await this.fileService.uploadFile(file, file.name, true);
+			} else {
+				// User cancelled - return success but with a message
+				return {
+					success: true,
+					message: `Upload cancelled: File "${file.name}" already exists`
+				};
+			}
+		}
+
+		return result;
+	}
+
+	private async handleMultipleFilesUpload(files: FileList): Promise<UploadResult> {
+		// Check for conflicts first
+		const conflicts: string[] = [];
+		const currentDir = this.fileService.getCurrentDirectory();
+		
+		if (currentDir) {
+			for (let i = 0; i < files.length; i++) {
+				const file = files[i];
+				const existingFile = currentDir.contents.find(
+					item => item.type === 'file' && item.name === file.name
+				);
+				if (existingFile) {
+					conflicts.push(file.name);
+				}
+			}
+		}
+
+		let overwriteAll = false;
+
+		// If there are conflicts, ask user what to do
+		if (conflicts.length > 0) {
+			const conflictMessage = conflicts.length === 1 
+				? `File "${conflicts[0]}" already exists.`
+				: `${conflicts.length} files already exist: ${conflicts.slice(0, 3).join(', ')}${conflicts.length > 3 ? '...' : ''}.`;
+			
+			const choice = confirm(
+				`${conflictMessage}\n\nClick OK to overwrite existing files, or Cancel to skip them.`
+			);
+
+			if (choice) {
+				overwriteAll = true;
+			}
+			// If user cancelled, overwriteAll remains false and existing files will be skipped
+		}
+
+		// Upload with the user's choice
+		return await this.fileService.uploadMultipleFiles(files, overwriteAll);
+	}
+
+	async onDirectorySelected(event: Event): Promise<void> {
+		const input = event.target as HTMLInputElement;
+		const files = input.files;
+
+		if (!files || files.length === 0) {
+			return;
+		}
+
+		this.clearMessages();
+
+		try {
+			const result = await this.fileService.uploadDirectory(files);
+
+			if (result.success) {
+				this.updateDirectoryListing();
+			} else {
+				this.error = `Upload failed: ${result.message}`;
+			}
+		} catch (error: any) {
+			this.error = `Upload failed: ${
+				error.message || "A critical error occurred."
+			}`;
+		} finally {
+			// Reset the input so the user can select the same directory again
 			input.value = "";
 		}
 	}

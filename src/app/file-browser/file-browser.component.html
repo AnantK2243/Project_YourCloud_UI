@@ -6,16 +6,32 @@
 
 	<!-- File Upload Section -->
 	<div *ngIf="initialized && !loading && !error">
+		<!-- Files Upload -->
 		<input
 			type="file"
 			id="fileInput"
 			#fileInput
-			(change)="onFileSelected($event)"
+			multiple
+			(change)="onFilesSelected($event)"
 			style="display: none"
 			[disabled]="isUploading"
 		/>
 		<button (click)="triggerFileUpload()" [disabled]="isUploading">
-			{{ isUploading ? "Uploading..." : "Upload File" }}
+			{{ isUploading ? "Uploading..." : "Upload Files" }}
+		</button>
+
+		<!-- Directory Upload -->
+		<input
+			type="file"
+			id="directoryInput"
+			#directoryInput
+			webkitdirectory
+			(change)="onDirectorySelected($event)"
+			style="display: none"
+			[disabled]="isUploading"
+		/>
+		<button (click)="triggerDirectoryUpload()" [disabled]="isUploading">
+			{{ isUploading ? "Uploading..." : "Upload Directory" }}
 		</button>
 
 		<!-- Create Directory Button -->

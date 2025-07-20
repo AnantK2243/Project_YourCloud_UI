@@ -14,6 +14,18 @@ export interface Directory {
 	contents: DirectoryItem[];
 }
 
+export interface DeleteResult {
+	success: boolean;
+	message?: string;
+	requiresConfirmation?: boolean;
+}
+
+export interface UploadResult {
+	success: boolean;
+	message?: string;
+	requiresConfirmation?: boolean;
+}
+
 export type DirectoryItem =
 	| {
 			type: "directory";
@@ -610,8 +622,9 @@ export class FileService {
 
 	public async uploadFile(
 		file: globalThis.File,
-		fileName: string
-	): Promise<{ success: boolean; message?: string }> {
+		fileName: string,
+		overwrite: boolean = false
+	): Promise<UploadResult> {
 		if (!this.storageNodeId) {
 			return {
 				success: false,
@@ -629,6 +642,32 @@ export class FileService {
 					success: false,
 					message: "Current directory is not initialized",
 				};
+			}
+
+			// Check if file name already exists
+			const existingFile = currentDirectory.contents.find(
+				(item) => item.type === "file" && item.name === fileName
+			);
+			if (existingFile) {
+				if (!overwrite) {
+					return {
+						success: false,
+						message: `File "${fileName}" already exists in this directory`,
+						requiresConfirmation: true,
+					};
+				} else {
+					// Delete the existing file first
+					const deleteResult = await this.deleteItem(
+						existingFile,
+						false
+					);
+					if (!deleteResult.success) {
+						return {
+							success: false,
+							message: `Failed to overwrite existing file: ${deleteResult.message}`,
+						};
+					}
+				}
 			}
 
 			const metadataSizeEstimate = await this.estimateFileMetadataSize(
@@ -714,6 +753,331 @@ export class FileService {
 				success: false,
 				message:
 					error.message || "An error occurred during file upload.",
+			};
+		}
+	}
+
+	public async uploadMultipleFiles(
+		files: FileList,
+		overwriteConflicts: boolean = false
+	): Promise<UploadResult> {
+		if (!this.storageNodeId) {
+			return {
+				success: false,
+				message: "No active storage node selected.",
+			};
+		}
+		if (!files || files.length === 0) {
+			return { success: false, message: "No files provided for upload." };
+		}
+
+		const totalFiles = files.length;
+		let uploadedFiles = 0;
+		let failedFiles = 0;
+		let skippedFiles = 0;
+		const errors: string[] = [];
+
+		for (let i = 0; i < files.length; i++) {
+			const file = files[i];
+
+			// Update progress to show current file being uploaded
+			this.uploadProgress.next({
+				fileName: `${file.name} (${i + 1}/${totalFiles})`,
+				progress: Math.round((uploadedFiles / totalFiles) * 100),
+				isUploading: true,
+				chunksUploaded: uploadedFiles,
+				totalChunks: totalFiles,
+			});
+
+			try {
+				const result = await this.uploadFile(
+					file,
+					file.name,
+					overwriteConflicts
+				);
+				if (result.success) {
+					uploadedFiles++;
+				} else if (result.requiresConfirmation && !overwriteConflicts) {
+					// File exists and user chose not to overwrite
+					skippedFiles++;
+				} else {
+					failedFiles++;
+					errors.push(`${file.name}: ${result.message}`);
+				}
+			} catch (error: any) {
+				failedFiles++;
+				errors.push(
+					`${file.name}: ${error.message || "Unknown error"}`
+				);
+			}
+		}
+
+		// Complete progress tracking
+		this.uploadProgress.next({
+			fileName: "",
+			progress: 100,
+			isUploading: false,
+			chunksUploaded: uploadedFiles,
+			totalChunks: totalFiles,
+		});
+
+		if (failedFiles === 0 && skippedFiles === 0) {
+			return { success: true };
+		} else if (uploadedFiles === 0) {
+			return {
+				success: false,
+				message: `All uploads failed: ${errors.join("; ")}`,
+			};
+		} else {
+			const messages = [];
+			if (uploadedFiles > 0)
+				messages.push(`${uploadedFiles} files uploaded successfully`);
+			if (skippedFiles > 0)
+				messages.push(`${skippedFiles} files skipped (already exist)`);
+			if (failedFiles > 0)
+				messages.push(
+					`${failedFiles} files failed: ${errors.join("; ")}`
+				);
+
+			return {
+				success: uploadedFiles > 0,
+				message: messages.join(", "),
+			};
+		}
+	}
+
+	public async uploadDirectory(
+		files: FileList
+	): Promise<{ success: boolean; message?: string }> {
+		if (!this.storageNodeId) {
+			return {
+				success: false,
+				message: "No active storage node selected.",
+			};
+		}
+		if (!files || files.length === 0) {
+			return { success: false, message: "No files provided for upload." };
+		}
+
+		try {
+			// Store the original directory to return to
+			const originalDirectory = this.directory.getValue();
+			if (!originalDirectory) {
+				return {
+					success: false,
+					message: "Current directory is not initialized",
+				};
+			}
+
+			// Build directory structure and create directories
+			const directoryMap = await this.buildAndCreateDirectoryStructure(
+				files
+			);
+
+			// Upload all files to their respective directories
+			const result = await this.uploadFilesToDirectories(
+				files,
+				directoryMap
+			);
+
+			// Ensure we're back at the original directory
+			await this.changeDirectory(originalDirectory.chunkId);
+
+			return result;
+		} catch (error: any) {
+			return {
+				success: false,
+				message:
+					error.message ||
+					"An error occurred during directory upload.",
+			};
+		}
+	}
+
+	private async buildAndCreateDirectoryStructure(
+		files: FileList
+	): Promise<Map<string, string>> {
+		// Map of directory path -> chunkId for fast lookup during file uploads
+		const directoryMap = new Map<string, string>();
+		const originalDirectory = this.directory.getValue();
+		if (!originalDirectory) {
+			throw new Error("Current directory is not initialized");
+		}
+
+		// Add current directory as root
+		directoryMap.set("", originalDirectory.chunkId);
+
+		// Collect all unique directory paths that need to be created
+		const allPaths = new Set<string>();
+		for (let i = 0; i < files.length; i++) {
+			const file = files[i];
+			const relativePath = (file as any).webkitRelativePath || file.name;
+			const pathParts = relativePath.split("/");
+
+			// If file is in subdirectories, collect all parent paths
+			if (pathParts.length > 1) {
+				// Remove filename, keep directory path
+				const dirParts = pathParts.slice(0, -1);
+
+				// Add all parent paths (e.g., for "a/b/c", add "a" and "a/b")
+				for (let j = 1; j <= dirParts.length; j++) {
+					const path = dirParts.slice(0, j).join("/");
+					allPaths.add(path);
+				}
+			}
+		}
+
+		// Sort paths by depth to create parent directories first
+		const sortedPaths = Array.from(allPaths).sort((a, b) => {
+			return a.split("/").length - b.split("/").length;
+		});
+
+		// Create directories iteratively
+		for (const path of sortedPaths) {
+			const pathParts = path.split("/");
+			const dirName = pathParts[pathParts.length - 1];
+			const parentPath = pathParts.slice(0, -1).join("/");
+
+			// Get parent directory chunkId
+			const parentChunkId = directoryMap.get(parentPath);
+			if (!parentChunkId) {
+				throw new Error(`Parent directory not found for path: ${path}`);
+			}
+
+			// Navigate to parent directory
+			await this.changeDirectory(parentChunkId);
+
+			// Check if directory already exists
+			const currentDir = this.directory.getValue();
+			if (!currentDir) {
+				throw new Error("Failed to navigate to parent directory");
+			}
+
+			let dirChunkId = "";
+			const existingDir = currentDir.contents.find(
+				(item) => item.type === "directory" && item.name === dirName
+			);
+
+			if (existingDir && existingDir.type === "directory") {
+				// Directory already exists
+				dirChunkId = existingDir.chunkId;
+			} else {
+				// Create new directory
+				const result = await this.createSubdirectory(dirName);
+				if (!result.success) {
+					throw new Error(
+						`Failed to create directory ${dirName}: ${result.message}`
+					);
+				}
+
+				// Get the newly created directory's chunkId
+				const updatedDir = this.directory.getValue();
+				if (!updatedDir) {
+					throw new Error(
+						"Failed to get updated directory after creation"
+					);
+				}
+
+				const newDir = updatedDir.contents.find(
+					(item) => item.type === "directory" && item.name === dirName
+				);
+
+				if (!newDir || newDir.type !== "directory") {
+					throw new Error(
+						`Failed to find newly created directory: ${dirName}`
+					);
+				}
+
+				dirChunkId = newDir.chunkId;
+			}
+
+			// Store the mapping
+			directoryMap.set(path, dirChunkId);
+		}
+
+		return directoryMap;
+	}
+
+	private async uploadFilesToDirectories(
+		files: FileList,
+		directoryMap: Map<string, string>
+	): Promise<{ success: boolean; message?: string }> {
+		const totalFiles = files.length;
+		let uploadedFiles = 0;
+		let failedFiles = 0;
+		const errors: string[] = [];
+
+		for (let i = 0; i < files.length; i++) {
+			const file = files[i];
+			const relativePath = (file as any).webkitRelativePath || file.name;
+			const pathParts = relativePath.split("/");
+			const fileName = pathParts[pathParts.length - 1];
+
+			// Update progress
+			this.uploadProgress.next({
+				fileName: `${relativePath} (${i + 1}/${totalFiles})`,
+				progress: Math.round((uploadedFiles / totalFiles) * 100),
+				isUploading: true,
+				chunksUploaded: uploadedFiles,
+				totalChunks: totalFiles,
+			});
+
+			try {
+				// Determine target directory path
+				let targetDirectoryPath = "";
+				if (pathParts.length > 1) {
+					targetDirectoryPath = pathParts.slice(0, -1).join("/");
+				}
+
+				// Get the target directory chunkId
+				const targetChunkId = directoryMap.get(targetDirectoryPath);
+				if (!targetChunkId) {
+					throw new Error(
+						`Target directory not found for path: ${targetDirectoryPath}`
+					);
+				}
+
+				// Navigate to target directory
+				await this.changeDirectory(targetChunkId);
+
+				// Upload the file
+				const result = await this.uploadFile(file, fileName, true); // Always overwrite in directory uploads
+				if (result.success) {
+					uploadedFiles++;
+				} else {
+					failedFiles++;
+					errors.push(`${relativePath}: ${result.message}`);
+				}
+			} catch (error: any) {
+				failedFiles++;
+				errors.push(
+					`${relativePath}: ${error.message || "Unknown error"}`
+				);
+			}
+		}
+
+		// Complete progress tracking
+		this.uploadProgress.next({
+			fileName: "",
+			progress: 100,
+			isUploading: false,
+			chunksUploaded: uploadedFiles,
+			totalChunks: totalFiles,
+		});
+
+		if (failedFiles === 0) {
+			return { success: true };
+		} else if (uploadedFiles === 0) {
+			return {
+				success: false,
+				message: `All uploads failed: ${errors.join("; ")}`,
+			};
+		} else {
+			return {
+				success: true,
+				message: `${uploadedFiles} files uploaded successfully, ${failedFiles} failed: ${errors.join(
+					"; "
+				)}`,
 			};
 		}
 	}

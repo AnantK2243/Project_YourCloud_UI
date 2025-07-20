@@ -39,12 +39,42 @@ export class FileService {
 	private directory = new BehaviorSubject<Directory | null>(null);
 	private storageNodeId: string | null = null;
 
+	// Upload progress tracking
+	private uploadProgress = new BehaviorSubject<{
+		fileName: string;
+		progress: number;
+		isUploading: boolean;
+		chunksUploaded: number;
+		totalChunks: number;
+	}>({
+		fileName: "",
+		progress: 0,
+		isUploading: false,
+		chunksUploaded: 0,
+		totalChunks: 0,
+	});
+
+	// Download progress tracking
+	private downloadProgress = new BehaviorSubject<{
+		fileName: string;
+		progress: number;
+		isDownloading: boolean;
+		chunksDownloaded: number;
+		totalChunks: number;
+	}>({
+		fileName: "",
+		progress: 0,
+		isDownloading: false,
+		chunksDownloaded: 0,
+		totalChunks: 0,
+	});
+
 	// WebRTC properties
 	public peerConnection: RTCPeerConnection | null = null;
 	public dataChannel: RTCDataChannel | null = null;
 	public webrtcReady: boolean = false;
 
-	private readonly CHUNK_SIZE = 256 * 1024 * 1024; // 256 MB
+	private readonly CHUNK_SIZE = 64 * 1024 * 1024; // 64 MB
 
 	constructor(
 		private http: HttpClient,
@@ -57,6 +87,22 @@ export class FileService {
 
 	getCurrentDirectory(): Directory | null {
 		return this.directory.getValue();
+	}
+
+	getUploadProgress() {
+		return this.uploadProgress.asObservable();
+	}
+
+	getCurrentUploadProgress() {
+		return this.uploadProgress.getValue();
+	}
+
+	getDownloadProgress() {
+		return this.downloadProgress.asObservable();
+	}
+
+	getCurrentDownloadProgress() {
+		return this.downloadProgress.getValue();
 	}
 
 	async initializePage(
@@ -558,6 +604,20 @@ export class FileService {
 			const fileBuffer = await file.arrayBuffer();
 			const totalSize = fileBuffer.byteLength;
 			const numChunks = Math.ceil(totalSize / this.CHUNK_SIZE);
+
+			console.log(
+				`Uploading file "${fileName}" of size ${totalSize} bytes in ${numChunks} chunks`
+			);
+
+			// Initialize progress tracking
+			this.uploadProgress.next({
+				fileName,
+				progress: 0,
+				isUploading: true,
+				chunksUploaded: 0,
+				totalChunks: numChunks,
+			});
+
 			const chunkIds: string[] = [];
 
 			for (let i = 0; i < numChunks; i++) {
@@ -573,33 +633,17 @@ export class FileService {
 					dataReservationSize
 				);
 				chunkIds.push(chunkId);
+
+				// Update progress
+				const progress = Math.round(((i + 1) / numChunks) * 100);
+				this.uploadProgress.next({
+					fileName,
+					progress,
+					isUploading: true,
+					chunksUploaded: i + 1,
+					totalChunks: numChunks,
+				});
 			}
-
-			// // After all data chunks are uploaded, create and upload the file metadata
-			// let fileMetadataChunkId = this.cryptoService.generateUUID();
-			// const newFile: FileItem = {
-			//     chunkId: fileMetadataChunkId,
-			//     name: fileName,
-			//     size: file.size,
-			//     createdAt: new Date().toISOString(),
-			//     fileChunks: chunkIds
-			// };
-
-			// // Store file Metadata chunk with retry
-			// do {
-			//     try {
-			//         await this.encryptAndStoreChunk(JSON.stringify(newFile), fileMetadataChunkId);
-			//         break;
-			//     } catch (error: any) {
-			//         // If chunk ID conflict, generate a new one and retry
-			//         if (error?.status === 409) {
-			//             fileMetadataChunkId = this.cryptoService.generateUUID();
-			//             newFile.chunkId = fileMetadataChunkId;
-			//         } else {
-			//             throw error; // Propagate other errors
-			//         }
-			//     }
-			// } while (true);
 
 			// Update the current directory to include the new file reference
 			currentDirectory.contents.push({
@@ -612,8 +656,26 @@ export class FileService {
 
 			await this.updateDirectory();
 
+			// Complete progress tracking
+			this.uploadProgress.next({
+				fileName,
+				progress: 100,
+				isUploading: false,
+				chunksUploaded: numChunks,
+				totalChunks: numChunks,
+			});
+
 			return { success: true };
 		} catch (error: any) {
+			// Reset progress on error
+			this.uploadProgress.next({
+				fileName: "",
+				progress: 0,
+				isUploading: false,
+				chunksUploaded: 0,
+				totalChunks: 0,
+			});
+
 			return {
 				success: false,
 				message:
@@ -691,24 +753,71 @@ export class FileService {
 			throw new Error("Selected item is not a file.");
 		}
 
-		// Download and decrypt all the data chunks listed in the metadata.
-		const decryptedChunks: ArrayBuffer[] = [];
-		for (const dataChunkId of item.fileChunks) {
-			const decryptedChunk = await this.downloadFileChunk(dataChunkId);
-			decryptedChunks.push(decryptedChunk);
-		}
+		// Initialize download progress tracking
+		const totalChunks = item.fileChunks.length;
+		this.downloadProgress.next({
+			fileName: item.name,
+			progress: 0,
+			isDownloading: true,
+			chunksDownloaded: 0,
+			totalChunks: totalChunks,
+		});
 
-		// Reassemble the decrypted chunks into a single buffer.
-		const totalSize = item.size;
-		const reassembledBuffer = new Uint8Array(totalSize);
-		let offset = 0;
-		for (const chunk of decryptedChunks) {
-			reassembledBuffer.set(new Uint8Array(chunk), offset);
-			offset += chunk.byteLength;
-		}
+		try {
+			// Download and decrypt all the data chunks listed in the metadata.
+			const decryptedChunks: ArrayBuffer[] = [];
+			for (let i = 0; i < item.fileChunks.length; i++) {
+				const dataChunkId = item.fileChunks[i];
+				const decryptedChunk = await this.downloadFileChunk(
+					dataChunkId
+				);
+				decryptedChunks.push(decryptedChunk);
 
-		// Return the final reassembled file as a Blob.
-		return new Blob([reassembledBuffer]);
+				// Update progress
+				const chunksDownloaded = i + 1;
+				const progress = Math.round(
+					(chunksDownloaded / totalChunks) * 100
+				);
+				this.downloadProgress.next({
+					fileName: item.name,
+					progress,
+					isDownloading: true,
+					chunksDownloaded,
+					totalChunks,
+				});
+			}
+
+			// Reassemble the decrypted chunks into a single buffer.
+			const totalSize = item.size;
+			const reassembledBuffer = new Uint8Array(totalSize);
+			let offset = 0;
+			for (const chunk of decryptedChunks) {
+				reassembledBuffer.set(new Uint8Array(chunk), offset);
+				offset += chunk.byteLength;
+			}
+
+			// Complete download progress tracking
+			this.downloadProgress.next({
+				fileName: item.name,
+				progress: 100,
+				isDownloading: false,
+				chunksDownloaded: totalChunks,
+				totalChunks: totalChunks,
+			});
+
+			// Return the final reassembled file as a Blob.
+			return new Blob([reassembledBuffer]);
+		} catch (error) {
+			// Reset progress on error
+			this.downloadProgress.next({
+				fileName: "",
+				progress: 0,
+				isDownloading: false,
+				chunksDownloaded: 0,
+				totalChunks: 0,
+			});
+			throw error;
+		}
 	}
 
 	private async downloadFileChunk(chunkId: string): Promise<ArrayBuffer> {

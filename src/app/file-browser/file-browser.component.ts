@@ -38,9 +38,13 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 
 	isUploading: boolean = false;
 	uploadStatus: string = "";
+	uploadProgress: number = 0;
+	uploadChunksInfo: string = "";
 
 	isDownloading: boolean = false;
 	downloadStatus: string = "";
+	downloadProgress: number = 0;
+	downloadChunksInfo: string = "";
 
 	isCreatingDirectory: boolean = false;
 	newDirectoryName: string = "";
@@ -49,6 +53,8 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 
 	private routeSub: Subscription | undefined;
 	private directorySub: Subscription | undefined;
+	private uploadProgressSub: Subscription | undefined;
+	private downloadProgressSub: Subscription | undefined;
 
 	public formatFileSize = formatFileSize;
 	public formatDate = formatDate;
@@ -80,6 +86,50 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 				this.directoryList = [];
 			}
 		});
+
+		// Subscribe to upload progress
+		this.uploadProgressSub = this.fileService
+			.getUploadProgress()
+			.subscribe((progress) => {
+				this.isUploading = progress.isUploading;
+
+				if (progress.isUploading) {
+					this.uploadStatus = `Uploading ${progress.fileName}`;
+					this.uploadProgress = progress.progress;
+					this.uploadChunksInfo = `Chunks: ${progress.chunksUploaded}/${progress.totalChunks}`;
+				} else if (progress.progress === 100 && progress.fileName) {
+					this.uploadStatus = `Successfully uploaded ${progress.fileName}`;
+					this.uploadChunksInfo = "";
+					// Clear status after a few seconds
+					setTimeout(() => {
+						this.uploadStatus = "";
+						this.uploadProgress = 0;
+						this.uploadChunksInfo = "";
+					}, 3000);
+				}
+			});
+
+		// Subscribe to download progress
+		this.downloadProgressSub = this.fileService
+			.getDownloadProgress()
+			.subscribe((progress) => {
+				this.isDownloading = progress.isDownloading;
+
+				if (progress.isDownloading) {
+					this.downloadStatus = `Downloading ${progress.fileName}`;
+					this.downloadProgress = progress.progress;
+					this.downloadChunksInfo = `Chunks: ${progress.chunksDownloaded}/${progress.totalChunks}`;
+				} else if (progress.progress === 100 && progress.fileName) {
+					this.downloadStatus = `Successfully downloaded ${progress.fileName}`;
+					this.downloadChunksInfo = "";
+					// Clear status after a few seconds
+					setTimeout(() => {
+						this.downloadStatus = "";
+						this.downloadProgress = 0;
+						this.downloadChunksInfo = "";
+					}, 3000);
+				}
+			});
 	}
 
 	ngOnDestroy(): void {
@@ -88,6 +138,12 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 		}
 		if (this.directorySub) {
 			this.directorySub.unsubscribe();
+		}
+		if (this.uploadProgressSub) {
+			this.uploadProgressSub.unsubscribe();
+		}
+		if (this.downloadProgressSub) {
+			this.downloadProgressSub.unsubscribe();
 		}
 	}
 
@@ -176,8 +232,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 		}
 
 		this.clearMessages();
-		this.isUploading = true;
-		this.uploadStatus = `Uploading ${browserFile.name}...`;
 
 		try {
 			const result = await this.fileService.uploadFile(
@@ -186,24 +240,15 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 			);
 
 			if (result.success) {
-				this.uploadStatus = `Successfully uploaded ${browserFile.name}`;
 				this.updateDirectoryListing();
 			} else {
 				this.error = `Upload failed: ${result.message}`;
-				this.uploadStatus = "";
 			}
 		} catch (error: any) {
 			this.error = `Upload failed: ${
 				error.message || "A critical error occurred."
 			}`;
-			this.uploadStatus = "";
 		} finally {
-			// Reset the upload UI state after 2 seconds on success/failure
-			setTimeout(() => {
-				this.isUploading = false;
-				this.uploadStatus = "";
-			}, 2000);
-
 			// Reset the input so the user can select the same file again
 			input.value = "";
 		}
@@ -217,8 +262,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 		}
 
 		this.clearMessages();
-		this.isDownloading = true;
-		this.downloadStatus = `Downloading ${item.name}...`;
 
 		try {
 			const decryptedBlob = await this.fileService.downloadFile(item);
@@ -235,8 +278,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 			a.click();
 			window.URL.revokeObjectURL(url);
 			a.remove();
-
-			this.downloadStatus = `Successfully downloaded ${item.name}`;
 		} catch (error: any) {
 			// Check if this is a session/authentication error
 			if (this.sessionHandler.checkAndHandleSessionError(error)) {
@@ -246,12 +287,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 			this.error = `Download failed: ${
 				error.message || "A critical error occurred."
 			}`;
-		} finally {
-			// Reset the download UI state after 2 seconds
-			setTimeout(() => {
-				this.isDownloading = false;
-				this.downloadStatus = "";
-			}, 2000);
 		}
 	}
 

@@ -44,12 +44,19 @@
 
 		<!-- Upload Progress -->
 		<div *ngIf="isUploading">
-			<div>{{ uploadStatus }}</div>
+			<span>{{ uploadStatus }}</span>
+
+			<div>{{ uploadProgress }}%</div>
+			<div *ngIf="uploadChunksInfo">{{ uploadChunksInfo }}</div>
 		</div>
 
 		<!-- Download Progress -->
 		<div *ngIf="isDownloading">
-			<div>{{ downloadStatus }}</div>
+			<span>{{ downloadStatus }}</span>
+
+			<div>{{ downloadProgress }}%</div>
+
+			<div *ngIf="downloadChunksInfo">{{ downloadChunksInfo }}</div>
 		</div>
 
 		<!-- Breadcrumb Navigation -->

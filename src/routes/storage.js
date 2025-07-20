@@ -105,7 +105,7 @@ async function updateNodeStatus(req, nodeId) {
 }
 
 // Send command to storage node and wait for response
-async function sendStorageNodeCommand(req, nodeId, command, command_id = null, timeout = true) {
+async function sendStorageNodeCommand(req, nodeId, command, timeout = true, command_id = null) {
 	return new Promise((resolve, reject) => {
 		const nodeConnections = getNodeConnections(req);
 		const pendingCommands = getPendingCommands(req);
@@ -409,7 +409,7 @@ router.post('/nodes/:nodeId/chunks/upload-sessions', authenticateToken, async (r
 		const chunkIdResponse = await sendStorageNodeCommand(req, nodeId, {
 			command_type: 'PREP_UPLOAD',
 			data_size,
-		}, commandId);
+		}, true, commandId);
 
 		if (!chunkIdResponse || !chunkIdResponse.success || !chunkIdResponse.chunk_id) {
 			throw new Error('Failed to get a valid chunkId from the storage node.');
@@ -639,7 +639,7 @@ router.put('/nodes/:nodeId/chunks/:chunkId', authenticateToken, async (req, res)
 			command_type: 'DOWNLOAD_AND_STORE_CHUNK',
 			chunk_id: chunkId,
 			download_url: downloadUrl
-		});
+		}, false); // Don't timeout this command
 
 		if (!storeResult || !storeResult.success) {
 			throw new Error(storeResult.error || 'Storage node failed to store the chunk.');
@@ -679,7 +679,7 @@ router.post('/nodes/:nodeId/chunks/:chunkId/download-sessions', authenticateToke
 			command_type: 'RETRIEVE_AND_UPLOAD_CHUNK',
 			chunk_id: chunkId,
 			upload_url: uploadUrl
-		}, commandId, false); // No timeout for this command
+		}, false, commandId); // No timeout for this command
 
 		if (!uploadConfirmation || !uploadConfirmation.success) {
 			throw new Error(uploadConfirmation.error || 'Storage node failed to upload the chunk.');

@@ -69,11 +69,6 @@ export class FileService {
 		totalChunks: 0,
 	});
 
-	// WebRTC properties
-	public peerConnection: RTCPeerConnection | null = null;
-	public dataChannel: RTCDataChannel | null = null;
-	public webrtcReady: boolean = false;
-
 	private readonly CHUNK_SIZE = 64 * 1024 * 1024; // 64 MB
 
 	constructor(
@@ -480,8 +475,13 @@ export class FileService {
 	}
 
 	public async deleteItem(
-		item: DirectoryItem
-	): Promise<{ success: boolean; message?: string }> {
+		item: DirectoryItem,
+		recursive: boolean = false
+	): Promise<{
+		success: boolean;
+		message?: string;
+		requiresConfirmation?: boolean;
+	}> {
 		if (!this.storageNodeId) {
 			return {
 				success: false,
@@ -529,7 +529,6 @@ export class FileService {
 				};
 			}
 		} else if (item.type === "directory") {
-			// Delete the directory and all its contents
 			try {
 				// First, fetch the directory to check if it's empty
 				const targetDirectory = JSON.parse(
@@ -538,10 +537,16 @@ export class FileService {
 
 				// Check if directory is empty
 				if (targetDirectory.contents.length > 0) {
-					return {
-						success: false,
-						message: `Cannot delete "${item.name}": Directory is not empty. Please delete all files and subdirectories first.`,
-					};
+					if (!recursive) {
+						return {
+							success: false,
+							message: `Cannot delete "${item.name}": Directory is not empty. Please delete all files and subdirectories first.`,
+							requiresConfirmation: true,
+						};
+					}
+
+					// Recursively delete all contents
+					await this.deleteDirectoryRecursively(targetDirectory);
 				}
 
 				// Delete the directory chunk from storage
@@ -571,6 +576,35 @@ export class FileService {
 				success: false,
 				message: "Unknown item type. Cannot delete.",
 			};
+		}
+	}
+
+	private async deleteDirectoryRecursively(
+		directory: Directory
+	): Promise<void> {
+		const stack: Directory[] = [directory];
+
+		while (stack.length > 0) {
+			const currentDirectory = stack.pop();
+			if (!currentDirectory) continue;
+
+			for (const item of currentDirectory.contents) {
+				if (item.type === "file") {
+					// Delete all data chunks that make up this file
+					for (const dataChunkId of item.fileChunks) {
+						await this.deleteChunk(dataChunkId);
+					}
+				} else if (item.type === "directory") {
+					// Fetch the subdirectory and push it onto the stack
+					const subDirectory = JSON.parse(
+						await this.fetchAndDecryptChunk(item.chunkId)
+					) as Directory;
+					stack.push(subDirectory);
+
+					// Delete the subdirectory chunk after processing its contents
+					await this.deleteChunk(item.chunkId);
+				}
+			}
 		}
 	}
 

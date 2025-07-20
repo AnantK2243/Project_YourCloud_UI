@@ -290,7 +290,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 		}
 	}
 
-	// TODO: FIX
 	async deleteItem(item: DirectoryItem): Promise<void> {
 		// Validate the item
 		if (item.type === "file" && !item.fileChunks[0]) {
@@ -315,15 +314,26 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 		this.clearMessages();
 
 		try {
-			// Call the file service to delete the item
-			const result = await this.fileService.deleteItem(item);
+			// First, try to delete without recursive option
+			let result = await this.fileService.deleteItem(item, false);
 
-			if (!result.success) {
-				// Check if error is about empty directory
-				if (result.message?.includes("Directory is not empty")) {
-					this.warning = "Cannot delete non-empty directory";
+			// If it's a non-empty directory, ask for confirmation
+			if (!result.success && result.requiresConfirmation) {
+				if (
+					confirm(
+						`"${item.name}" is not empty. Do you want to delete it and all its contents recursively? This action cannot be undone.`
+					)
+				) {
+					// User confirmed recursive deletion
+					result = await this.fileService.deleteItem(item, true);
+				} else {
+					// User cancelled
+					this.loading = false;
 					return;
 				}
+			} else if (!result.success) {
+				this.error = result.message || "Failed to delete item";
+				return;
 			}
 
 			// Refresh the current directory listing after successful deletion

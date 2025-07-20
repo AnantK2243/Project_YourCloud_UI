@@ -4,6 +4,20 @@
 		<button (click)="goBack()"><- Back to Dashboard</button>
 	</div>
 
+	<!-- Upload Progress (always visible when uploading) -->
+	<div *ngIf="isUploading">
+		<span>{{ uploadStatus }}</span>
+		<div>{{ uploadProgress }}%</div>
+		<div *ngIf="uploadChunksInfo">{{ uploadChunksInfo }}</div>
+	</div>
+
+	<!-- Download Progress (always visible when downloading) -->
+	<div *ngIf="isDownloading">
+		<span>{{ downloadStatus }}</span>
+		<div>{{ downloadProgress }}%</div>
+		<div *ngIf="downloadChunksInfo">{{ downloadChunksInfo }}</div>
+	</div>
+
 	<!-- File Upload Section -->
 	<div *ngIf="initialized && !loading && !error">
 		<!-- Files Upload -->
@@ -14,9 +28,12 @@
 			multiple
 			(change)="onFilesSelected($event)"
 			style="display: none"
-			[disabled]="isUploading"
+			[disabled]="isUploading || isDownloading"
 		/>
-		<button (click)="triggerFileUpload()" [disabled]="isUploading">
+		<button
+			(click)="triggerFileUpload()"
+			[disabled]="isUploading || isDownloading"
+		>
 			{{ isUploading ? "Uploading..." : "Upload Files" }}
 		</button>
 
@@ -28,16 +45,19 @@
 			webkitdirectory
 			(change)="onDirectorySelected($event)"
 			style="display: none"
-			[disabled]="isUploading"
+			[disabled]="isUploading || isDownloading"
 		/>
-		<button (click)="triggerDirectoryUpload()" [disabled]="isUploading">
+		<button
+			(click)="triggerDirectoryUpload()"
+			[disabled]="isUploading || isDownloading"
+		>
 			{{ isUploading ? "Uploading..." : "Upload Directory" }}
 		</button>
 
 		<!-- Create Directory Button -->
 		<button
 			(click)="startCreatingDirectory()"
-			[disabled]="isUploading || isCreatingDirectory"
+			[disabled]="isUploading || isCreatingDirectory || isDownloading"
 		>
 			Create Directory
 		</button>
@@ -58,28 +78,16 @@
 			</button>
 		</div>
 
-		<!-- Upload Progress -->
-		<div *ngIf="isUploading">
-			<span>{{ uploadStatus }}</span>
-
-			<div>{{ uploadProgress }}%</div>
-			<div *ngIf="uploadChunksInfo">{{ uploadChunksInfo }}</div>
-		</div>
-
-		<!-- Download Progress -->
-		<div *ngIf="isDownloading">
-			<span>{{ downloadStatus }}</span>
-
-			<div>{{ downloadProgress }}%</div>
-
-			<div *ngIf="downloadChunksInfo">{{ downloadChunksInfo }}</div>
-		</div>
-
 		<!-- Breadcrumb Navigation -->
 		<div *ngIf="initialized"><span>Path: </span> {{ getPath() }}</div>
 
 		<!-- Go to parent -->
-		<button (click)="leaveDirectory()" [disabled]="loading">Back</button>
+		<button
+			(click)="leaveDirectory()"
+			[disabled]="loading || isDownloading"
+		>
+			Back
+		</button>
 
 		<!-- Show Page Status -->
 		<div *ngIf="loading">
@@ -136,6 +144,17 @@
 								title="Navigate to Directory"
 							>
 								Enter
+							</button>
+							<button
+								(click)="onFileDownload(item)"
+								[disabled]="loading || isDownloading"
+								title="Download"
+							>
+								{{
+									isDownloading
+										? "Downloading..."
+										: "Download"
+								}}
 							</button>
 							<button
 								(click)="deleteItem(item)"

@@ -81,6 +81,67 @@
 		<!-- Breadcrumb Navigation -->
 		<div *ngIf="initialized"><span>Path: </span> {{ getPath() }}</div>
 
+		<!-- Selection Mode Controls -->
+		<div *ngIf="initialized && !loading">
+			<button
+				(click)="toggleSelectionMode()"
+				[disabled]="isUploading || isDownloading"
+			>
+				{{ isSelectionMode ? "Exit Selection" : "Select Files" }}
+			</button>
+
+			<div *ngIf="isSelectionMode">
+				<button
+					(click)="selectAllItems()"
+					[disabled]="
+						directoryList.length === 0 ||
+						isDownloading ||
+						isUploading ||
+						loading
+					"
+				>
+					Select All
+				</button>
+				<button
+					(click)="deselectAllItems()"
+					[disabled]="
+						selectedItems.size === 0 ||
+						isDownloading ||
+						isUploading ||
+						loading
+					"
+				>
+					Deselect All
+				</button>
+				<span
+					*ngIf="selectedItems.size > 0"
+					style="margin-left: 15px; font-weight: bold"
+				>
+					{{ getSelectedCount() }} item(s) selected
+				</span>
+
+				<!-- Batch Operation Buttons -->
+				<div *ngIf="selectedItems.size > 0">
+					<button
+						(click)="downloadSelectedItems()"
+						[disabled]="loading || isDownloading || isUploading"
+					>
+						{{
+							isDownloading
+								? "Downloading..."
+								: "Download Selected"
+						}}
+					</button>
+					<button
+						(click)="deleteSelectedItems()"
+						[disabled]="loading || isDownloading || isUploading"
+					>
+						{{ loading ? "Deleting..." : "Delete Selected" }}
+					</button>
+				</div>
+			</div>
+		</div>
+
 		<!-- Go to parent -->
 		<button
 			(click)="leaveDirectory()"
@@ -104,10 +165,38 @@
 				<li *ngFor="let item of directoryList">
 					<div>
 						<div>
-							<span *ngIf="item.type === 'directory'">
+							<!-- Selection checkbox when in selection mode -->
+							<input
+								*ngIf="isSelectionMode"
+								type="checkbox"
+								[checked]="isItemSelected(item)"
+								(change)="toggleItemSelection(item)"
+								style="margin-right: 10px"
+							/>
+							<span
+								*ngIf="item.type === 'directory'"
+								[style.cursor]="
+									!isSelectionMode ? 'pointer' : 'default'
+								"
+								(click)="
+									!isSelectionMode
+										? enterDirectory(item)
+										: toggleItemSelection(item)
+								"
+							>
 								{{ item.type }} - {{ item.name }}
 							</span>
-							<span *ngIf="item.type === 'file'">
+							<span
+								*ngIf="item.type === 'file'"
+								[style.cursor]="
+									isSelectionMode ? 'pointer' : 'default'
+								"
+								(click)="
+									isSelectionMode
+										? toggleItemSelection(item)
+										: null
+								"
+							>
 								{{ item.type }} - {{ item.name }}
 							</span>
 							<div *ngIf="item.type === 'file'">
@@ -116,53 +205,6 @@
 									{{ formatDate(item.createdAt) }}</span
 								>
 							</div>
-						</div>
-						<div *ngIf="item.type === 'file'">
-							<button
-								(click)="onFileDownload(item)"
-								[disabled]="loading || isDownloading"
-								title="Download"
-							>
-								{{
-									isDownloading
-										? "Downloading..."
-										: "Download"
-								}}
-							</button>
-							<button
-								(click)="deleteItem(item)"
-								[disabled]="loading || isDownloading"
-								title="Delete File"
-							>
-								{{ loading ? "Deleting..." : "Delete" }}
-							</button>
-						</div>
-						<div *ngIf="item.type === 'directory'">
-							<button
-								(click)="enterDirectory(item)"
-								[disabled]="loading || isDownloading"
-								title="Navigate to Directory"
-							>
-								Enter
-							</button>
-							<button
-								(click)="onFileDownload(item)"
-								[disabled]="loading || isDownloading"
-								title="Download"
-							>
-								{{
-									isDownloading
-										? "Downloading..."
-										: "Download"
-								}}
-							</button>
-							<button
-								(click)="deleteItem(item)"
-								[disabled]="loading || isDownloading"
-								title="Delete Directory"
-							>
-								{{ loading ? "Deleting..." : "Delete" }}
-							</button>
 						</div>
 					</div>
 				</li>

@@ -58,6 +58,10 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 	isCreatingDirectory: boolean = false;
 	newDirectoryName: string = "";
 
+	// File selection properties
+	isSelectionMode: boolean = false;
+	selectedItems: Set<DirectoryItem> = new Set();
+
 	@ViewChild("fileInput") fileInput!: ElementRef<HTMLInputElement>;
 	@ViewChild("directoryInput") directoryInput!: ElementRef<HTMLInputElement>;
 
@@ -194,6 +198,37 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 	clearMessages(): void {
 		this.error = "";
 		this.warning = "";
+	}
+
+	toggleSelectionMode(): void {
+		this.isSelectionMode = !this.isSelectionMode;
+		if (!this.isSelectionMode) {
+			this.selectedItems.clear();
+		}
+	}
+
+	toggleItemSelection(item: DirectoryItem): void {
+		if (this.selectedItems.has(item)) {
+			this.selectedItems.delete(item);
+		} else {
+			this.selectedItems.add(item);
+		}
+	}
+
+	isItemSelected(item: DirectoryItem): boolean {
+		return this.selectedItems.has(item);
+	}
+
+	selectAllItems(): void {
+		this.directoryList.forEach((item) => this.selectedItems.add(item));
+	}
+
+	deselectAllItems(): void {
+		this.selectedItems.clear();
+	}
+
+	getSelectedCount(): number {
+		return this.selectedItems.size;
 	}
 
 	private handleError(error: any, defaultMessage: string): boolean {
@@ -407,19 +442,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 		return await this.fileService.uploadMultipleFiles(files, overwriteAll);
 	}
 
-	async onFileDownload(item: DirectoryItem): Promise<void> {
-		this.clearMessages();
-
-		try {
-			const { blob, fileName } = await this.getDownloadData(item);
-			this.triggerDownload(blob, fileName);
-		} catch (error: any) {
-			if (this.handleError(error, "Download failed")) {
-				return;
-			}
-		}
-	}
-
 	private async getDownloadData(
 		item: DirectoryItem
 	): Promise<{ blob: Blob; fileName: string }> {
@@ -455,77 +477,13 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 		a.remove();
 	}
 
-	async deleteItem(item: DirectoryItem): Promise<void> {
-		if (
-			!this.validateItemForDeletion(item) ||
-			!this.confirmDeletion(item)
-		) {
-			return;
-		}
-
-		this.loading = true;
-		this.clearMessages();
-
-		try {
-			await this.performDeletion(item);
-			this.updateDirectoryListing();
-		} catch (error: any) {
-			if (
-				this.handleError(
-					error,
-					"An unexpected error occurred while deleting"
-				)
-			) {
-				return;
-			}
-		} finally {
-			this.loading = false;
-		}
-	}
-
-	private validateItemForDeletion(item: DirectoryItem): boolean {
-		if (item.type === "file" && !item.fileChunks[0]) {
-			this.error = "Cannot delete: Invalid item (missing file chunk(s))";
-			return false;
-		}
-		if (item.type === "directory" && !item.chunkId) {
-			this.error = "Cannot delete: Invalid item (missing directory ID)";
-			return false;
-		}
-		return true;
-	}
-
-	private confirmDeletion(item: DirectoryItem): boolean {
-		return confirm(
-			`Are you sure you want to delete "${item.name}"? This action cannot be undone.`
-		);
-	}
-
-	private async performDeletion(item: DirectoryItem): Promise<void> {
-		let result = await this.fileService.deleteItem(item, false);
-
-		if (!result.success && result.requiresConfirmation) {
-			const confirmRecursive = confirm(
-				`"${item.name}" is not empty. Do you want to delete it and all its contents recursively? This action cannot be undone.`
-			);
-
-			if (confirmRecursive) {
-				result = await this.fileService.deleteItem(item, true);
-			} else {
-				return; // User cancelled recursive deletion
-			}
-		}
-
-		if (!result.success) {
-			this.error = result.message || "Failed to delete item";
-			return;
-		}
-	}
-
 	async enterDirectory(item: DirectoryItem): Promise<void> {
 		if (item.type !== "directory") {
 			return;
 		}
+
+		// Clear selection when navigating
+		this.selectedItems.clear();
 
 		await this.navigateDirectory(
 			() => this.fileService.changeDirectory(item.chunkId),
@@ -538,6 +496,9 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 		if (this.directoryPath.length <= 1) {
 			return;
 		}
+
+		// Clear selection when navigating
+		this.selectedItems.clear();
 
 		await this.navigateDirectory(
 			() => this.fileService.leaveDirectory(),
@@ -611,5 +572,228 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 	private resetDirectoryCreation(): void {
 		this.isCreatingDirectory = false;
 		this.newDirectoryName = "";
+	}
+
+	// Batch operations
+	async downloadSelectedItems(): Promise<void> {
+		if (this.selectedItems.size === 0) {
+			this.warning = "No items selected for download";
+			return;
+		}
+
+		this.clearMessages();
+
+		try {
+			if (this.selectedItems.size === 1) {
+				// Single item - use existing download logic
+				const item = Array.from(this.selectedItems)[0];
+				const { blob, fileName } = await this.getDownloadData(item);
+				this.triggerDownload(blob, fileName);
+			} else {
+				// Multiple items - create a ZIP
+				await this.downloadMultipleItemsAsZip();
+			}
+		} catch (error: any) {
+			if (this.handleError(error, "Download failed")) {
+				return;
+			}
+		}
+	}
+
+	private async downloadMultipleItemsAsZip(): Promise<void> {
+		// Import JSZip dynamically if not already imported
+		const JSZip = (await import("jszip")).default;
+		const zip = new JSZip();
+
+		// Update progress
+		this.updateDownloadProgress({
+			fileName: "selected-items.zip",
+			progress: 0,
+			isDownloading: true,
+			chunksDownloaded: 0,
+			totalChunks: this.selectedItems.size,
+		});
+
+		let processedCount = 0;
+		const totalItems = this.selectedItems.size;
+
+		for (const item of this.selectedItems) {
+			try {
+				if (item.type === "file") {
+					const fileBlob = await this.fileService.downloadFile(item);
+					zip.file(item.name, fileBlob);
+				} else if (item.type === "directory") {
+					// For directories, we need to create a ZIP structure
+					const dirBlob = await this.fileService.downloadDirectory(
+						item
+					);
+					zip.file(`${item.name}.zip`, dirBlob);
+				}
+
+				processedCount++;
+				const progress = Math.round(
+					(processedCount / totalItems) * 100
+				);
+				this.updateDownloadProgress({
+					fileName: "selected-items.zip",
+					progress,
+					isDownloading: true,
+					chunksDownloaded: processedCount,
+					totalChunks: totalItems,
+				});
+			} catch (error) {
+				console.warn(`Failed to add ${item.name} to ZIP:`, error);
+			}
+		}
+
+		// Generate and download the ZIP
+		const zipBlob = await zip.generateAsync({ type: "blob" });
+		this.triggerDownload(zipBlob, "selected-items.zip");
+
+		// Complete progress
+		this.updateDownloadProgress({
+			fileName: "selected-items.zip",
+			progress: 100,
+			isDownloading: false,
+			chunksDownloaded: totalItems,
+			totalChunks: totalItems,
+		});
+	}
+
+	private updateDownloadProgress(progress: any): void {
+		// TODO: This method should be properly typed, but for now using any to match existing pattern
+		this.downloadStatus = `Downloading ${progress.fileName}`;
+		this.downloadProgress = progress.progress;
+		this.isDownloading = progress.isDownloading;
+		this.downloadChunksInfo = `Items: ${progress.chunksDownloaded}/${progress.totalChunks}`;
+	}
+
+	async deleteSelectedItems(): Promise<void> {
+		if (this.selectedItems.size === 0) {
+			this.warning = "No items selected for deletion";
+			return;
+		}
+
+		const itemCount = this.selectedItems.size;
+		const itemNames = Array.from(this.selectedItems)
+			.map((item) => item.name)
+			.slice(0, 3);
+		const displayNames =
+			itemNames.join(", ") + (itemCount > 3 ? "..." : "");
+
+		// Check for non-empty directories first
+		const nonEmptyDirs = Array.from(this.selectedItems)
+			.filter((item) => item.type === "directory")
+			.map((item) => item.name);
+
+		let confirmMessage = `Are you sure you want to delete ${itemCount} selected item${
+			itemCount > 1 ? "s" : ""
+		}: ${displayNames}?`;
+
+		if (nonEmptyDirs.length > 0) {
+			confirmMessage += `\n\nThis includes ${
+				nonEmptyDirs.length
+			} director${
+				nonEmptyDirs.length > 1 ? "ies" : "y"
+			} that may contain files. All contents will be deleted recursively.`;
+		}
+
+		confirmMessage += "\n\nThis action cannot be undone.";
+
+		if (!confirm(confirmMessage)) {
+			return;
+		}
+
+		this.loading = true;
+		this.clearMessages();
+
+		const errors: string[] = [];
+		let deletedCount = 0;
+
+		try {
+			// Process all selected items, but find fresh references from current directory listing
+			for (const selectedItem of Array.from(this.selectedItems)) {
+				try {
+					// Find the current item in the directory listing by name and type
+					const currentItem = this.directoryList.find(
+						(dirItem) =>
+							dirItem.name === selectedItem.name &&
+							dirItem.type === selectedItem.type
+					);
+
+					if (!currentItem) {
+						continue;
+					}
+
+					if (this.validateItemForDeletion(currentItem)) {
+						await this.performBatchDeletion(currentItem);
+						deletedCount++;
+
+						this.directoryList = this.directoryList.filter(
+							(item) =>
+								!(
+									item.name === currentItem.name &&
+									item.type === currentItem.type
+								)
+						);
+					}
+				} catch (error: any) {
+					errors.push(
+						`${selectedItem.name}: ${
+							error.message || "Unknown error"
+						}`
+					);
+				}
+			}
+
+			// Clear selection and update listing only once at the end
+			this.selectedItems.clear();
+			this.updateDirectoryListing();
+
+			// Only show errors if there were actual failure errors, not "no longer exists" cases
+			const realErrors = errors.filter(
+				(error) => !error.includes("no longer exists")
+			);
+			if (realErrors.length > 0) {
+				this.warning = `${deletedCount} items deleted successfully. Errors: ${realErrors.join(
+					"; "
+				)}`;
+			} else if (deletedCount > 0) {
+				// All items processed successfully
+				this.warning = `${deletedCount} items deleted successfully.`;
+			}
+		} catch (error: any) {
+			if (
+				this.handleError(
+					error,
+					"An unexpected error occurred during batch deletion"
+				)
+			) {
+				return;
+			}
+		} finally {
+			this.loading = false;
+		}
+	}
+
+	private async performBatchDeletion(item: DirectoryItem): Promise<void> {
+		// For batch operations, always try recursive deletion without individual prompts
+		let result = await this.fileService.deleteItem(item, true);
+
+		if (!result.success) {
+			throw new Error(result.message || "Failed to delete item");
+		}
+	}
+
+	private validateItemForDeletion(item: DirectoryItem): boolean {
+		if (item.type === "file" && !item.fileChunks[0]) {
+			this.error = "Cannot delete: Invalid item (missing file chunk(s))";
+			return false;
+		}
+		if (item.type === "directory" && !item.chunkId) {
+			this.error = "Cannot delete: Invalid item (missing directory ID)";
+			return false;
+		}
+		return true;
 	}
 }

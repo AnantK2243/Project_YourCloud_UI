@@ -75,7 +75,7 @@ app.use(cors({
 app.use(express.json());
 
 // Apply rate limiting to API routes
-app.use('/api', apiLimiter);
+// app.use('/api', apiLimiter);
 
 // Serve static files
 app.use(express.static(path.join(__dirname, 'dist/user_interface/browser')));
@@ -116,7 +116,7 @@ app.get('/health', (req, res) => {
 });
 
 // Mount route modules
-app.use('/api', authLimiter, speedLimiter, authRoutes);
+// app.use('/api', authLimiter, speedLimiter, authRoutes);
 app.use('/api', storageRoutes);
 
 // Catch-all handler for Angular routes

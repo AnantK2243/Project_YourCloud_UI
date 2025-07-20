@@ -117,6 +117,7 @@ app.get('/health', (req, res) => {
 
 // Mount route modules
 // app.use('/api', authLimiter, speedLimiter, authRoutes);
+app.use('/api', authRoutes);
 app.use('/api', storageRoutes);
 
 // Catch-all handler for Angular routes

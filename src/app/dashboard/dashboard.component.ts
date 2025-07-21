@@ -199,6 +199,10 @@ export class DashboardComponent implements OnInit {
 		});
 	}
 
+	openNodeSetupTutorial() {
+		this.router.navigate(["/node-setup-tutorial"]);
+	}
+
 	clearMessages() {
 		this.warning = "";
 		this.error = "";

@@ -1,0 +1,111 @@
+<div>
+	<div>
+		<h1>Node Setup Tutorial</h1>
+		<button (click)="goBackToDashboard()">← Back to Dashboard</button>
+	</div>
+
+	<div>
+		<!-- <section>
+			<h2>Step 1: Download the Storage Client</h2>
+			<p>Download the latest storage client for your operating system:</p>
+			<div>
+				<a href="#">Download for Linux/Mac</a>
+			</div>
+
+			<p>More platforms to be added</p>
+		</section> -->
+
+		<section>
+			<h2>Step 1: Install the Storage Client (Requires Rust Compiler)</h2>
+			<div>
+				<h3>Linux Installation</h3>
+				<div>
+					<pre><code># Clone the repository
+git clone https://github.com/AnantK2243/Project_YourCloud_Client.git --depth 1
+
+# Navigate to the extracted directory
+cd Project_YourCloud_Client
+
+# Ensure you have Rust installed (https://www.rust-lang.org/tools/install)
+# If not, install Rust using the command below:
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# Follow the on-screen instructions to complete the installation
+
+# Build the project for release
+cargo build --release
+
+# Run the installation script
+sudo ./scripts/install.sh
+
+# The client will be installed to /usr/local/bin/project_yourcloud</code></pre>
+				</div>
+			</div>
+		</section>
+
+		<section>
+			<h2>Step 2: Configure Your Node</h2>
+			<p>
+				After registering your node in the dashboard, configure it using
+				the config file:
+			</p>
+
+			<h3>Configuration File Location</h3>
+			<ul>
+				<li>
+					<strong>Linux/macOS:</strong>
+					<code>~/.config/Project_YourCloud/config.toml</code>
+				</li>
+			</ul>
+		</section>
+
+		<section>
+			<h2>Step 3: Start the Storage Node</h2>
+			<p>Once configured, start your storage node:</p>
+
+			<h3>Manual Start</h3>
+			<div>
+				<pre><code># Start the storage client
+project_yourcloud</code></pre>
+			</div>
+
+			<h3>Run as System Service (Linux)</h3>
+			<div>
+				<pre><code># Enable and start the systemd service
+sudo systemctl enable project_yourcloud_daemon
+sudo systemctl start project_yourcloud_daemon
+
+# Check service status
+sudo systemctl status project_yourcloud_daemon</code></pre>
+			</div>
+		</section>
+
+		<section>
+			<h2>Step 4: Verify Connection</h2>
+			<p>
+				Go back to your dashboard to verify that your node appears as
+				"online" and is ready to store files.
+			</p>
+			<div>
+				<h3>Troubleshooting</h3>
+				<ul>
+					<li>
+						Ensure your firewall allows connections on the
+						configured port
+					</li>
+					<li>
+						Check that the storage path exists and has proper
+						permissions
+					</li>
+					<li>
+						Verify your Node ID and Auth Token are correctly entered
+					</li>
+				</ul>
+			</div>
+		</section>
+	</div>
+
+	<div>
+		<button (click)="goBackToDashboard()">Return to Dashboard</button>
+	</div>
+</div>

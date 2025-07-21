@@ -4,6 +4,7 @@
 	<div>
 		<button (click)="logout()">Logout</button>
 		<button (click)="showNodeRegistrationPopup()">Register New Node</button>
+		<button (click)="openNodeSetupTutorial()">Node Setup Tutorial</button>
 	</div>
 
 	<!-- User's Storage Nodes -->
@@ -123,6 +124,9 @@
 			<div>
 				<button (click)="registerNode()">Register Node</button>
 				<button (click)="hideNodeRegistrationPopup()">Cancel</button>
+				<button (click)="openNodeSetupTutorial()">
+					View Installation Tutorial
+				</button>
 			</div>
 
 			<div *ngIf="registerMessage">

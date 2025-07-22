@@ -6,8 +6,19 @@ module.exports = {
     testEnvironment: 'jsdom',
     setupFilesAfterEnv: ['<rootDir>/tests/frontend-setup.js'],
     moduleFileExtensions: ['ts', 'js', 'json'],
+    preset: 'ts-jest',
     transform: {
-        '^.+\\.(ts|tsx)$': 'ts-jest',
+        '^.+\\.(ts|tsx)$': ['ts-jest', {
+            tsconfig: {
+                module: 'commonjs',
+                target: 'es2017',
+                moduleResolution: 'node',
+                experimentalDecorators: true,
+                emitDecoratorMetadata: true,
+                skipLibCheck: true,
+                lib: ['es2017', 'dom']
+            }
+        }],
         '^.+\\.(js|jsx)$': 'babel-jest'
     },
     moduleNameMapper: {

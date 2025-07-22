@@ -8,7 +8,7 @@ global.TextDecoder = TextDecoder;
 // Setup localStorage mock with proper Jest spy functions
 const createStorageMock = () => {
     const storage = {};
-    
+
     return {
         getItem: jest.fn((key) => storage[key] || null),
         setItem: jest.fn((key, value) => {
@@ -74,12 +74,34 @@ global.crypto = {
     })
 };
 
-// Mock Angular testing utilities
+// Mock Angular testing utilities - Simple version for our tests
 global.Zone = {
     current: {
         run: jest.fn((fn) => fn())
     }
 };
+
+// Mock Angular TestBed for component testing
+global.TestBed = {
+    configureTestingModule: jest.fn(() => ({
+        compileComponents: jest.fn(() => Promise.resolve())
+    })),
+    createComponent: jest.fn(() => ({
+        componentInstance: {},
+        detectChanges: jest.fn(),
+        destroy: jest.fn()
+    }))
+};
+
+// Mock RxJS operators
+global.of = jest.fn((value) => ({
+    subscribe: jest.fn((fn) => fn(value)),
+    pipe: jest.fn(() => ({ subscribe: jest.fn() }))
+}));
+
+global.throwError = jest.fn((error) => ({
+    subscribe: jest.fn((next, error_fn) => error_fn && error_fn(error))
+}));
 
 // Reset mocks before each test
 beforeEach(() => {

@@ -18,89 +18,110 @@
 		<section>
 			<h2>Step 1: Install the Storage Client (Requires Rust Compiler)</h2>
 			<div>
-				<h3>Linux Installation</h3>
+				<h3>Linux/macOS Installation</h3>
 				<div>
 					<pre><code># Clone the repository
 git clone https://github.com/AnantK2243/Project_YourCloud_Client.git --depth 1
 
-# Navigate to the extracted directory
+# Navigate to the storage client directory
 cd Project_YourCloud_Client
 
 # Ensure you have Rust installed (https://www.rust-lang.org/tools/install)
 # If not, install Rust using the command below:
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env
 
-# Follow the on-screen instructions to complete the installation
-
-# Build the project for release
-cargo build --release
-
-# Run the installation script
+# Run the interactive installation script
 sudo ./scripts/install.sh
 
-# The client will be installed to /usr/local/bin/project_yourcloud</code></pre>
+# The script will:
+# 1. Build the release binary
+# 2. Install it to /usr/local/bin/Project_YourCloud_Client
+# 3. Ask for your configuration details
+# 4. Set up systemd service (optional)</code></pre>
 				</div>
+
+				<h3>What the installer will ask for:</h3>
+				<ul>
+					<li><strong>Node ID:</strong> From your dashboard registration</li>
+					<li><strong>Auth Token:</strong> From your dashboard registration</li>
+					<li><strong>Storage Path:</strong> Where to store files (default: ~/Project_YourCloud)</li>
+					<li><strong>Storage Size:</strong> Maximum storage in GB (default: 40)</li>
+					<li><strong>Systemd Setup:</strong> Whether to install as a system service</li>
+				</ul>
 			</div>
 		</section>
 
 		<section>
-			<h2>Step 2: Configure Your Node</h2>
+			<h2>Step 2: Verify Installation</h2>
 			<p>
-				After registering your node in the dashboard, configure it using
-				the config file:
+				The installation script will automatically configure everything for you. 
+				If you chose systemd setup, your node will start automatically.
 			</p>
+			
+			<h3>Manual Commands (if not using systemd)</h3>
+			<div>
+				<pre><code># Start the storage node
+project_yourcloud start
 
-			<h3>Configuration File Location</h3>
-			<ul>
-				<li>
-					<strong>Linux/macOS:</strong>
-					<code>~/.config/Project_YourCloud/config.toml</code>
-				</li>
-			</ul>
+# Check status
+project_yourcloud status
+
+# View help
+project_yourcloud --help</code></pre>
+			</div>
+
+			<h3>Systemd Commands (if using systemd service)</h3>
+			<div>
+				<pre><code># Check service status
+sudo systemctl status project-yourcloud-storage
+
+# Start/stop the service
+sudo systemctl start project-yourcloud-storage
+sudo systemctl stop project-yourcloud-storage
+
 		</section>
 
 		<section>
-			<h2>Step 3: Start the Storage Node</h2>
-			<p>Once configured, start your storage node:</p>
-
-			<h3>Manual Start</h3>
-			<div>
-				<pre><code># Start the storage client
-project_yourcloud</code></pre>
-			</div>
-
-			<h3>Run as System Service (Linux)</h3>
-			<div>
-				<pre><code># Enable and start the systemd service
-sudo systemctl enable project_yourcloud_daemon
-sudo systemctl start project_yourcloud_daemon
-
-# Check service status
-sudo systemctl status project_yourcloud_daemon</code></pre>
-			</div>
-		</section>
-
-		<section>
-			<h2>Step 4: Verify Connection</h2>
-			<p>
-				Go back to your dashboard to verify that your node appears as
-				"online" and is ready to store files.
-			</p>
+			<h2>Step 3: Verify Connection</h2>
+			<p>Go back to your dashboard to verify that your node appears as "online" and is ready to store files.</p>
 			<div>
 				<h3>Troubleshooting</h3>
 				<ul>
-					<li>
-						Ensure your firewall allows connections on the
-						configured port
-					</li>
-					<li>
-						Check that the storage path exists and has proper
-						permissions
-					</li>
-					<li>
-						Verify your Node ID and Auth Token are correctly entered
-					</li>
+					<li>Ensure your firewall allows connections on the configured port</li>
+					<li>Check that the storage path exists and has proper permissions</li>
+					<li>Verify your Node ID and Auth Token are correctly entered</li>
+					<li>Check the logs for any error messages</li>
+					<li>If using systemd: <code>sudo journalctl -u project-yourcloud-storage -f</code></li>
+					<li>If running manually: Check the terminal output for errors</li>
 				</ul>
+			</div>
+		</section>
+
+		<section>
+			<h2>Additional Information</h2>
+			<div>
+				<h3>Configuration File</h3>
+				<p>Your configuration is automatically saved to: <code>~/.config/Project_YourCloud/config.toml</code></p>
+				<p>You can edit this file later if needed.</p>
+
+				<h3>Systemd Service Management</h3>
+				<div>
+					<pre><code># Check service status
+sudo systemctl status project-yourcloud-storage
+
+# Enable/disable autostart
+sudo systemctl enable project-yourcloud-storage
+sudo systemctl disable project-yourcloud-storage
+
+# Start/stop/restart service
+sudo systemctl start project-yourcloud-storage
+sudo systemctl stop project-yourcloud-storage
+sudo systemctl restart project-yourcloud-storage
+
+# View service logs
+sudo journalctl -u project-yourcloud-storage -f</code></pre>
+				</div>
 			</div>
 		</section>
 	</div>

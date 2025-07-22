@@ -8,9 +8,9 @@ import { Router } from "@angular/router";
 	selector: "app-node-setup-tutorial",
 	standalone: true,
 	imports: [CommonModule],
-	templateUrl: "./node-setup-tutorial.component.html",
+	templateUrl: "./storage-setup-instructions.component.html",
 })
-export class NodeSetupTutorialComponent {
+export class StorageSetupInstructions {
 	constructor(private router: Router) {}
 
 	goBackToDashboard(): void {

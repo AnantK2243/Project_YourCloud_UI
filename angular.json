@@ -34,7 +34,14 @@
 						"outputMode": "server",
 						"ssr": {
 							"entry": "src/server.ts"
-						}
+						},
+						"allowedCommonJsDependencies": [
+							"readable-stream",
+							"lie",
+							"setimmediate",
+							"jszip",
+							"pako"
+						]
 					},
 					"configurations": {
 						"production": {

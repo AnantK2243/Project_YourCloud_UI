@@ -5,7 +5,7 @@ import { LoginComponent } from "./login/login.component";
 import { RegisterComponent } from "./register/register.component";
 import { DashboardComponent } from "./dashboard/dashboard.component";
 import { FileBrowserComponent } from "./file-browser/file-browser.component";
-import { NodeSetupTutorialComponent } from "./node-setup-tutorial/node-setup-tutorial.component";
+import { StorageSetupInstructions } from "./storage-setup-instructions/storage-setup-instructions.component";
 import { AuthGuard, GuestGuard } from "./auth.guard";
 
 export const routes: Routes = [
@@ -35,8 +35,8 @@ export const routes: Routes = [
 		canActivate: [AuthGuard],
 	},
 	{
-		path: "node-setup-tutorial",
-		component: NodeSetupTutorialComponent,
+		path: "storage-setup-instructions",
+		component: StorageSetupInstructions,
 		canActivate: [AuthGuard],
 	},
 	{ path: "**", redirectTo: "/login" }, // Wildcard route for 404 errors

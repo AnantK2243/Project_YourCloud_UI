@@ -199,8 +199,8 @@ export class DashboardComponent implements OnInit {
 		});
 	}
 
-	openNodeSetupTutorial() {
-		this.router.navigate(["/node-setup-tutorial"]);
+	openStorageSetupInstructions() {
+		this.router.navigate(["/storage-setup-instructions"]);
 	}
 
 	clearMessages() {

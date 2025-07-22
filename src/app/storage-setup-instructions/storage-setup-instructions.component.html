@@ -32,7 +32,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source ~/.cargo/env
 
 # Run the interactive installation script
-sudo ./scripts/install.sh
+./scripts/install.sh
 
 # The script will:
 # 1. Build the release binary
@@ -43,11 +43,26 @@ sudo ./scripts/install.sh
 
 				<h3>What the installer will ask for:</h3>
 				<ul>
-					<li><strong>Node ID:</strong> From your dashboard registration</li>
-					<li><strong>Auth Token:</strong> From your dashboard registration</li>
-					<li><strong>Storage Path:</strong> Where to store files (default: ~/Project_YourCloud)</li>
-					<li><strong>Storage Size:</strong> Maximum storage in GB (default: 40)</li>
-					<li><strong>Systemd Setup:</strong> Whether to install as a system service</li>
+					<li>
+						<strong>Node ID:</strong> From your dashboard
+						registration
+					</li>
+					<li>
+						<strong>Auth Token:</strong> From your dashboard
+						registration
+					</li>
+					<li>
+						<strong>Storage Path:</strong> Where to store files
+						(default: ~/Project_YourCloud)
+					</li>
+					<li>
+						<strong>Storage Size:</strong> Maximum storage in GB
+						(default: 40)
+					</li>
+					<li>
+						<strong>Systemd Setup:</strong> Whether to install as a
+						system service
+					</li>
 				</ul>
 			</div>
 		</section>
@@ -55,10 +70,11 @@ sudo ./scripts/install.sh
 		<section>
 			<h2>Step 2: Verify Installation</h2>
 			<p>
-				The installation script will automatically configure everything for you. 
-				If you chose systemd setup, your node will start automatically.
+				The installation script will automatically configure everything
+				for you. If you chose systemd setup, your node will start
+				automatically.
 			</p>
-			
+
 			<h3>Manual Commands (if not using systemd)</h3>
 			<div>
 				<pre><code># Start the storage node
@@ -86,16 +102,36 @@ sudo systemctl stop project-yourcloud-storage
 
 		<section>
 			<h2>Step 3: Verify Connection</h2>
-			<p>Go back to your dashboard to verify that your node appears as "online" and is ready to store files.</p>
+			<p>
+				Go back to your dashboard to verify that your node appears as
+				"online" and is ready to store files.
+			</p>
 			<div>
 				<h3>Troubleshooting</h3>
 				<ul>
-					<li>Ensure your firewall allows connections on the configured port</li>
-					<li>Check that the storage path exists and has proper permissions</li>
-					<li>Verify your Node ID and Auth Token are correctly entered</li>
+					<li>
+						Ensure your firewall allows connections on the
+						configured port
+					</li>
+					<li>
+						Check that the storage path exists and has proper
+						permissions
+					</li>
+					<li>
+						Verify your Node ID and Auth Token are correctly entered
+					</li>
 					<li>Check the logs for any error messages</li>
-					<li>If using systemd: <code>sudo journalctl -u project-yourcloud-storage -f</code></li>
-					<li>If running manually: Check the terminal output for errors</li>
+					<li>
+						If using systemd:
+						<code
+							>sudo journalctl -u project-yourcloud-storage
+							-f</code
+						>
+					</li>
+					<li>
+						If running manually: Check the terminal output for
+						errors
+					</li>
 				</ul>
 			</div>
 		</section>
@@ -104,7 +140,10 @@ sudo systemctl stop project-yourcloud-storage
 			<h2>Additional Information</h2>
 			<div>
 				<h3>Configuration File</h3>
-				<p>Your configuration is automatically saved to: <code>~/.config/Project_YourCloud/config.toml</code></p>
+				<p>
+					Your configuration is automatically saved to:
+					<code>~/.config/Project_YourCloud/config.toml</code>
+				</p>
 				<p>You can edit this file later if needed.</p>
 
 				<h3>Systemd Service Management</h3>

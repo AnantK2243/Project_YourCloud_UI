@@ -31,10 +31,15 @@ function cleanupExpiredTokens() {
 	}
 }
 
-// Periodically clean up the blacklist
+// Periodically clean up the blacklist (only in non-test environment)
 const cleanupInterval = 24 * 60 * 60 * 1000;
-setInterval(cleanupExpiredTokens, cleanupInterval);
-console.log(`Token blacklist cleanup job scheduled to run every ${cleanupInterval / (60 * 60 * 1000)} hours.`);
+let cleanupIntervalId = null;
+
+if (process.env.NODE_ENV !== 'test') {
+	cleanupIntervalId = setInterval(cleanupExpiredTokens, cleanupInterval);
+	const hours = cleanupInterval / (60 * 60 * 1000);
+	console.log(`Token blacklist cleanup job scheduled to run every ${hours} hours.`);
+}
 
 // JWT Authentication middleware
 const authenticateToken = (req, res, next) => {
@@ -78,7 +83,9 @@ function blacklistToken(token) {
 			tokenBlacklist.set(token, decoded.exp * 1000);
 		}
 	} catch (error) {
-		console.error('Error blacklisting token:', error);
+		if (process.env.NODE_ENV !== 'test') {
+			console.error('Error blacklisting token:', error);
+		}
 	}
 }
 
@@ -124,9 +131,10 @@ router.post('/register', async (req, res) => {
 			success: true,
 			message: 'User registered successfully'
 		});
-
 	} catch (error) {
-		console.error('Registration error:', error);
+		if (process.env.NODE_ENV !== 'test') {
+			console.error('Registration error:', error);
+		}
 		res.status(500).json({
 			success: false,
 			message: 'Registration failed'
@@ -194,9 +202,10 @@ router.post('/login', async (req, res) => {
 				salt: user.salt
 			}
 		});
-
 	} catch (error) {
-		console.error('Login error:', error);
+		if (process.env.NODE_ENV !== 'test') {
+			console.error('Login error:', error);
+		}
 		res.status(500).json({
 			success: false,
 			message: 'Login failed'
@@ -215,7 +224,9 @@ router.post('/logout', authenticateToken, (req, res) => {
 			message: 'Logged out successfully'
 		});
 	} catch (error) {
-		console.error('Logout error:', error);
+		if (process.env.NODE_ENV !== 'test') {
+			console.error('Logout error:', error);
+		}
 		res.status(500).json({
 			success: false,
 			message: 'Logout failed'
@@ -227,5 +238,6 @@ module.exports = {
 	router,
 	authenticateToken,
 	blacklistToken,
-	cleanupExpiredTokens
+	cleanupExpiredTokens,
+	cleanupIntervalId
 };

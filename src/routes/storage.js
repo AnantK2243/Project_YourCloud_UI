@@ -2,23 +2,28 @@
 
 // Storage and Node management routes
 const express = require('express');
-const { S3Client, GetObjectCommand, PutObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
+const {
+	S3Client,
+	GetObjectCommand,
+	PutObjectCommand,
+	DeleteObjectCommand
+} = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const bcrypt = require('bcryptjs');
 const { authenticateToken } = require('./auth');
 const { StorageNode, User } = require('../models/User');
-// TODO: IMPLEMENT
-const { validateNodeRegistrationInput, validateChunkId } = require('../utils/validation');
+// TODO: IMPLEMENT THESE VALIDATIONS
+// const { validateNodeRegistrationInput, validateChunkId } = require('../utils/validation');
 
 const router = express.Router();
 
 const s3Client = new S3Client({
-	region: "auto",
+	region: 'auto',
 	endpoint: `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
 	credentials: {
 		accessKeyId: process.env.R2_ACCESS_KEY_ID,
-		secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
-	},
+		secretAccessKey: process.env.R2_SECRET_ACCESS_KEY
+	}
 });
 
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
@@ -90,16 +95,20 @@ async function updateNodeStatus(req, nodeId) {
 		}
 		// If not connected or failed to get status, fetch from DB
 		const nodeInDb = await StorageNode.findOne({ node_id: nodeId });
-		return nodeInDb ? {
-			node_id: nodeId,
-			status: 'offline',
-			total_available_space: nodeInDb.total_available_space || 0,
-			used_space: nodeInDb.used_space || 0,
-			num_chunks: nodeInDb.num_chunks || 0,
-			last_seen: nodeInDb.last_seen || null
-		} : null;
+		return nodeInDb
+			? {
+				node_id: nodeId,
+				status: 'offline',
+				total_available_space: nodeInDb.total_available_space || 0,
+				used_space: nodeInDb.used_space || 0,
+				num_chunks: nodeInDb.num_chunks || 0,
+				last_seen: nodeInDb.last_seen || null
+			}
+			: null;
 	} catch (error) {
-		console.error(`Error updating node ${nodeId} status:`, error);
+		if (process.env.NODE_ENV !== 'test') {
+			console.error(`Error updating node ${nodeId} status:`, error);
+		}
 		return null;
 	}
 }
@@ -123,7 +132,7 @@ async function sendStorageNodeCommand(req, nodeId, command, timeout = true, comm
 		};
 
 		// Set up response handler
-		pendingCommands.set(commandId, (result) => {
+		pendingCommands.set(commandId, result => {
 			resolve(result);
 		});
 
@@ -148,59 +157,61 @@ async function sendStorageNodeCommand(req, nodeId, command, timeout = true, comm
 
 // Send store command with data
 async function sendStoreCommand(req, nodeId, command, binaryData) {
-	return new Promise(async (resolve, reject) => {
-		const nodeConnections = getNodeConnections(req);
-		const pendingCommands = getPendingCommands(req);
-		const ws = nodeConnections.get(nodeId);
+	return new Promise((resolve, reject) => {
+		(async () => {
+			const nodeConnections = getNodeConnections(req);
+			const pendingCommands = getPendingCommands(req);
+			const ws = nodeConnections.get(nodeId);
 
-		if (!ws || ws.readyState !== 1) {
-			reject(new Error(`Storage node ${nodeId} is not connected`));
-			return;
-		}
-
-		const commandId = generateCommandId(req);
-		const fullCommand = {
-			...command,
-			command_id: commandId
-		};
-
-		// Set up response handler
-		pendingCommands.set(commandId, (result) => {
-			resolve(result);
-		});
-
-		// Set timeout (30 seconds)
-		const timeout = setTimeout(() => {
-			if (pendingCommands.has(commandId)) {
-				pendingCommands.delete(commandId);
-				reject(new Error('Command timeout'));
+			if (!ws || ws.readyState !== 1) {
+				reject(new Error(`Storage node ${nodeId} is not connected`));
+				return;
 			}
-		}, 30000);
 
-		try {
-			// Create combined binary message: [4 bytes: json_length][json][binary_data]
-			const jsonString = JSON.stringify(fullCommand);
-			const jsonBytes = Buffer.from(jsonString, 'utf8');
+			const commandId = generateCommandId(req);
+			const fullCommand = {
+				...command,
+				command_id: commandId
+			};
 
-			// Create combined message buffer
-			const combinedMessage = Buffer.alloc(4 + jsonBytes.length + binaryData.length);
+			// Set up response handler
+			pendingCommands.set(commandId, result => {
+				resolve(result);
+			});
 
-			// Write JSON length as 4-byte little-endian integer
-			combinedMessage.writeUInt32LE(jsonBytes.length, 0);
+			// Set timeout (30 seconds)
+			const timeout = setTimeout(() => {
+				if (pendingCommands.has(commandId)) {
+					pendingCommands.delete(commandId);
+					reject(new Error('Command timeout'));
+				}
+			}, 30000);
 
-			// Write JSON command
-			jsonBytes.copy(combinedMessage, 4);
+			try {
+				// Create combined binary message: [4 bytes: json_length][json][binary_data]
+				const jsonString = JSON.stringify(fullCommand);
+				const jsonBytes = Buffer.from(jsonString, 'utf8');
 
-			// Write binary data
-			binaryData.copy(combinedMessage, 4 + jsonBytes.length);
+				// Create combined message buffer
+				const combinedMessage = Buffer.alloc(4 + jsonBytes.length + binaryData.length);
 
-			// Send as single binary WebSocket message
-			ws.send(combinedMessage);
-		} catch (error) {
-			pendingCommands.delete(commandId);
-			clearTimeout(timeout);
-			reject(error);
-		}
+				// Write JSON length as 4-byte little-endian integer
+				combinedMessage.writeUInt32LE(jsonBytes.length, 0);
+
+				// Write JSON command
+				jsonBytes.copy(combinedMessage, 4);
+
+				// Write binary data
+				binaryData.copy(combinedMessage, 4 + jsonBytes.length);
+
+				// Send as single binary WebSocket message
+				ws.send(combinedMessage);
+			} catch (error) {
+				pendingCommands.delete(commandId);
+				clearTimeout(timeout);
+				reject(error);
+			}
+		})();
 	});
 }
 
@@ -249,24 +260,30 @@ router.post('/nodes', authenticateToken, async (req, res) => {
 		await node.save();
 
 		// Set timeout to delete node if it doesn't connect
-		setTimeout(async () => {
-			try {
-				// Check if node still exists and is offline
-				const nodeCheck = await StorageNode.findOne({ node_id });
-				if (nodeCheck && nodeCheck.status === 'offline' && nodeCheck.last_seen === null) {
-					// Node never connected, remove it from database
-					await StorageNode.deleteOne({ node_id });
+		setTimeout(
+			async () => {
+				try {
+					// Check if node still exists and is offline
+					const nodeCheck = await StorageNode.findOne({ node_id });
+					if (
+						nodeCheck &&
+						nodeCheck.status === 'offline' &&
+						nodeCheck.last_seen === null
+					) {
+						// Node never connected, remove it from database
+						await StorageNode.deleteOne({ node_id });
 
-					// Remove node_id from user's storage_nodes array
-					await User.findByIdAndUpdate(
-						req.user.userId,
-						{ $pull: { storage_nodes: node_id } }
-					);
+						// Remove node_id from user's storage_nodes array
+						await User.findByIdAndUpdate(req.user.userId, {
+							$pull: { storage_nodes: node_id }
+						});
+					}
+				} catch (error) {
+					console.error('Error cleaning up unconnected node:', error);
 				}
-			} catch (error) {
-				console.error('Error cleaning up unconnected node:', error);
-			}
-		}, 5 * 60 * 1000); // 5 minutes
+			},
+			5 * 60 * 1000
+		); // 5 minutes
 
 		// Add the node_id to the user's storage_nodes array
 		await User.findByIdAndUpdate(
@@ -286,7 +303,7 @@ router.post('/nodes', authenticateToken, async (req, res) => {
 	} catch (error) {
 		res.status(500).json({
 			success: false,
-			error: "Failed to register node: " + error.message
+			error: 'Failed to register node: ' + error.message
 		});
 	}
 });
@@ -306,13 +323,14 @@ router.get('/nodes', authenticateToken, async (req, res) => {
 		// Get detailed information about each storage node
 		const storageNodes = await StorageNode.find({
 			node_id: { $in: user.storage_nodes }
-		}).select('-auth_token').select('-owner_user_id'); // Exclude auth_token and owner_user_id for security
+		})
+			.select('-auth_token')
+			.select('-owner_user_id'); // Exclude auth_token and owner_user_id for security
 
 		res.json({
 			success: true,
 			data: storageNodes
 		});
-
 	} catch (error) {
 		res.status(500).json({
 			success: false,
@@ -377,10 +395,7 @@ router.delete('/nodes/:nodeId', authenticateToken, async (req, res) => {
 		await StorageNode.deleteOne({ node_id: nodeId });
 
 		// Remove node_id from user's storage_nodes array
-		await User.findByIdAndUpdate(
-			req.user.userId,
-			{ $pull: { storage_nodes: nodeId } }
-		);
+		await User.findByIdAndUpdate(req.user.userId, { $pull: { storage_nodes: nodeId } });
 
 		res.json({
 			success: true,
@@ -406,10 +421,16 @@ router.post('/nodes/:nodeId/chunks/upload-sessions', authenticateToken, async (r
 		await validateUserOwnsNode(req, req.user.userId, nodeId);
 		const commandId = generateCommandId(req);
 
-		const chunkIdResponse = await sendStorageNodeCommand(req, nodeId, {
-			command_type: 'PREP_UPLOAD',
-			data_size,
-		}, true, commandId);
+		const chunkIdResponse = await sendStorageNodeCommand(
+			req,
+			nodeId,
+			{
+				command_type: 'PREP_UPLOAD',
+				data_size
+			},
+			true,
+			commandId
+		);
 
 		if (!chunkIdResponse || !chunkIdResponse.success || !chunkIdResponse.chunk_id) {
 			throw new Error('Failed to get a valid chunkId from the storage node.');
@@ -418,7 +439,10 @@ router.post('/nodes/:nodeId/chunks/upload-sessions', authenticateToken, async (r
 
 		const temporaryObjectName = `temp-${commandId}-${chunkId}`;
 
-		const putCommand = new PutObjectCommand({ Bucket: R2_BUCKET_NAME, Key: temporaryObjectName });
+		const putCommand = new PutObjectCommand({
+			Bucket: R2_BUCKET_NAME,
+			Key: temporaryObjectName
+		});
 		const uploadUrl = await getSignedUrl(s3Client, putCommand, { expiresIn: 300 });
 
 		res.status(201).json({
@@ -431,81 +455,92 @@ router.post('/nodes/:nodeId/chunks/upload-sessions', authenticateToken, async (r
 				expiresIn: 300
 			}
 		});
-
 	} catch (error) {
-		console.error('[ERROR] Upload session creation failed:', error);
-		console.error('[ERROR] Error stack:', error.stack);
+		if (process.env.NODE_ENV !== 'test') {
+			console.error('[ERROR] Upload session creation failed:', error);
+			console.error('[ERROR] Error stack:', error.stack);
+		}
 		res.status(500).json({ success: false, error: error.message });
 	}
 });
 
 // POST /api/nodes/:nodeId/chunks/:chunkId - Store chunk (direct binary upload)
-router.post('/nodes/:nodeId/chunks/:chunkId', authenticateToken, express.raw({ type: 'application/octet-stream', limit: '64mb' }), async (req, res) => {
-	try {
-		const { nodeId, chunkId } = req.params;
-		if (!nodeId || !chunkId) {
-			throw new Error('Node ID and Chunk ID are required');
-		}
+router.post(
+	'/nodes/:nodeId/chunks/:chunkId',
+	authenticateToken,
+	express.raw({ type: 'application/octet-stream', limit: '64mb' }),
+	async (req, res) => {
+		try {
+			const { nodeId, chunkId } = req.params;
+			if (!nodeId || !chunkId) {
+				throw new Error('Node ID and Chunk ID are required');
+			}
 
-		await validateUserOwnsNode(req, req.user.userId, nodeId);
+			await validateUserOwnsNode(req, req.user.userId, nodeId);
 
-		const chunkData = req.body;
-		if (!chunkData || chunkData.length === 0) {
-			throw new Error('No data provided');
-		}
+			const chunkData = req.body;
+			if (!chunkData || chunkData.length === 0) {
+				throw new Error('No data provided');
+			}
 
-		// Send STORE_CHUNK command with binary data
-		const result = await sendStoreCommand(req, nodeId, {
-			command_type: 'STORE_CHUNK',
-			chunk_id: chunkId,
-			data_size: chunkData.length
-		}, chunkData);
+			// Send STORE_CHUNK command with binary data
+			const result = await sendStoreCommand(
+				req,
+				nodeId,
+				{
+					command_type: 'STORE_CHUNK',
+					chunk_id: chunkId,
+					data_size: chunkData.length
+				},
+				chunkData
+			);
 
-		if (result.success && result.chunk_id) {
-			res.status(201).json({
-				success: true,
-				data: {
-					chunkId: result.chunk_id,
-					status: 'stored'
-				}
-			});
-		} else {
-			throw new Error(result.error || 'Failed to store chunk');
-		}
-	} catch (error) {
-		if (error.message.includes('required')) {
-			res.status(400).json({
-				success: false,
-				error: error.message
-			});
-		} else if (error.message.includes('not connected')) {
-			res.status(503).json({
-				success: false,
-				error: 'Storage node is not available'
-			});
-		} else if (error.message.includes('does not own')) {
-			res.status(403).json({
-				success: false,
-				error: 'Access denied'
-			});
-		} else if (error.message.includes('Chunk ID already exists')) {
-			res.status(409).json({
-				success: false,
-				error: 'Chunk ID already exists'
-			});
-		} else if (error.message.includes('Insufficient disk space.')) {
-			res.status(507).json({
-				success: false,
-				error: error.message
-			});
-		} else {
-			res.status(500).json({
-				success: false,
-				error: error.message || 'Internal Server Error'
-			});
+			if (result.success && result.chunk_id) {
+				res.status(201).json({
+					success: true,
+					data: {
+						chunkId: result.chunk_id,
+						status: 'stored'
+					}
+				});
+			} else {
+				throw new Error(result.error || 'Failed to store chunk');
+			}
+		} catch (error) {
+			if (error.message.includes('required')) {
+				res.status(400).json({
+					success: false,
+					error: error.message
+				});
+			} else if (error.message.includes('not connected')) {
+				res.status(503).json({
+					success: false,
+					error: 'Storage node is not available'
+				});
+			} else if (error.message.includes('does not own')) {
+				res.status(403).json({
+					success: false,
+					error: 'Access denied'
+				});
+			} else if (error.message.includes('Chunk ID already exists')) {
+				res.status(409).json({
+					success: false,
+					error: 'Chunk ID already exists'
+				});
+			} else if (error.message.includes('Insufficient disk space.')) {
+				res.status(507).json({
+					success: false,
+					error: error.message
+				});
+			} else {
+				res.status(500).json({
+					success: false,
+					error: error.message || 'Internal Server Error'
+				});
+			}
 		}
 	}
-});
+);
 
 // GET /api/nodes/:nodeId/chunks/:chunkId - Get chunk data
 router.get('/nodes/:nodeId/chunks/:chunkId', authenticateToken, async (req, res) => {
@@ -625,27 +660,38 @@ router.put('/nodes/:nodeId/chunks/:chunkId', authenticateToken, async (req, res)
 	if (!chunkId || !temporaryObjectName) {
 		return res.status(400).json({
 			success: false,
-			error: "chunkId and temporaryObjectName are required."
+			error: 'chunkId and temporaryObjectName are required.'
 		});
 	}
 
 	try {
 		await validateUserOwnsNode(req, req.user.userId, nodeId);
 
-		const getCommand = new GetObjectCommand({ Bucket: R2_BUCKET_NAME, Key: temporaryObjectName });
+		const getCommand = new GetObjectCommand({
+			Bucket: R2_BUCKET_NAME,
+			Key: temporaryObjectName
+		});
 		const downloadUrl = await getSignedUrl(s3Client, getCommand, { expiresIn: 300 });
 
-		const storeResult = await sendStorageNodeCommand(req, nodeId, {
-			command_type: 'DOWNLOAD_AND_STORE_CHUNK',
-			chunk_id: chunkId,
-			download_url: downloadUrl
-		}, false); // Don't timeout this command
+		const storeResult = await sendStorageNodeCommand(
+			req,
+			nodeId,
+			{
+				command_type: 'DOWNLOAD_AND_STORE_CHUNK',
+				chunk_id: chunkId,
+				download_url: downloadUrl
+			},
+			false
+		); // Don't timeout this command
 
 		if (!storeResult || !storeResult.success) {
 			throw new Error(storeResult.error || 'Storage node failed to store the chunk.');
 		}
 
-		const deleteCommand = new DeleteObjectCommand({ Bucket: R2_BUCKET_NAME, Key: temporaryObjectName });
+		const deleteCommand = new DeleteObjectCommand({
+			Bucket: R2_BUCKET_NAME,
+			Key: temporaryObjectName
+		});
 		await s3Client.send(deleteCommand);
 
 		res.json({
@@ -655,106 +701,134 @@ router.put('/nodes/:nodeId/chunks/:chunkId', authenticateToken, async (req, res)
 				status: 'stored'
 			}
 		});
-
 	} catch (error) {
 		res.status(500).json({ success: false, error: error.message });
 	}
 });
 
 // POST /api/nodes/:nodeId/chunks/:chunkId/download-sessions - Create download session
-router.post('/nodes/:nodeId/chunks/:chunkId/download-sessions', authenticateToken, async (req, res) => {
-	const { nodeId, chunkId } = req.params;
+router.post(
+	'/nodes/:nodeId/chunks/:chunkId/download-sessions',
+	authenticateToken,
+	async (req, res) => {
+		const { nodeId, chunkId } = req.params;
 
-	try {
-		await validateUserOwnsNode(req, req.user.userId, nodeId);
+		try {
+			await validateUserOwnsNode(req, req.user.userId, nodeId);
 
-		const commandId = generateCommandId(req);
-		const temporaryObjectName = `temp-${commandId}-${chunkId}`;
+			const commandId = generateCommandId(req);
+			const temporaryObjectName = `temp-${commandId}-${chunkId}`;
 
-		const putCommand = new PutObjectCommand({ Bucket: R2_BUCKET_NAME, Key: temporaryObjectName });
-		const uploadUrl = await getSignedUrl(s3Client, putCommand, { expiresIn: 300 });
+			const putCommand = new PutObjectCommand({
+				Bucket: R2_BUCKET_NAME,
+				Key: temporaryObjectName
+			});
+			const uploadUrl = await getSignedUrl(s3Client, putCommand, { expiresIn: 300 });
 
-		// Tell the storage node to fetch the chunk from its disk and upload it to R2
-		const uploadConfirmation = await sendStorageNodeCommand(req, nodeId, {
-			command_type: 'RETRIEVE_AND_UPLOAD_CHUNK',
-			chunk_id: chunkId,
-			upload_url: uploadUrl
-		}, false, commandId); // No timeout for this command
+			// Tell the storage node to fetch the chunk from its disk and upload it to R2
+			const uploadConfirmation = await sendStorageNodeCommand(
+				req,
+				nodeId,
+				{
+					command_type: 'RETRIEVE_AND_UPLOAD_CHUNK',
+					chunk_id: chunkId,
+					upload_url: uploadUrl
+				},
+				false,
+				commandId
+			); // No timeout for this command
 
-		if (!uploadConfirmation || !uploadConfirmation.success) {
-			throw new Error(uploadConfirmation.error || 'Storage node failed to upload the chunk.');
+			if (!uploadConfirmation || !uploadConfirmation.success) {
+				throw new Error(
+					uploadConfirmation.error || 'Storage node failed to upload the chunk.'
+				);
+			}
+
+			// Once the storage node confirms the upload, create a pre-signed GET URL for the frontend
+			const getCommand = new GetObjectCommand({
+				Bucket: R2_BUCKET_NAME,
+				Key: temporaryObjectName
+			});
+			const downloadUrl = await getSignedUrl(s3Client, getCommand, { expiresIn: 300 });
+
+			// Respond to the frontend with the download link
+			res.status(201).json({
+				success: true,
+				data: {
+					sessionId: commandId,
+					downloadUrl,
+					temporaryObjectName,
+					expiresIn: 300
+				}
+			});
+
+			// Schedule cleanup after 10 minutes
+			setTimeout(
+				async () => {
+					try {
+						const deleteCommand = new DeleteObjectCommand({
+							Bucket: R2_BUCKET_NAME,
+							Key: temporaryObjectName
+						});
+						await s3Client.send(deleteCommand);
+						console.log(`Cleaned up temporary download object: ${temporaryObjectName}`);
+					} catch (error) {
+						console.error(
+							`Failed to cleanup temporary download object ${temporaryObjectName}:`,
+							error
+						);
+					}
+				},
+				10 * 60 * 1000
+			); // 10 minute cleanup
+		} catch (error) {
+			res.status(500).json({ success: false, error: error.message });
 		}
-
-		// Once the storage node confirms the upload, create a pre-signed GET URL for the frontend
-		const getCommand = new GetObjectCommand({ Bucket: R2_BUCKET_NAME, Key: temporaryObjectName });
-		const downloadUrl = await getSignedUrl(s3Client, getCommand, { expiresIn: 300 });
-
-		// Respond to the frontend with the download link
-		res.status(201).json({
-			success: true,
-			data: {
-				sessionId: commandId,
-				downloadUrl,
-				temporaryObjectName,
-				expiresIn: 300
-			}
-		});
-
-		// Schedule cleanup after 10 minutes
-		setTimeout(async () => {
-			try {
-				const deleteCommand = new DeleteObjectCommand({ Bucket: R2_BUCKET_NAME, Key: temporaryObjectName });
-				await s3Client.send(deleteCommand);
-				console.log(`Cleaned up temporary download object: ${temporaryObjectName}`);
-			} catch (error) {
-				console.error(`Failed to cleanup temporary download object ${temporaryObjectName}:`, error);
-			}
-		}, 10 * 60 * 1000); // 10 minute cleanup
-
-	} catch (error) {
-		res.status(500).json({ success: false, error: error.message });
 	}
-});
+);
 
 // DELETE /api/nodes/:nodeId/chunks/:chunkId/download-sessions - Complete download and cleanup
-router.delete('/nodes/:nodeId/chunks/:chunkId/download-sessions', authenticateToken, async (req, res) => {
-	const { nodeId, chunkId } = req.params;
-	const { temporaryObjectName } = req.body;
+router.delete(
+	'/nodes/:nodeId/chunks/:chunkId/download-sessions',
+	authenticateToken,
+	async (req, res) => {
+		const { nodeId, chunkId } = req.params;
+		const { temporaryObjectName } = req.body;
 
-	if (!temporaryObjectName) {
-		return res.status(400).json({
-			success: false,
-			error: "temporaryObjectName is required."
-		});
+		if (!temporaryObjectName) {
+			return res.status(400).json({
+				success: false,
+				error: 'temporaryObjectName is required.'
+			});
+		}
+
+		try {
+			await validateUserOwnsNode(req, req.user.userId, nodeId);
+
+			// Delete the temporary object from R2
+			const deleteCommand = new DeleteObjectCommand({
+				Bucket: R2_BUCKET_NAME,
+				Key: temporaryObjectName
+			});
+
+			await s3Client.send(deleteCommand);
+
+			res.json({
+				success: true,
+				data: {
+					chunkId,
+					status: 'download_session_completed'
+				}
+			});
+		} catch (error) {
+			// Cleanup is non-critical as it will automatically be cleaned up later
+			res.status(500).json({
+				success: false,
+				error: `Failed to cleanup temporary object: ${error.message}`
+			});
+		}
 	}
-
-	try {
-		await validateUserOwnsNode(req, req.user.userId, nodeId);
-
-		// Delete the temporary object from R2
-		const deleteCommand = new DeleteObjectCommand({
-			Bucket: R2_BUCKET_NAME,
-			Key: temporaryObjectName
-		});
-
-		await s3Client.send(deleteCommand);
-
-		res.json({
-			success: true,
-			data: {
-				chunkId,
-				status: 'download_session_completed'
-			}
-		});
-
-	} catch (error) {
-		// Cleanup is non-critical as it will automatically be cleaned up later
-		res.status(500).json({
-			success: false,
-			error: `Failed to cleanup temporary object: ${error.message}`
-		});
-	}
-});
+);
 
 module.exports = {
 	router,

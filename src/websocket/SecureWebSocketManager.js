@@ -19,12 +19,14 @@ class SecureWebSocketManager {
 	// Check if IP is allowed to connect
 	isIPAllowed(ip) {
 		const attempts = this.connectionAttempts.get(ip);
-		if (!attempts) return true;
+		if (!attempts) {
+			return true;
+		}
 
 		// Clean old attempts
 		const now = Date.now();
-		const recentAttempts = attempts.filter(timestamp =>
-			now - timestamp < this.connectionAttemptWindow
+		const recentAttempts = attempts.filter(
+			timestamp => now - timestamp < this.connectionAttemptWindow
 		);
 
 		this.connectionAttempts.set(ip, recentAttempts);
@@ -42,7 +44,7 @@ class SecureWebSocketManager {
 	// Count active connections for IP
 	getConnectionCountForIP(ip) {
 		let count = 0;
-		for (const [nodeId, connection] of this.connections) {
+		for (const [, connection] of this.connections) {
 			if (connection.ip === ip && connection.ws.readyState === WebSocket.OPEN) {
 				count++;
 			}
@@ -97,7 +99,7 @@ class SecureWebSocketManager {
 			}, 30000); // 30 seconds to authenticate
 
 			// Wait for authentication message
-			ws.once('message', async (data) => {
+			ws.once('message', async data => {
 				clearTimeout(connectionTimeout);
 
 				try {
@@ -151,10 +153,12 @@ class SecureWebSocketManager {
 					this.setupConnectionHandlers(ws, node_id);
 
 					// Send authentication success
-					ws.send(JSON.stringify({
-						type: 'AUTH_SUCCESS',
-						message: 'Authentication successful'
-					}));
+					ws.send(
+						JSON.stringify({
+							type: 'AUTH_SUCCESS',
+							message: 'Authentication successful'
+						})
+					);
 
 					// Request a status update
 					let id;
@@ -167,13 +171,11 @@ class SecureWebSocketManager {
 					};
 
 					ws.send(JSON.stringify(command));
-
 				} catch (error) {
 					console.error('WebSocket authentication error:', error);
 					ws.close(1002, 'Authentication failed');
 				}
 			});
-
 		} catch (error) {
 			console.error('WebSocket connection error:', error);
 			ws.close(1011, 'Server error');
@@ -197,7 +199,7 @@ class SecureWebSocketManager {
 		});
 
 		// Handle connection close
-		ws.on('close', async (code, reason) => {
+		ws.on('close', async (_code, _reason) => {
 			// Update node status in database
 			StorageNode.findOneAndUpdate(
 				{ node_id: nodeId },
@@ -214,7 +216,7 @@ class SecureWebSocketManager {
 		});
 
 		// Handle connection error
-		ws.on('error', (error) => {
+		ws.on('error', error => {
 			console.error(`WebSocket error for node ${nodeId}:`, error);
 		});
 
@@ -304,14 +306,23 @@ class SecureWebSocketManager {
 		// Handle binary command result
 		if (data.type === 'GET_CHUNK_RESULT' && data.data_size !== undefined) {
 			if (binaryPayload.length !== data.data_size) {
-				throw new Error(`Binary payload size mismatch: expected ${data.data_size}, got ${binaryPayload.length}`);
+				const expectedSize = data.data_size;
+				const actualSize = binaryPayload.length;
+				throw new Error(
+					`Binary payload size mismatch: expected ${expectedSize}, got ${actualSize}`
+				);
 			}
 
 			// Handle framed GET_CHUNK_RESULT
 			await this.handleFramedGetChunkResult(data, binaryPayload, ws);
 		} else {
 			// For other binary message types, just log and ignore
-			console.warn(`Unknown received binary message of type ${data.type} with command_id ${data.command_id}`);
+			const messageType = data.type;
+			const commandId = data.command_id;
+			console.warn(
+				`Unknown received binary message of type ${messageType} ` +
+					`with command_id ${commandId}`
+			);
 		}
 	}
 
@@ -351,15 +362,19 @@ class SecureWebSocketManager {
 		if (reconstruction.received_count === total_frames) {
 			// Reconstruct the full binary data
 			const fullData = Buffer.alloc(
-				Array.from(reconstruction.frames.values())
-					.reduce((total, frame) => total + frame.length, 0)
+				Array.from(reconstruction.frames.values()).reduce(
+					(total, frame) => total + frame.length,
+					0
+				)
 			);
 
 			let offset = 0;
 			for (let i = 1; i <= total_frames; i++) {
 				const frameData = reconstruction.frames.get(i);
 				if (!frameData) {
-					throw new Error(`Missing frame ${i} of ${total_frames} for command ${command_id}`);
+					throw new Error(
+						`Missing frame ${i} of ${total_frames} for command ${command_id}`
+					);
 				}
 				frameData.copy(fullData, offset);
 				offset += frameData.length;
@@ -388,9 +403,14 @@ class SecureWebSocketManager {
 		}
 
 		// Update storage node metrics for successful operations with storage impact
-		if (data.success && ws.nodeId && data.storage_delta !== undefined && data.storage_delta !== null) {
+		if (
+			data.success &&
+			ws.nodeId &&
+			data.storage_delta !== undefined &&
+			data.storage_delta !== null
+		) {
 			const storageDelta = data.storage_delta;
-			const chunkDelta = storageDelta > 0 ? 1 : (storageDelta < 0 ? -1 : 0);
+			const chunkDelta = storageDelta > 0 ? 1 : storageDelta < 0 ? -1 : 0;
 
 			if (storageDelta !== 0 || chunkDelta !== 0) {
 				const updateFields = {};
@@ -458,8 +478,8 @@ class SecureWebSocketManager {
 	cleanup() {
 		const now = Date.now();
 		for (const [ip, attempts] of this.connectionAttempts) {
-			const recentAttempts = attempts.filter(timestamp =>
-				now - timestamp < this.connectionAttemptWindow
+			const recentAttempts = attempts.filter(
+				timestamp => now - timestamp < this.connectionAttemptWindow
 			);
 
 			if (recentAttempts.length === 0) {

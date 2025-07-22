@@ -1,0 +1,20 @@
+node_modules/
+dist/
+build/
+coverage/
+*.log
+.env*
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.nyc_output/
+ssl/
+target/
+
+# Files with complex quote patterns that ESLint handles better
+server.js
+src/routes/storage.js  
+tests/unit/validation-edge-cases.test.js

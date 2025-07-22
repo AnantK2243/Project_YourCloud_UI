@@ -6,6 +6,12 @@ const validator = require('validator');
 function validateRegistrationInput(data) {
 	const errors = [];
 
+	// Check if data exists
+	if (!data || typeof data !== 'object') {
+		errors.push('Invalid input data');
+		return { valid: false, errors };
+	}
+
 	if (!data.name || typeof data.name !== 'string') {
 		errors.push('Name is required and must be a string');
 	} else if (data.name.length < 2 || data.name.length > 50) {
@@ -29,7 +35,9 @@ function validateRegistrationInput(data) {
 	} else if (data.password.length > 128) {
 		errors.push('Password is too long');
 	} else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(data.password)) {
-		errors.push('Password must contain at least one lowercase, uppercase, and numeric character');
+		errors.push(
+			'Password must contain at least one lowercase, uppercase, and numeric character'
+		);
 	}
 
 	if (!data.salt || typeof data.salt !== 'string') {
@@ -44,6 +52,12 @@ function validateRegistrationInput(data) {
 
 function validateLoginInput(data) {
 	const errors = [];
+
+	// Check if data exists
+	if (!data || typeof data !== 'object') {
+		errors.push('Invalid input data');
+		return { valid: false, errors };
+	}
 
 	if (!data.email || typeof data.email !== 'string') {
 		errors.push('Email is required and must be a string');
@@ -63,6 +77,12 @@ function validateLoginInput(data) {
 
 function validateNodeRegistrationInput(data) {
 	const errors = [];
+
+	// Check if data exists
+	if (!data || typeof data !== 'object') {
+		errors.push('Invalid input data');
+		return { valid: false, errors };
+	}
 
 	if (!data.node_id || typeof data.node_id !== 'string') {
 		errors.push('Node ID is required and must be a string');
@@ -101,11 +121,18 @@ function validateChunkId(chunkId) {
 }
 
 function sanitizeString(str) {
-	if (typeof str !== 'string') {
+	if (typeof str !== 'string' || str === null || str === undefined) {
 		return '';
 	}
 
-	return validator.escape(str);
+	// Remove javascript: protocol and script tags
+	let sanitized = str.replace(/javascript:/gi, '');
+	sanitized = sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+
+	// Escape HTML characters
+	sanitized = validator.escape(sanitized);
+
+	return sanitized;
 }
 
 module.exports = {

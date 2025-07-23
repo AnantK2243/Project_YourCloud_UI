@@ -1,7 +1,9 @@
 // tests/utils/testHelper.js
+// Consolidated test utilities - single source of truth for test helpers
 
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const request = require('supertest');
 const { User, StorageNode } = require('../../src/models/User');
 
 class TestHelper {
@@ -11,7 +13,7 @@ class TestHelper {
 	static async createTestUser(userData = {}) {
 		const defaultData = {
 			name: 'Test User',
-			email: 'test@example.com',
+			email: `test-${Date.now()}@example.com`,
 			password: 'hashedpassword123',
 			salt: 'randomsalt123'
 		};
@@ -21,30 +23,10 @@ class TestHelper {
 	}
 
 	/**
-	 * Create multiple test users
-	 */
-	static async createTestUsers(count = 2) {
-		const users = [];
-		for (let i = 0; i < count; i++) {
-			const user = await this.createTestUser({
-				name: `Test User ${i + 1}`,
-				email: `test${i + 1}@example.com`
-			});
-			users.push(user);
-		}
-		return users;
-	}
-
-	/**
 	 * Generate JWT token for a user
 	 */
 	static generateAuthToken(userId, options = {}) {
-		const defaultOptions = {
-			expiresIn: '24h',
-			issuer: 'yourcloud-api',
-			audience: 'yourcloud-users'
-		};
-
+		const defaultOptions = { expiresIn: '24h' };
 		return jwt.sign({ userId: userId.toString() }, process.env.JWT_SECRET, {
 			...defaultOptions,
 			...options
@@ -88,109 +70,38 @@ class TestHelper {
 	}
 
 	/**
-	 * Create multiple storage nodes for a user
+	 * Make authenticated request
 	 */
-	static async createTestStorageNodes(count = 2, userId = null) {
-		if (!userId) {
-			const user = await this.createTestUser();
-			userId = user._id;
-		}
-
-		const nodes = [];
-		for (let i = 0; i < count; i++) {
-			const { node } = await this.createTestStorageNode(
-				{
-					node_name: `Test Node ${i + 1}`,
-					node_id: `test-node-${i + 1}-${Date.now()}`
-				},
-				userId
-			);
-			nodes.push(node);
-		}
-
-		return { nodes, userId };
+	static makeAuthenticatedRequest(app, token) {
+		return request(app).set('Authorization', `Bearer ${token}`);
 	}
 
 	/**
-	 * Mock WebSocket manager for testing
+	 * Common test data generators
 	 */
-	static createMockWSManager(options = {}) {
-		const connections = new Map();
-		const pendingCommands = new Map();
-
-		if (options.connectedNodes) {
-			options.connectedNodes.forEach(nodeId => {
-				connections.set(nodeId, {
-					readyState: 1,
-					send: jest.fn(),
-					close: jest.fn()
-				});
-			});
-		}
-
+	static getValidUserData(overrides = {}) {
 		return {
-			getNodeConnections: jest.fn(() => connections),
-			getPendingCommands: jest.fn(() => pendingCommands),
-			addNodeConnection: jest.fn((nodeId, ws, _ip, _nodeData) => {
-				connections.set(nodeId, ws);
-			}),
-			removeConnection: jest.fn(nodeId => {
-				connections.delete(nodeId);
-			}),
-			handleCommandResponse: jest.fn((commandId, response) => {
-				const callback = pendingCommands.get(commandId);
-				if (callback) {
-					callback(response);
-					pendingCommands.delete(commandId);
-				}
-			})
+			name: 'John Doe',
+			email: 'john@example.com',
+			password: 'StrongPass123',
+			salt: 'randomsalt123',
+			...overrides
 		};
 	}
 
-	/**
-	 * Create mock Express request object
-	 */
-	static createMockRequest(options = {}) {
+	static getValidLoginData(overrides = {}) {
 		return {
-			headers: options.headers || {},
-			body: options.body || {},
-			params: options.params || {},
-			query: options.query || {},
-			user: options.user || null,
-			token: options.token || null,
-			app: {
-				locals: {
-					wsManager: options.wsManager || this.createMockWSManager()
-				}
-			},
-			...options
+			email: 'john@example.com',
+			password: 'password123',
+			...overrides
 		};
 	}
 
-	/**
-	 * Create mock Express response object
-	 */
-	static createMockResponse() {
+	static getValidNodeData(overrides = {}) {
 		return {
-			status: jest.fn().mockReturnThis(),
-			json: jest.fn().mockReturnThis(),
-			send: jest.fn().mockReturnThis(),
-			set: jest.fn().mockReturnThis(),
-			cookie: jest.fn().mockReturnThis(),
-			clearCookie: jest.fn().mockReturnThis()
+			node_name: 'Test Storage Node',
+			...overrides
 		};
-	}
-
-	/**
-	 * Generate random string for testing
-	 */
-	static generateRandomString(length = 10) {
-		const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-		let result = '';
-		for (let i = 0; i < length; i++) {
-			result += chars.charAt(Math.floor(Math.random() * chars.length));
-		}
-		return result;
 	}
 
 	/**
@@ -205,47 +116,17 @@ class TestHelper {
 	}
 
 	/**
-	 * Wait for a specified amount of time (for testing async operations)
+	 * Mock WebSocket manager for testing
 	 */
-	static async wait(ms = 100) {
-		return new Promise(resolve => setTimeout(resolve, ms));
-	}
+	static createMockWSManager(connectedNodes = []) {
+		const connections = new Map();
+		connectedNodes.forEach(nodeId => {
+			connections.set(nodeId, { readyState: 1, send: jest.fn() });
+		});
 
-	/**
-	 * Clean up test data (called in afterEach)
-	 */
-	static async cleanup() {
-		// This is handled by the global test setup which clears all collections
-		// But can be extended for specific cleanup needs
-	}
-
-	/**
-	 * Validate response structure for API endpoints
-	 */
-	static validateAPIResponse(response, expectedStatus, shouldHaveSuccess = true) {
-		expect(response.status).toBe(expectedStatus);
-		if (shouldHaveSuccess) {
-			expect(response.body).toHaveProperty('success');
-		}
-		return response.body;
-	}
-
-	/**
-	 * Create test binary data
-	 */
-	static createTestBinaryData(size = 1024) {
-		return Buffer.allocUnsafe(size).fill(Math.floor(Math.random() * 256));
-	}
-
-	/**
-	 * Mock environment variables for testing
-	 */
-	static mockEnvVars(envVars) {
-		const originalEnv = { ...process.env };
-		Object.assign(process.env, envVars);
-
-		return () => {
-			process.env = originalEnv;
+		return {
+			getNodeConnections: () => connections,
+			getPendingCommands: () => new Map()
 		};
 	}
 }

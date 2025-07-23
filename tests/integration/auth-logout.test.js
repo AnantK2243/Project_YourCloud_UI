@@ -4,7 +4,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const { router } = require('../../src/routes/auth');
 const { User: _User } = require('../../src/models/User');
-const TestUtils = require('../utils/testUtils');
+const TestHelper = require('../utils/testHelper');
 
 // Create test app
 const app = express();
@@ -16,8 +16,8 @@ describe('Auth Logout and Token Management', () => {
 	let userId;
 
 	beforeEach(async () => {
-		// Create test user using TestUtils for proper password hashing
-		const userData = await TestUtils.createTestUser({
+		// Create test user using TestHelper for proper password hashing
+		const userData = await TestHelper.createTestUser({
 			name: 'Test User',
 			email: 'logout@example.com',
 			password: 'TestPassword123!'

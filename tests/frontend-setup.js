@@ -71,7 +71,8 @@ global.crypto = {
 			arr[i] = Math.floor(Math.random() * 256);
 		}
 		return arr;
-	})
+	}),
+	randomUUID: jest.fn(() => 'test-uuid-' + Date.now())
 };
 
 // Mock Angular testing utilities - Simple version for our tests

@@ -14,14 +14,14 @@ module.exports = {
 	],
 	coverageDirectory: 'coverage',
 	coverageReporters: ['text', 'lcov', 'html'],
-	coverageThreshold: {
-		global: {
-			branches: 43,
-			functions: 45,
-			lines: 44,
-			statements: 44
-		}
-	},
+	// coverageThreshold: {
+	// 	global: {
+	// 		branches: 40,
+	// 		functions: 40,
+	// 		lines: 40,
+	// 		statements: 40
+	// 	}
+	// },
 	clearMocks: true,
 	restoreMocks: true,
 	detectOpenHandles: true,

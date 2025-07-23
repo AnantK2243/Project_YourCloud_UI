@@ -3,6 +3,7 @@
 const request = require('supertest');
 const express = require('express');
 const { router } = require('../../src/routes/auth');
+const TestHelper = require('../utils/testHelper');
 
 // Create test app
 const app = express();
@@ -12,12 +13,9 @@ app.use('/api/auth', router);
 describe('Auth Routes', () => {
 	describe('POST /api/auth/register', () => {
 		test('should register a new user with valid data', async () => {
-			const userData = {
-				name: 'Test User',
-				email: 'test@example.com',
-				password: 'StrongPass123',
-				salt: 'randomsalt123'
-			};
+			const userData = TestHelper.getValidUserData({
+				email: `test-${Date.now()}@example.com`
+			});
 
 			const response = await request(app).post('/api/auth/register').send(userData);
 
@@ -27,12 +25,9 @@ describe('Auth Routes', () => {
 		});
 
 		test('should reject registration with invalid email', async () => {
-			const userData = {
-				name: 'Test User',
-				email: 'invalid-email',
-				password: 'StrongPass123',
-				salt: 'randomsalt123'
-			};
+			const userData = TestHelper.getValidUserData({
+				email: 'invalid-email'
+			});
 
 			const response = await request(app).post('/api/auth/register').send(userData);
 
@@ -41,12 +36,10 @@ describe('Auth Routes', () => {
 		});
 
 		test('should reject registration with weak password', async () => {
-			const userData = {
-				name: 'Test User',
-				email: 'test2@example.com',
-				password: 'weak',
-				salt: 'randomsalt123'
-			};
+			const userData = TestHelper.getValidUserData({
+				email: `test-${Date.now()}@example.com`,
+				password: 'weak'
+			});
 
 			const response = await request(app).post('/api/auth/register').send(userData);
 

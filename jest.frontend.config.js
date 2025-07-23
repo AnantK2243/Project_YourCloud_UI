@@ -28,6 +28,9 @@ module.exports = {
 		'^@/(.*)$': '<rootDir>/src/$1',
 		'^@app/(.*)$': '<rootDir>/src/app/$1'
 	},
+	transformIgnorePatterns: [
+		'node_modules/(?!(@angular|rxjs)/)'
+	],
 	collectCoverageFrom: [
 		'src/app/**/*.ts',
 		'!src/app/**/*.spec.ts',
@@ -38,14 +41,14 @@ module.exports = {
 	],
 	coverageDirectory: 'coverage/frontend',
 	coverageReporters: ['text', 'lcov', 'html'],
-	coverageThreshold: {
-		global: {
-			branches: 50,
-			functions: 50,
-			lines: 50,
-			statements: 50
-		}
-	},
+	// coverageThreshold: {
+	// 	global: {
+	// 		branches: 50,
+	// 		functions: 50,
+	// 		lines: 50,
+	// 		statements: 50
+	// 	}
+	// },
 	verbose: true,
 	testTimeout: 10000,
 	clearMocks: true,

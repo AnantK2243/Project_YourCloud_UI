@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Copy package files and install dependencies
 COPY package*.json ./
-RUN npm ci --include=dev --ignore-scripts
+RUN npm ci --include=dev
 
 # Copy source code
 COPY . .
@@ -26,7 +26,7 @@ WORKDIR /app
 
 # Copy package files and install production dependencies
 COPY package*.json ./
-RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Copy all application files
 COPY --from=angular-builder /app/dist ./dist

@@ -91,7 +91,7 @@ describe('Storage Routes - Advanced Tests', () => {
 			// Check for either error message format
 			expect(
 				response.body.error.includes('not connected') ||
-				response.body.error.includes('not available')
+					response.body.error.includes('not available')
 			).toBe(true);
 		});
 

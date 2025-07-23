@@ -28,9 +28,7 @@ module.exports = {
 		'^@/(.*)$': '<rootDir>/src/$1',
 		'^@app/(.*)$': '<rootDir>/src/app/$1'
 	},
-	transformIgnorePatterns: [
-		'node_modules/(?!(@angular|rxjs)/)'
-	],
+	transformIgnorePatterns: ['node_modules/(?!(@angular|rxjs)/)'],
 	collectCoverageFrom: [
 		'src/app/**/*.ts',
 		'!src/app/**/*.spec.ts',

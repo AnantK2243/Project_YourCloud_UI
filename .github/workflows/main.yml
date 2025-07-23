@@ -1,20 +1,40 @@
 name: CI/CD Pipeline
 
 on:
-  push:
-    branches: [prod, main]
+    push:
+        branches: [prod, main]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-    - name: Set up Node.js
-      uses: actions/setup-node@v2
-      with:
-        node-version: 18
-    - name: Install dependencies
-      run: npm install
-    - name: Build application
-      run: npm run build:prod
+    # Job for main branch - only build
+    build-main:
+        if: github.ref == 'refs/heads/main'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+            - name: Set up Node.js
+              uses: actions/setup-node@v2
+              with:
+                  node-version: 18
+            - name: Install dependencies
+              run: npm install
+            - name: Build application
+              run: npm run build:prod
+
+    # Job for prod branch - full quality check + build
+    quality-check-and-build:
+        if: github.ref == 'refs/heads/prod'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
+            - name: Set up Node.js
+              uses: actions/setup-node@v2
+              with:
+                  node-version: 18
+            - name: Install dependencies
+              run: npm install
+            - name: Run quality checks
+              run: npm run quality:check
+            - name: Build production application
+              run: npm run build:prod

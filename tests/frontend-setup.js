@@ -107,6 +107,20 @@ global.throwError = jest.fn(error => ({
 // Reset mocks before each test
 beforeEach(() => {
 	jest.clearAllMocks();
-	localStorageMock.clear();
-	sessionStorageMock.clear();
+
+	// Recreate storage mocks after clearing to ensure they have Jest functions
+	const freshLocalStorage = createStorageMock();
+	const freshSessionStorage = createStorageMock();
+
+	// Update global references AND window references
+	global.localStorage = freshLocalStorage;
+	global.sessionStorage = freshSessionStorage;
+
+	// Make sure window points to the same objects
+	global.window.localStorage = freshLocalStorage;
+	global.window.sessionStorage = freshSessionStorage;
+
+	// Clear storage data
+	freshLocalStorage.clear();
+	freshSessionStorage.clear();
 });

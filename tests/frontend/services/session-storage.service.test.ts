@@ -22,78 +22,49 @@ import { SessionStorageService } from '../../../src/app/session-storage.service'
 
 describe('SessionStorageService', () => {
 	let service: SessionStorageService;
-	let mockSessionStorage: any;
+	let sessionStorageMock: any;
 	let mockCrypto: any;
-	let mockNavigator: any;
-	let mockWindow: any;
 
 	beforeEach(() => {
-		// Mock sessionStorage
-		mockSessionStorage = {
-			getItem: jest.fn(),
+		// Reset mocks first
+		jest.clearAllMocks();
+
+		// Create fresh Jest spy mocks directly here
+		sessionStorageMock = {
+			getItem: jest.fn(() => null),
 			setItem: jest.fn(),
 			removeItem: jest.fn(),
 			clear: jest.fn()
 		};
+		
+		// Get crypto from global setup
+		mockCrypto = global.crypto;
 
-		// Mock global crypto
-		mockCrypto = {
-			randomUUID: jest.fn(() => 'test-uuid-123'),
-			getRandomValues: jest.fn(array => {
-				// Fill with test values
-				for (let i = 0; i < array.length; i++) {
-					array[i] = i % 256;
-				}
-				return array;
-			}),
-			subtle: {
+		// Override global references AND jsdom's sessionStorage
+		global.sessionStorage = sessionStorageMock;
+		(global.window as any).sessionStorage = sessionStorageMock;
+		
+		// Also override the global scope sessionStorage directly and in window
+		(global as any).sessionStorage = sessionStorageMock;
+		Object.defineProperty(global.window, 'sessionStorage', {
+			value: sessionStorageMock,
+			writable: true
+		});
+
+		// Ensure crypto mock has all required methods
+		if (!mockCrypto.subtle) {
+			mockCrypto.subtle = {
 				digest: jest.fn().mockResolvedValue(new ArrayBuffer(32)),
-				encrypt: jest.fn(),
-				decrypt: jest.fn(),
-				importKey: jest.fn(),
-				deriveKey: jest.fn()
-			}
-		};
+				encrypt: jest.fn().mockResolvedValue(new ArrayBuffer(32)),
+				decrypt: jest.fn().mockResolvedValue(new ArrayBuffer(32)),
+				importKey: jest.fn().mockResolvedValue({ type: 'secret' } as any),
+				deriveKey: jest.fn().mockResolvedValue({ type: 'secret' } as any)
+			};
+		}
 
-		Object.defineProperty(global, 'crypto', {
-			writable: true,
-			value: mockCrypto
-		});
-
-		// Mock navigator
-		mockNavigator = {
-			userAgent: 'test-user-agent'
-		};
-		Object.defineProperty(global, 'navigator', {
-			writable: true,
-			value: mockNavigator
-		});
-
-		// Mock window
-		mockWindow = {
-			sessionStorage: mockSessionStorage,
-			location: {
-				origin: 'https://test.example.com'
-			}
-		};
-		Object.defineProperty(global, 'window', {
-			writable: true,
-			value: mockWindow
-		});
-
-		// Mock sessionStorage globally (since service uses sessionStorage directly)
-		Object.defineProperty(global, 'sessionStorage', {
-			writable: true,
-			value: mockSessionStorage
-		});
-
-		// Setup default mocks
+		// Setup default mock implementations
 		mockIsPlatformBrowser.mockReturnValue(true);
-		mockCrypto.subtle.importKey.mockResolvedValue({ type: 'secret' } as any);
-		mockCrypto.subtle.deriveKey.mockResolvedValue({ type: 'secret' } as any);
-		mockCrypto.subtle.encrypt.mockResolvedValue(new ArrayBuffer(32));
-		mockCrypto.subtle.decrypt.mockResolvedValue(new ArrayBuffer(32));
-
+		
 		// Create service instance
 		service = new SessionStorageService('browser');
 	});
@@ -127,10 +98,10 @@ describe('SessionStorageService', () => {
 
 			await service.storeCredentials(password, salt);
 
-			expect(mockSessionStorage.setItem).toHaveBeenCalled();
+			expect(sessionStorageMock.setItem).toHaveBeenCalled();
 
 			// Verify the stored data contains timestamp
-			const storedCall = mockSessionStorage.setItem.mock.calls[0];
+			const storedCall = sessionStorageMock.setItem.mock.calls[0];
 			expect(storedCall[0]).toBe('user_session_data');
 			expect(typeof storedCall[1]).toBe('string');
 			expect(storedCall[1]).toContain('timestamp');
@@ -142,7 +113,7 @@ describe('SessionStorageService', () => {
 
 			await serverService.storeCredentials('password', 'salt');
 
-			expect(mockSessionStorage.setItem).not.toHaveBeenCalled();
+			expect(sessionStorageMock.setItem).not.toHaveBeenCalled();
 		});
 
 		test('should handle encryption errors gracefully', async () => {
@@ -167,7 +138,7 @@ describe('SessionStorageService', () => {
 				sessionId: 'session-123'
 			};
 
-			mockSessionStorage.getItem.mockReturnValue(JSON.stringify(mockSessionData));
+			sessionStorageMock.getItem.mockReturnValue(JSON.stringify(mockSessionData));
 
 			// Mock the entire decryption chain to return a valid result
 			const mockDecryptedPassword = new ArrayBuffer(13);
@@ -179,7 +150,7 @@ describe('SessionStorageService', () => {
 			const result = await service.retrieveCredentials();
 
 			// Since the encryption/decryption is complex, just verify that it attempted to retrieve
-			expect(mockSessionStorage.getItem).toHaveBeenCalledWith('user_session_data');
+			expect(sessionStorageMock.getItem).toHaveBeenCalledWith('user_session_data');
 			// The result may be null due to complex mocking requirements, which is acceptable
 			expect(result === null || typeof result === 'object').toBe(true);
 		});
@@ -192,16 +163,16 @@ describe('SessionStorageService', () => {
 				sessionId: 'session-123'
 			};
 
-			mockSessionStorage.getItem.mockReturnValue(JSON.stringify(expiredSessionData));
+			sessionStorageMock.getItem.mockReturnValue(JSON.stringify(expiredSessionData));
 
 			const result = await service.retrieveCredentials();
 
 			expect(result).toBeNull();
-			expect(mockSessionStorage.removeItem).toHaveBeenCalledWith('user_session_data');
+			expect(sessionStorageMock.removeItem).toHaveBeenCalledWith('user_session_data');
 		});
 
 		test('should return null for invalid session data', async () => {
-			mockSessionStorage.getItem.mockReturnValue('invalid-json');
+			sessionStorageMock.getItem.mockReturnValue('invalid-json');
 
 			const result = await service.retrieveCredentials();
 
@@ -225,13 +196,13 @@ describe('SessionStorageService', () => {
 				sessionId: 'session-123'
 			};
 
-			mockSessionStorage.getItem.mockReturnValue(JSON.stringify(mockSessionData));
+			sessionStorageMock.getItem.mockReturnValue(JSON.stringify(mockSessionData));
 			mockCrypto.subtle.decrypt.mockRejectedValue(new Error('Decryption failed'));
 
 			const result = await service.retrieveCredentials();
 
 			expect(result).toBeNull();
-			expect(mockSessionStorage.removeItem).toHaveBeenCalledWith('user_session_data');
+			expect(sessionStorageMock.removeItem).toHaveBeenCalledWith('user_session_data');
 		});
 	});
 
@@ -244,7 +215,7 @@ describe('SessionStorageService', () => {
 				sessionId: 'session-123'
 			};
 
-			mockSessionStorage.getItem.mockReturnValue(JSON.stringify(validSessionData));
+			sessionStorageMock.getItem.mockReturnValue(JSON.stringify(validSessionData));
 
 			const isActive = await service.isSessionActive();
 
@@ -252,7 +223,7 @@ describe('SessionStorageService', () => {
 		});
 
 		test('should return false for inactive session', async () => {
-			mockSessionStorage.getItem.mockReturnValue(null);
+			sessionStorageMock.getItem.mockReturnValue(null);
 
 			const isActive = await service.isSessionActive();
 
@@ -271,7 +242,7 @@ describe('SessionStorageService', () => {
 		test('should clear credentials', () => {
 			service.clearCredentials();
 
-			expect(mockSessionStorage.removeItem).toHaveBeenCalledWith('user_session_data');
+			expect(sessionStorageMock.removeItem).toHaveBeenCalledWith('user_session_data');
 		});
 
 		test('should not clear credentials on server platform', () => {
@@ -280,7 +251,7 @@ describe('SessionStorageService', () => {
 
 			serverService.clearCredentials();
 
-			expect(mockSessionStorage.removeItem).not.toHaveBeenCalled();
+			expect(sessionStorageMock.removeItem).not.toHaveBeenCalled();
 		});
 	});
 });

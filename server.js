@@ -221,6 +221,15 @@ async function startServer() {
 				process.exit(0);
 			});
 		});
+
+
+		process.on('SIGINT', () => {
+			console.log('SIGINT signal received: closing HTTP server');
+			server.close(() => {
+				mongoose.connection.close();
+				process.exit(0);
+			});
+		});
 	} catch (error) {
 		console.error('Failed to start server:', error);
 		process.exit(1);

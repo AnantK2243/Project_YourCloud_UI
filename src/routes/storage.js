@@ -28,6 +28,45 @@ const s3Client = new S3Client({
 
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
 
+// Cache for node status reports
+const nodeStatusCache = new Map(); // nodeId -> { status, timestamp }
+const nodeStatusCacheOnlineTTL = 60 * 1000; // 1 minute
+const nodeStatusCacheOfflineTTL = 30 * 60 * 1000; // 30 minutes
+
+// Cache for user ownership validation
+const userOwnershipCache = new Map(); // userId -> { nodeIds: Set, timestamp }
+const userOwnershipCacheTTL = 60 * 60 * 1000; // 1 hour
+
+// Clean up expired cache entries
+function cleanupNodeStatusCache() {
+	const now = Date.now();
+	for (const [nodeId, entry] of nodeStatusCache) {
+		const isOnline = entry.status && entry.status.status === 'online';
+		const ttl = isOnline ? nodeStatusCacheOnlineTTL : nodeStatusCacheOfflineTTL;
+
+		if (now - entry.timestamp > ttl) {
+			nodeStatusCache.delete(nodeId);
+		}
+	}
+}
+
+// Clean up expired user ownership cache entries
+function cleanupUserOwnershipCache() {
+	const now = Date.now();
+	for (const [userId, entry] of userOwnershipCache) {
+		if (now - entry.timestamp > userOwnershipCacheTTL) {
+			userOwnershipCache.delete(userId);
+		}
+	}
+}
+
+
+// Clean up caches every 30 minutes
+setInterval(() => {
+	cleanupNodeStatusCache();
+	cleanupUserOwnershipCache();
+}, 30 * 60 * 1000);
+
 // Helper functions to get WebSocket manager instances
 function getWSManager(req) {
 	return req.app.locals.wsManager;
@@ -43,68 +82,164 @@ function getPendingCommands(req) {
 
 // Generate unique command IDs
 function generateCommandId(req) {
-	const id = 'cmd-' + require('crypto').randomBytes(8).toString('hex');
-
-	// Ensure uniqueness
 	const pendingCommands = getPendingCommands(req);
-	if (pendingCommands.has(id)) {
-		return generateCommandId(req);
+	let attempts = 0;
+	const maxAttempts = 100; // Prevent infinite recursion
+
+	while (attempts < maxAttempts) {
+		const id = 'cmd-' + require('crypto').randomBytes(8).toString('hex');
+
+		if (!pendingCommands.has(id)) {
+			return id;
+		}
+
+		attempts++;
 	}
 
-	return id;
+	// If we can't generate a unique ID after maxAttempts, throw an error
+	throw new Error('Unable to generate unique command ID');
 }
 
 // Validates user owns the storage node
-async function validateUserOwnsNode(req, userId, nodeId) {
-	const user = await User.findById(userId);
-	if (!user || !user.storage_nodes || !user.storage_nodes.includes(nodeId)) {
-		throw new Error('User does not own this storage node');
-	}
+async function validateUserOwnsNode(req, userId, nodeId, requireConnection = true) {
+	try {
+		// Check ownership cache first
+		const now = Date.now();
+		if (userOwnershipCache.has(userId)) {
+			const cachedEntry = userOwnershipCache.get(userId);
 
-	const nodeConnections = getNodeConnections(req);
-	const ws = nodeConnections.get(nodeId);
-	if (!ws || ws.readyState !== 1) {
-		throw new Error(`Storage node ${nodeId} is not connected`);
-	}
+			// Check if cache is still valid
+			if (now - cachedEntry.timestamp < userOwnershipCacheTTL) {
+				if (!cachedEntry.nodeIds.has(nodeId)) {
+					throw new Error('User does not own this storage node');
+				}
+			} else {
+				// Cache expired, remove it
+				userOwnershipCache.delete(userId);
+			}
+		}
 
-	return true;
+		// If not in cache or cache expired, fetch from database
+		if (!userOwnershipCache.has(userId)) {
+			const user = await User.findById(userId);
+			if (!user || !user.storage_nodes) {
+				throw new Error('User does not own this storage node');
+			}
+
+			// Update cache with user's node ownership
+			userOwnershipCache.set(userId, {
+				nodeIds: new Set(user.storage_nodes),
+				timestamp: now
+			});
+
+			// Check ownership after fetching from DB
+			if (!user.storage_nodes.includes(nodeId)) {
+				throw new Error('User does not own this storage node');
+			}
+		}
+
+		if (requireConnection) {
+			const nodeConnections = getNodeConnections(req);
+			const ws = nodeConnections.get(nodeId);
+			if (!ws || ws.readyState !== 1) {
+				throw new Error(`Storage node ${nodeId} is not connected`);
+			}
+		}
+
+		return true;
+	} catch (error) {
+		if (error.message.includes('User does not own') || error.message.includes('not connected')) {
+			throw error;
+		}
+		throw new Error(`Failed to validate node ownership: ${error.message}`);
+	}
 }
 
 // Updates storage node status
-async function updateNodeStatus(req, nodeId) {
+async function updateNodeStatus(req, nodeId, forceUpdate = false) {
 	try {
 		const nodeConnections = getNodeConnections(req);
 		const ws = nodeConnections.get(nodeId);
 		const isConnected = ws && ws.readyState === 1;
 
-		if (isConnected) {
-			const result = await sendStorageNodeCommand(req, nodeId, {
-				command_type: 'STATUS_REQUEST'
-			});
+		// Check cache first if not forcing update
+		if (!forceUpdate && nodeStatusCache.has(nodeId)) {
+			const cachedStatus = nodeStatusCache.get(nodeId);
+			const cacheAge = Date.now() - cachedStatus.timestamp;
 
-			if (result && result.type === 'STATUS_REPORT' && result.status) {
+			// Use appropriate TTL based on connection status
+			const ttl = isConnected ? nodeStatusCacheOnlineTTL : nodeStatusCacheOfflineTTL;
+
+			if (cacheAge < ttl) {
 				return {
 					node_id: nodeId,
-					status: 'online',
-					total_available_space: result.status.max_space_bytes || 0,
-					used_space: result.status.used_space_bytes || 0,
-					num_chunks: result.status.current_chunk_count || 0,
-					last_seen: null
+					status: isConnected ? 'online' : 'offline',
+					total_available_space: cachedStatus.status.total_available_space || 0,
+					used_space: cachedStatus.status.used_space || 0,
+					num_chunks: cachedStatus.status.num_chunks || 0,
+					last_seen: isConnected ? null : cachedStatus.status.last_seen || null
 				};
 			}
+
+			// Cache expired, remove it
+			nodeStatusCache.delete(nodeId);
 		}
-		// If not connected or failed to get status, fetch from DB
+
+		if (isConnected) {
+			try {
+				const result = await sendStorageNodeCommand(req, nodeId, {
+					command_type: 'STATUS_REQUEST'
+				});
+
+				if (result && result.type === 'STATUS_REPORT' && result.status) {
+					// Update the cache with the new status
+					const status = {
+						node_id: nodeId,
+						status: 'online',
+						total_available_space: result.status.max_space_bytes || 0,
+						used_space: result.status.used_space_bytes || 0,
+						num_chunks: result.status.current_chunk_count || 0,
+						last_seen: null
+					};
+
+					nodeStatusCache.set(nodeId, {
+						status,
+						timestamp: Date.now()
+					});
+
+					return status;
+				}
+			} catch (wsError) {
+				// WebSocket command failed, fall through to database lookup
+				if (process.env.NODE_ENV !== 'test') {
+					console.warn(`WebSocket command failed for node ${nodeId}:`, wsError.message);
+				}
+			}
+		}
+
+		// If not connected or WebSocket command failed, fetch from DB
 		const nodeInDb = await StorageNode.findOne({ node_id: nodeId });
-		return nodeInDb
-			? {
+		if (nodeInDb) {
+			const nodeStatus = {
 				node_id: nodeId,
 				status: 'offline',
 				total_available_space: nodeInDb.total_available_space || 0,
 				used_space: nodeInDb.used_space || 0,
 				num_chunks: nodeInDb.num_chunks || 0,
 				last_seen: nodeInDb.last_seen || null
-			}
-			: null;
+			};
+
+			// Update the cache with the offline status
+			nodeStatusCache.set(nodeId, {
+				status: nodeStatus,
+				timestamp: Date.now()
+			});
+
+			return nodeStatus;
+		}
+
+		// Node not found in database
+		return null;
 	} catch (error) {
 		if (process.env.NODE_ENV !== 'test') {
 			console.error(`Error updating node ${nodeId} status:`, error);
@@ -125,31 +260,52 @@ async function sendStorageNodeCommand(req, nodeId, command, timeout = true, comm
 			return;
 		}
 
-		const commandId = command_id || generateCommandId(req);
-		const fullCommand = {
-			...command,
-			command_id: commandId
-		};
-
-		// Set up response handler
-		pendingCommands.set(commandId, result => {
-			resolve(result);
-		});
-
-		// Set timeout (30 seconds)
-		if (timeout) {
-			setTimeout(() => {
-				if (pendingCommands.has(commandId)) {
-					pendingCommands.delete(commandId);
-					reject(new Error('Command timeout'));
-				}
-			}, 30000);
-		}
-
 		try {
+			const commandId = command_id || generateCommandId(req);
+			const fullCommand = {
+				...command,
+				command_id: commandId
+			};
+
+			let timeoutId = null;
+
+			// Set up response handler
+			pendingCommands.set(commandId, result => {
+				if (timeoutId) {
+					clearTimeout(timeoutId);
+				}
+				pendingCommands.delete(commandId);
+
+				if (result.storage_delta !== undefined && result.storage_delta !== null) {
+					// Force reupdate on future hits
+					if (nodeStatusCache.has(nodeId)) {
+						nodeStatusCache.delete(nodeId);
+					}
+				}
+				resolve(result);
+			});
+
+			// Set timeout (30 seconds)
+			if (timeout) {
+				timeoutId = setTimeout(() => {
+					if (pendingCommands.has(commandId)) {
+						pendingCommands.delete(commandId);
+						reject(new Error('Command timeout'));
+					}
+				}, 30000);
+			}
+
 			ws.send(JSON.stringify(fullCommand));
 		} catch (error) {
-			pendingCommands.delete(commandId);
+			if (command_id || generateCommandId.name) {
+				// Only try to delete if we successfully generated a command ID
+				try {
+					const commandId = command_id || generateCommandId(req);
+					pendingCommands.delete(commandId);
+				} catch (e) {
+					// Ignore errors in cleanup
+				}
+			}
 			reject(error);
 		}
 	});
@@ -159,35 +315,48 @@ async function sendStorageNodeCommand(req, nodeId, command, timeout = true, comm
 async function sendStoreCommand(req, nodeId, command, binaryData) {
 	return new Promise((resolve, reject) => {
 		(async () => {
-			const nodeConnections = getNodeConnections(req);
-			const pendingCommands = getPendingCommands(req);
-			const ws = nodeConnections.get(nodeId);
-
-			if (!ws || ws.readyState !== 1) {
-				reject(new Error(`Storage node ${nodeId} is not connected`));
-				return;
-			}
-
-			const commandId = generateCommandId(req);
-			const fullCommand = {
-				...command,
-				command_id: commandId
-			};
-
-			// Set up response handler
-			pendingCommands.set(commandId, result => {
-				resolve(result);
-			});
-
-			// Set timeout (30 seconds)
-			const timeout = setTimeout(() => {
-				if (pendingCommands.has(commandId)) {
-					pendingCommands.delete(commandId);
-					reject(new Error('Command timeout'));
-				}
-			}, 30000);
-
 			try {
+				const nodeConnections = getNodeConnections(req);
+				const pendingCommands = getPendingCommands(req);
+				const ws = nodeConnections.get(nodeId);
+
+				if (!ws || ws.readyState !== 1) {
+					reject(new Error(`Storage node ${nodeId} is not connected`));
+					return;
+				}
+
+				const commandId = generateCommandId(req);
+				const fullCommand = {
+					...command,
+					command_id: commandId
+				};
+
+				let timeoutId = null;
+
+				// Set up response handler
+				pendingCommands.set(commandId, result => {
+					if (timeoutId) {
+						clearTimeout(timeoutId);
+					}
+					pendingCommands.delete(commandId);
+
+					if (result.storage_delta !== undefined && result.storage_delta !== null) {
+						// Force reupdate on future hits
+						if (nodeStatusCache.has(nodeId)) {
+							nodeStatusCache.delete(nodeId);
+						}
+					}
+					resolve(result);
+				});
+
+				// Set timeout (30 seconds)
+				timeoutId = setTimeout(() => {
+					if (pendingCommands.has(commandId)) {
+						pendingCommands.delete(commandId);
+						reject(new Error('Command timeout'));
+					}
+				}, 30000);
+
 				// Create combined binary message: [4 bytes: json_length][json][binary_data]
 				const jsonString = JSON.stringify(fullCommand);
 				const jsonBytes = Buffer.from(jsonString, 'utf8');
@@ -207,8 +376,13 @@ async function sendStoreCommand(req, nodeId, command, binaryData) {
 				// Send as single binary WebSocket message
 				ws.send(combinedMessage);
 			} catch (error) {
-				pendingCommands.delete(commandId);
-				clearTimeout(timeout);
+				// Clean up pending command and timeout on error
+				if (pendingCommands.has(commandId)) {
+					pendingCommands.delete(commandId);
+				}
+				if (timeoutId) {
+					clearTimeout(timeoutId);
+				}
 				reject(error);
 			}
 		})();
@@ -277,6 +451,11 @@ router.post('/nodes', authenticateToken, async (req, res) => {
 						await User.findByIdAndUpdate(req.user.userId, {
 							$pull: { storage_nodes: node_id }
 						});
+
+						// Invalidate user ownership cache since we removed a node
+						if (userOwnershipCache.has(req.user.userId)) {
+							userOwnershipCache.delete(req.user.userId);
+						}
 					}
 				} catch (error) {
 					console.error('Error cleaning up unconnected node:', error);
@@ -291,6 +470,11 @@ router.post('/nodes', authenticateToken, async (req, res) => {
 			{ $addToSet: { storage_nodes: node_id } },
 			{ new: true }
 		);
+
+		// Invalidate user ownership cache since we added a new node
+		if (userOwnershipCache.has(req.user.userId)) {
+			userOwnershipCache.delete(req.user.userId);
+		}
 
 		res.status(201).json({
 			success: true,
@@ -346,6 +530,7 @@ router.get('/nodes/:nodeId/status', authenticateToken, async (req, res) => {
 		if (!nodeId) {
 			throw new Error('nodeId is required');
 		}
+
 		const nodeStatus = await updateNodeStatus(req, nodeId);
 		if (!nodeStatus) {
 			throw new Error(`Failed to update status for node ${nodeId}`);
@@ -382,6 +567,9 @@ router.delete('/nodes/:nodeId', authenticateToken, async (req, res) => {
 			throw new Error('nodeId is required');
 		}
 
+		// Validate user owns the node (don't require connection for deletion)
+		await validateUserOwnsNode(req, req.user.userId, nodeId, false);
+
 		// Find the node in the database
 		const node = await StorageNode.findOne({ node_id: nodeId });
 		if (!node) {
@@ -391,11 +579,21 @@ router.delete('/nodes/:nodeId', authenticateToken, async (req, res) => {
 			});
 		}
 
-		// Delete the node
+		// Delete the node from database
 		await StorageNode.deleteOne({ node_id: nodeId });
 
 		// Remove node_id from user's storage_nodes array
 		await User.findByIdAndUpdate(req.user.userId, { $pull: { storage_nodes: nodeId } });
+
+		// Invalidate user ownership cache since we removed a node
+		if (userOwnershipCache.has(req.user.userId)) {
+			userOwnershipCache.delete(req.user.userId);
+		}
+
+		// Remove from cache if present
+		if (nodeStatusCache.has(nodeId)) {
+			nodeStatusCache.delete(nodeId);
+		}
 
 		res.json({
 			success: true,
@@ -405,10 +603,22 @@ router.delete('/nodes/:nodeId', authenticateToken, async (req, res) => {
 			}
 		});
 	} catch (error) {
-		res.status(500).json({
-			success: false,
-			error: 'Failed to delete node: ' + error.message
-		});
+		if (error.message.includes('required')) {
+			res.status(400).json({
+				success: false,
+				error: error.message
+			});
+		} else if (error.message.includes('does not own')) {
+			res.status(403).json({
+				success: false,
+				error: 'Access denied'
+			});
+		} else {
+			res.status(500).json({
+				success: false,
+				error: 'Failed to delete node: ' + error.message
+			});
+		}
 	}
 });
 
@@ -834,5 +1044,5 @@ module.exports = {
 	router,
 	validateUserOwnsNode,
 	updateNodeStatus,
-	sendStorageNodeCommand
+	sendStorageNodeCommand,
 };

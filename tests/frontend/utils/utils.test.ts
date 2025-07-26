@@ -1,10 +1,5 @@
 // tests/frontend/utils/utils.test.ts
 
-/**
- * General utility functions tests
- * Testing the actual utility functions from the TypeScript source
- */
-
 import {
 	formatFileSize,
 	formatDate,

@@ -1,10 +1,5 @@
 // tests/frontend/services/session-storage.service.test.ts
 
-/**
- * Session storage service tests
- * Testing credential storage and session management functionality
- */
-
 // Mock Angular dependencies
 jest.mock('@angular/core', () => ({
 	Injectable: () => (target: any) => target,
@@ -36,14 +31,14 @@ describe('SessionStorageService', () => {
 			removeItem: jest.fn(),
 			clear: jest.fn()
 		};
-		
+
 		// Get crypto from global setup
 		mockCrypto = global.crypto;
 
 		// Override global references AND jsdom's sessionStorage
 		global.sessionStorage = sessionStorageMock;
 		(global.window as any).sessionStorage = sessionStorageMock;
-		
+
 		// Also override the global scope sessionStorage directly and in window
 		(global as any).sessionStorage = sessionStorageMock;
 		Object.defineProperty(global.window, 'sessionStorage', {
@@ -64,7 +59,7 @@ describe('SessionStorageService', () => {
 
 		// Setup default mock implementations
 		mockIsPlatformBrowser.mockReturnValue(true);
-		
+
 		// Create service instance
 		service = new SessionStorageService('browser');
 	});

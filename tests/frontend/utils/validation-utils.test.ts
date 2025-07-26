@@ -1,10 +1,5 @@
 // tests/frontend/utils/validation-utils.test.ts
 
-/**
- * Validation utilities tests
- * Testing the actual validation functions from the TypeScript source
- */
-
 import {
 	validateEmail,
 	validatePasswordStrength,

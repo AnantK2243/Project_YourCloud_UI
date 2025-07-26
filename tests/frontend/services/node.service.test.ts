@@ -1,10 +1,5 @@
 // tests/frontend/services/node.service.test.ts
 
-/**
- * Node service tests
- * Testing the actual NodeService functionality with mock HTTP calls
- */
-
 // Mock Angular dependencies
 jest.mock('@angular/core', () => ({
 	Injectable: () => (target: any) => target

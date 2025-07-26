@@ -1,10 +1,5 @@
 // tests/frontend/utils/auth-utils.test.ts
 
-/**
- * Frontend authentication utility tests
- * Testing the actual auth utilities from the TypeScript source
- */
-
 import {
 	setToken,
 	getToken,

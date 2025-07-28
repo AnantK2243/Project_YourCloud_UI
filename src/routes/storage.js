@@ -62,10 +62,13 @@ function cleanupUserOwnershipCache() {
 
 
 // Clean up caches every 30 minutes
-setInterval(() => {
-	cleanupNodeStatusCache();
-	cleanupUserOwnershipCache();
-}, 30 * 60 * 1000);
+let cacheCleanupInterval;
+if (process.env.NODE_ENV !== 'test') {
+	cacheCleanupInterval = setInterval(() => {
+		cleanupNodeStatusCache();
+		cleanupUserOwnershipCache();
+	}, 30 * 60 * 1000);
+}
 
 // Helper functions to get WebSocket manager instances
 function getWSManager(req) {
@@ -302,7 +305,7 @@ async function sendStorageNodeCommand(req, nodeId, command, timeout = true, comm
 				try {
 					const commandId = command_id || generateCommandId(req);
 					pendingCommands.delete(commandId);
-				} catch (e) {
+				} catch {
 					// Ignore errors in cleanup
 				}
 			}
@@ -315,9 +318,12 @@ async function sendStorageNodeCommand(req, nodeId, command, timeout = true, comm
 async function sendStoreCommand(req, nodeId, command, binaryData) {
 	return new Promise((resolve, reject) => {
 		(async () => {
+			const nodeConnections = getNodeConnections(req);
+			const pendingCommands = getPendingCommands(req);
+			let commandId;
+			let timeoutId = null;
+
 			try {
-				const nodeConnections = getNodeConnections(req);
-				const pendingCommands = getPendingCommands(req);
 				const ws = nodeConnections.get(nodeId);
 
 				if (!ws || ws.readyState !== 1) {
@@ -325,13 +331,11 @@ async function sendStoreCommand(req, nodeId, command, binaryData) {
 					return;
 				}
 
-				const commandId = generateCommandId(req);
+				commandId = generateCommandId(req);
 				const fullCommand = {
 					...command,
 					command_id: commandId
 				};
-
-				let timeoutId = null;
 
 				// Set up response handler
 				pendingCommands.set(commandId, result => {
@@ -567,10 +571,7 @@ router.delete('/nodes/:nodeId', authenticateToken, async (req, res) => {
 			throw new Error('nodeId is required');
 		}
 
-		// Validate user owns the node (don't require connection for deletion)
-		await validateUserOwnsNode(req, req.user.userId, nodeId, false);
-
-		// Find the node in the database
+		// Find the node in the database first
 		const node = await StorageNode.findOne({ node_id: nodeId });
 		if (!node) {
 			return res.status(404).json({
@@ -578,6 +579,9 @@ router.delete('/nodes/:nodeId', authenticateToken, async (req, res) => {
 				error: 'Node not found'
 			});
 		}
+
+		// Validate user owns the node (don't require connection for deletion)
+		await validateUserOwnsNode(req, req.user.userId, nodeId, false);
 
 		// Delete the node from database
 		await StorageNode.deleteOne({ node_id: nodeId });
@@ -1040,9 +1044,18 @@ router.delete(
 	}
 );
 
+// Function to clear the interval
+function clearCacheCleanupInterval() {
+	if (cacheCleanupInterval) {
+		clearInterval(cacheCleanupInterval);
+		cacheCleanupInterval = null;
+	}
+}
+
 module.exports = {
 	router,
 	validateUserOwnsNode,
 	updateNodeStatus,
 	sendStorageNodeCommand,
+	clearCacheCleanupInterval
 };

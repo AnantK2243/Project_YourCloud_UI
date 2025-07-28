@@ -321,7 +321,7 @@ class SecureWebSocketManager {
 			const commandId = data.command_id;
 			console.warn(
 				`Unknown received binary message of type ${messageType} ` +
-				`with command_id ${commandId}`
+					`with command_id ${commandId}`
 			);
 		}
 	}

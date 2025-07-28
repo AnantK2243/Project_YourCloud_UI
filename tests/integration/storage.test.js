@@ -128,6 +128,11 @@ describe('Storage Routes', () => {
 			});
 			await node.save();
 
+			// Add the node to user's storage_nodes array
+			await User.findByIdAndUpdate(userId, {
+				$addToSet: { storage_nodes: 'delete-test-123' }
+			});
+
 			const response = await request(app)
 				.delete('/api/storage/nodes/delete-test-123')
 				.set('Authorization', `Bearer ${authToken}`);

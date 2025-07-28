@@ -10,6 +10,7 @@
 		"dev:watch": "concurrently -n \"Angular,Server\" -c \"cyan,green\" \"npm run build:watch\" \"dotenv -e .env nodemon server.js --ignore dist/ --ignore src/app/\"",
 		"dev:backend": "dotenv -e .env nodemon server.js --ignore dist/ --ignore src/app/",
 		"start": "npm run dev:watch",
+		"prod": "node server.js",
 		"test": "jest",
 		"test:watch": "jest --watch",
 		"test:coverage": "jest --coverage",

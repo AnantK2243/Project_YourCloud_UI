@@ -22,7 +22,7 @@ describe('Auth Logout and Token Management', () => {
 			email: 'logout@example.com',
 			password: 'TestPassword123!'
 		});
-		userId = userData.userId;
+		userId = userData._id.toString();
 
 		// Generate auth token
 		authToken = jwt.sign({ userId: userId }, process.env.JWT_SECRET, { expiresIn: '24h' });

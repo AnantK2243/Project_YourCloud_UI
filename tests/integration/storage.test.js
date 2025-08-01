@@ -29,7 +29,8 @@ describe('Storage Routes', () => {
 			name: 'Test User',
 			email: 'storage@example.com',
 			password: 'hashedpassword123',
-			salt: 'randomsalt123'
+			salt: 'randomsalt123',
+			isVerified: true
 		});
 		const savedUser = await user.save();
 		userId = savedUser._id.toString();

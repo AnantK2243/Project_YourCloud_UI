@@ -15,7 +15,8 @@ class TestHelper {
 			name: 'Test User',
 			email: `test-${Date.now()}@example.com`,
 			password: 'hashedpassword123',
-			salt: 'randomsalt123'
+			salt: 'randomsalt123',
+			isVerified: true // Test users should be verified by default
 		};
 
 		const user = new User({ ...defaultData, ...userData });

@@ -30,8 +30,13 @@ const UserSchema = new mongoose.Schema({
 	salt: { type: String, required: true },
 	storage_nodes: [{ type: String }],
 	last_login: { type: Date },
-	validated: { type: Boolean, default: false },
-	created_at: { type: Date, default: Date.now }
+	created_at: { type: Date, default: Date.now },
+	isVerified: {
+		type: Boolean,
+		default: false
+	},
+	emailVerificationToken: { type: String },
+	emailVerificationExpires: { type: Date }
 });
 
 // Add indexes for better performance

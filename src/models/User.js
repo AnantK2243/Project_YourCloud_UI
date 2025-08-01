@@ -29,18 +29,17 @@ const UserSchema = new mongoose.Schema({
 	password: { type: String, required: true },
 	salt: { type: String, required: true },
 	storage_nodes: [{ type: String }],
-	created_at: { type: Date, default: Date.now },
 	last_login: { type: Date },
-	failed_login_attempts: { type: Number, default: 0 },
-	account_locked_until: { type: Date }
+	validated: { type: Boolean, default: false },
+	created_at: { type: Date, default: Date.now }
 });
 
 // Add indexes for better performance
 UserSchema.index({ created_at: 1 });
 StorageNodeSchema.index({ owner_user_id: 1 });
 
-const StorageNode = mongoose.model('StorageNode', StorageNodeSchema);
-const User = mongoose.model('User', UserSchema);
+const StorageNode = mongoose.model('StorageNodes', StorageNodeSchema);
+const User = mongoose.model('Users', UserSchema);
 
 module.exports = {
 	StorageNode,

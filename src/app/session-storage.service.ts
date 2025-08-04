@@ -1,7 +1,7 @@
 // src/app/session-storage.service.ts
 
-import { Injectable, Inject, PLATFORM_ID } from "@angular/core";
-import { isPlatformBrowser } from "@angular/common";
+import { Injectable, Inject, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 
 interface SessionData {
 	timestamp: number;
@@ -11,10 +11,10 @@ interface SessionData {
 }
 
 @Injectable({
-	providedIn: "root",
+	providedIn: 'root'
 })
 export class SessionStorageService {
-	private readonly SESSION_DATA_KEY = "user_session_data";
+	private readonly SESSION_DATA_KEY = 'user_session_data';
 	private readonly SESSION_TIMEOUT = 4 * 60 * 60 * 1000; // 4 hours
 	private sessionKey: CryptoKey | null = null;
 	private currentSessionId: string | null = null;
@@ -33,14 +33,10 @@ export class SessionStorageService {
 		const existingData = this.getSessionData();
 		if (existingData && this.isSessionValid(existingData)) {
 			this.currentSessionId = existingData.sessionId;
-			this.sessionKey = await this.deriveSessionKey(
-				existingData.sessionId
-			);
+			this.sessionKey = await this.deriveSessionKey(existingData.sessionId);
 		} else {
 			this.currentSessionId = crypto.randomUUID();
-			this.sessionKey = await this.deriveSessionKey(
-				this.currentSessionId
-			);
+			this.sessionKey = await this.deriveSessionKey(this.currentSessionId);
 		}
 	}
 
@@ -80,7 +76,7 @@ export class SessionStorageService {
 			timestamp: Date.now(),
 			encryptedPassword,
 			salt,
-			sessionId: this.currentSessionId!,
+			sessionId: this.currentSessionId!
 		};
 
 		this.setSessionData(sessionData);
@@ -103,15 +99,11 @@ export class SessionStorageService {
 		// Update session key if session ID changed
 		if (sessionData.sessionId !== this.currentSessionId) {
 			this.currentSessionId = sessionData.sessionId;
-			this.sessionKey = await this.deriveSessionKey(
-				sessionData.sessionId
-			);
+			this.sessionKey = await this.deriveSessionKey(sessionData.sessionId);
 		}
 
 		try {
-			const password = await this.decryptData(
-				sessionData.encryptedPassword
-			);
+			const password = await this.decryptData(sessionData.encryptedPassword);
 			return { password, salt: sessionData.salt };
 		} catch (error) {
 			this.clearCredentials();
@@ -136,13 +128,13 @@ export class SessionStorageService {
 	}
 
 	private async encryptData(data: string): Promise<string> {
-		if (!this.sessionKey) throw new Error("No session key available");
+		if (!this.sessionKey) throw new Error('No session key available');
 
 		const dataBuffer = new TextEncoder().encode(data);
 		const iv = crypto.getRandomValues(new Uint8Array(12));
 
 		const encryptedData = await crypto.subtle.encrypt(
-			{ name: "AES-GCM", iv },
+			{ name: 'AES-GCM', iv },
 			this.sessionKey,
 			dataBuffer
 		);
@@ -155,16 +147,14 @@ export class SessionStorageService {
 	}
 
 	private async decryptData(encryptedData: string): Promise<string> {
-		if (!this.sessionKey) throw new Error("No session key available");
+		if (!this.sessionKey) throw new Error('No session key available');
 
-		const combined = new Uint8Array(
-			[...atob(encryptedData)].map((char) => char.charCodeAt(0))
-		);
+		const combined = new Uint8Array([...atob(encryptedData)].map(char => char.charCodeAt(0)));
 		const iv = combined.slice(0, 12);
 		const data = combined.slice(12);
 
 		const decryptedData = await crypto.subtle.decrypt(
-			{ name: "AES-GCM", iv },
+			{ name: 'AES-GCM', iv },
 			this.sessionKey,
 			data
 		);
@@ -174,26 +164,23 @@ export class SessionStorageService {
 
 	private async deriveSessionKey(sessionId: string): Promise<CryptoKey> {
 		const keyMaterial = `${sessionId}-${navigator.userAgent}-${window.location.origin}`;
-		const saltData = await crypto.subtle.digest(
-			"SHA-256",
-			new TextEncoder().encode(sessionId)
-		);
+		const saltData = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(sessionId));
 		const salt = new Uint8Array(saltData).slice(0, 16);
 
 		const baseKey = await crypto.subtle.importKey(
-			"raw",
+			'raw',
 			new TextEncoder().encode(keyMaterial),
-			"PBKDF2",
+			'PBKDF2',
 			false,
-			["deriveKey"]
+			['deriveKey']
 		);
 
 		return await crypto.subtle.deriveKey(
-			{ name: "PBKDF2", salt, iterations: 10000, hash: "SHA-256" },
+			{ name: 'PBKDF2', salt, iterations: 10000, hash: 'SHA-256' },
 			baseKey,
-			{ name: "AES-GCM", length: 256 },
+			{ name: 'AES-GCM', length: 256 },
 			false,
-			["encrypt", "decrypt"]
+			['encrypt', 'decrypt']
 		);
 	}
 

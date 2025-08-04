@@ -1,24 +1,24 @@
 // src/app/register/register.component.ts
 
-import { Component, OnDestroy } from "@angular/core";
-import { Router } from "@angular/router";
-import { AuthService } from "../auth.service";
-import { ValidationService, FormErrors } from "../validation.service";
-import { CommonModule } from "@angular/common";
-import { FormsModule } from "@angular/forms";
-import { Subject, debounceTime, distinctUntilChanged } from "rxjs";
+import { Component, OnDestroy } from '@angular/core';
+import { Router } from '@angular/router';
+import { AuthService } from '../auth.service';
+import { ValidationService, FormErrors } from '../validation.service';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 
 @Component({
-	selector: "app-register",
+	selector: 'app-register',
 	standalone: true,
 	imports: [CommonModule, FormsModule],
-	templateUrl: "./register.component.html",
+	templateUrl: './register.component.html'
 })
 export class RegisterComponent implements OnDestroy {
-	name: string = "";
-	email: string = "";
-	password: string = "";
-	confirmPassword: string = "";
+	name: string = '';
+	email: string = '';
+	password: string = '';
+	confirmPassword: string = '';
 
 	// Form state
 	errors: FormErrors = {};
@@ -27,11 +27,11 @@ export class RegisterComponent implements OnDestroy {
 	submitAttempted: boolean = false;
 
 	// Success/error messages
-	errorMessage: string = "";
-	successMessage: string = "";
+	errorMessage: string = '';
+	successMessage: string = '';
 
 	// Password strength
-	passwordStrength: "weak" | "fair" | "good" | "strong" = "weak";
+	passwordStrength: 'weak' | 'fair' | 'good' | 'strong' = 'weak';
 	showPasswordRequirements: boolean = false;
 
 	// Real-time validation
@@ -47,8 +47,7 @@ export class RegisterComponent implements OnDestroy {
 			.pipe(
 				debounceTime(300),
 				distinctUntilChanged(
-					(prev, curr) =>
-						prev.field === curr.field && prev.value === curr.value
+					(prev, curr) => prev.field === curr.field && prev.value === curr.value
 				)
 			)
 			.subscribe(({ field, value }) => {
@@ -63,26 +62,25 @@ export class RegisterComponent implements OnDestroy {
 	// Field event handlers
 	onFieldChange(field: string, value: string) {
 		this.touched[field] = true;
-		if (field === "password") {
-			this.passwordStrength =
-				this.validationService.assessPasswordStrength(value);
+		if (field === 'password') {
+			this.passwordStrength = this.validationService.assessPasswordStrength(value);
 			// Also validate confirm password when password changes
 			if (this.confirmPassword) {
-				this.validateField("confirmPassword", this.confirmPassword);
+				this.validateField('confirmPassword', this.confirmPassword);
 			}
 		}
 		this.validationSubject.next({ field, value });
 	}
 
 	onFieldFocus(field: string) {
-		if (field === "password") {
+		if (field === 'password') {
 			this.showPasswordRequirements = true;
 		}
 	}
 
 	onFieldBlur(field: string) {
 		this.touched[field] = true;
-		if (field === "password" && !this.password) {
+		if (field === 'password' && !this.password) {
 			this.showPasswordRequirements = false;
 		}
 	}
@@ -90,43 +88,35 @@ export class RegisterComponent implements OnDestroy {
 	// Real-time field validation
 	private validateField(field: string, value: string) {
 		switch (field) {
-			case "name":
-				const nameValidation =
-					this.validationService.validateName(value);
+			case 'name':
+				const nameValidation = this.validationService.validateName(value);
 				this.updateFieldError(
-					"name",
+					'name',
 					nameValidation.isValid ? null : nameValidation.message!
 				);
 				break;
-			case "email":
-				const emailValidation =
-					this.validationService.validateEmail(value);
+			case 'email':
+				const emailValidation = this.validationService.validateEmail(value);
 				this.updateFieldError(
-					"email",
+					'email',
 					emailValidation.isValid ? null : emailValidation.message!
 				);
 				break;
-			case "password":
-				const passwordValidation =
-					this.validationService.validatePassword(value);
+			case 'password':
+				const passwordValidation = this.validationService.validatePassword(value);
 				this.updateFieldError(
-					"password",
-					passwordValidation.isValid
-						? null
-						: passwordValidation.message!
+					'password',
+					passwordValidation.isValid ? null : passwordValidation.message!
 				);
 				break;
-			case "confirmPassword":
-				const confirmValidation =
-					this.validationService.validatePasswordConfirmation(
-						this.password,
-						value
-					);
+			case 'confirmPassword':
+				const confirmValidation = this.validationService.validatePasswordConfirmation(
+					this.password,
+					value
+				);
 				this.updateFieldError(
-					"confirmPassword",
-					confirmValidation.isValid
-						? null
-						: confirmValidation.message!
+					'confirmPassword',
+					confirmValidation.isValid ? null : confirmValidation.message!
 				);
 				break;
 		}
@@ -182,14 +172,14 @@ export class RegisterComponent implements OnDestroy {
 			name: true,
 			email: true,
 			password: true,
-			confirmPassword: true,
-		}).forEach((field) => {
+			confirmPassword: true
+		}).forEach(field => {
 			this.touched[field] = true;
 		});
 
 		// Clear previous messages
-		this.errorMessage = "";
-		this.successMessage = "";
+		this.errorMessage = '';
+		this.successMessage = '';
 
 		// Sanitize inputs
 		this.name = this.validationService.sanitizeInput(this.name);
@@ -200,19 +190,18 @@ export class RegisterComponent implements OnDestroy {
 			name: this.name,
 			email: this.email,
 			password: this.password,
-			confirmPassword: this.confirmPassword,
+			confirmPassword: this.confirmPassword
 		});
 
 		if (!validation.isValid) {
 			this.errors = validation.errors;
-			this.errorMessage = "Please fix the errors below and try again.";
+			this.errorMessage = 'Please fix the errors below and try again.';
 			return;
 		}
 
 		// Check password strength
-		if (this.passwordStrength === "weak") {
-			this.errorMessage =
-				"Please choose a stronger password for better security.";
+		if (this.passwordStrength === 'weak') {
+			this.errorMessage = 'Please choose a stronger password for better security.';
 			return;
 		}
 
@@ -222,99 +211,101 @@ export class RegisterComponent implements OnDestroy {
 			.register({
 				name: this.name.trim(),
 				email: this.email.toLowerCase().trim(),
-				password: this.password,
+				password: this.password
 			})
 			.subscribe({
-				next: (response) => {
+				next: response => {
 					this.isSubmitting = false;
 					if (response.success) {
-						this.successMessage =
-							"Registration successful! Redirecting to login...";
-						this.errorMessage = "";
+						this.successMessage = 'Registration successful! Redirecting to login...';
+						this.errorMessage = '';
 
 						// Clear form
-						this.name = "";
-						this.email = "";
-						this.password = "";
-						this.confirmPassword = "";
+						this.name = '';
+						this.email = '';
+						this.password = '';
+						this.confirmPassword = '';
 						this.errors = {};
 						this.touched = {};
 
 						// Navigate to login after successful registration
-						this.router.navigate(["/login"], {
+						this.router.navigate(['/login'], {
 							queryParams: {
 								message:
-									"Registration successful! Please log in with your new account.",
-							},
+									'Registration successful! Please log in with your new account.'
+							}
 						});
 					} else {
 						this.errorMessage =
-							response.message ||
-							"Registration failed. Please try again.";
-						this.successMessage = "";
+							response.message || 'Registration failed. Please try again.';
+						this.successMessage = '';
 					}
 				},
-				error: (error) => {
+				error: error => {
 					this.isSubmitting = false;
 
 					// Handle specific error cases
 					if (error.status === 400) {
 						this.errorMessage =
 							error.error?.message ||
-							"Invalid registration data. Please check your information.";
+							'Invalid registration data. Please check your information.';
 					} else if (error.status === 409) {
 						this.errorMessage =
-							"An account with this email already exists. Please use a different email or try logging in.";
+							'An account with this email already exists. Please use a different email or try logging in.';
 					} else if (error.status === 429) {
 						this.errorMessage =
-							"Too many registration attempts. Please try again later.";
+							'Too many registration attempts. Please try again later.';
 					} else {
 						this.errorMessage =
-							"Registration failed. Please check your connection and try again.";
+							'Registration failed. Please check your connection and try again.';
 					}
 
-					this.successMessage = "";
-				},
+					this.successMessage = '';
+				}
 			});
 	}
 
 	goToLogin() {
-		this.router.navigate(["/login"]);
+		this.router.navigate(['/login']);
 	}
 
 	// Password strength helper methods
 	getPasswordStrengthClass(): string {
-		return `strength-${this.passwordStrength}`;
+		const classMap = {
+			weak: 'text-red-500 font-medium',
+			fair: 'text-orange-500 font-medium',
+			good: 'text-yellow-500 font-medium',
+			strong: 'text-green-500 font-medium'
+		};
+		return classMap[this.passwordStrength];
 	}
 
 	getPasswordStrengthText(): string {
 		const strengthMap = {
-			weak: "Weak",
-			fair: "Fair",
-			good: "Good",
-			strong: "Strong",
+			weak: 'Weak',
+			fair: 'Fair',
+			good: 'Good',
+			strong: 'Strong'
 		};
 		return strengthMap[this.passwordStrength];
 	}
 
 	getPasswordRequirements(): { text: string; met: boolean }[] {
 		return [
-			{ text: "At least 8 characters", met: this.password.length >= 8 },
+			{ text: 'At least 8 characters', met: this.password.length >= 8 },
 			{
-				text: "Contains lowercase letter",
-				met: /[a-z]/.test(this.password),
+				text: 'Contains lowercase letter',
+				met: /[a-z]/.test(this.password)
 			},
 			{
-				text: "Contains uppercase letter",
-				met: /[A-Z]/.test(this.password),
+				text: 'Contains uppercase letter',
+				met: /[A-Z]/.test(this.password)
 			},
-			{ text: "Contains number", met: /\d/.test(this.password) },
+			{ text: 'Contains number', met: /\d/.test(this.password) },
 			{
-				text: "Contains special character",
-				met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(
-					this.password
-				),
-			},
+				text: 'Contains special character',
+				met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(this.password)
+			}
 		];
 	}
 }

@@ -1,83 +1,178 @@
-<div>
-	<h2>Login</h2>
+<!-- Glassmorphism Background -->
+<div
+	class="min-h-screen glassmorphism-bg flex items-center justify-center p-4 relative overflow-hidden"
+>
+	<!-- Floating Abstract Elements -->
+	<div
+		class="absolute top-20 left-20 w-32 h-32 bg-gradient-to-br from-blue-400/20 to-teal-400/20 rounded-full blur-xl animate-pulse"
+	></div>
+	<div
+		class="absolute bottom-20 right-20 w-48 h-48 bg-gradient-to-br from-teal-400/20 to-blue-600/20 rounded-full blur-2xl animate-pulse"
+		style="animation-delay: 2s"
+	></div>
+	<div
+		class="absolute top-1/2 left-10 w-24 h-24 bg-gradient-to-br from-blue-600/20 to-teal-500/20 rounded-full blur-lg animate-pulse"
+		style="animation-delay: 4s"
+	></div>
 
-	<!-- Messages -->
-	<div *ngIf="infoMessage">
-		{{ infoMessage }}
-	</div>
-	<div *ngIf="successMessage">
-		{{ successMessage }}
-	</div>
-	<div *ngIf="errorMessage">
-		{{ errorMessage }}
-	</div>
-
-	<form (ngSubmit)="onLogin()" #loginForm="ngForm">
-		<!-- Email Field -->
-		<div>
-			<label for="email">Email:</label>
-			<input
-				type="email"
-				id="email"
-				name="email"
-				[(ngModel)]="email"
-				placeholder="Enter your email"
-				(input)="onFieldChange('email', email)"
-				(blur)="onFieldBlur('email')"
-				[class]="getFieldClass('email')"
-				required
-				autocomplete="email"
-			/>
-			<div *ngIf="hasFieldError('email')">
-				<div *ngFor="let error of getFieldErrors('email')">
-					{{ error }}
+	<!-- Login Card -->
+	<div
+		class="glass-card bg-white/30 backdrop-blur-lg p-8 rounded-2xl shadow-2xl w-full max-w-md border border-white/20 relative z-10"
+	>
+		<!-- Logo & Title Section -->
+		<div class="text-center mb-8">
+			<div class="mb-4">
+				<div
+					class="w-16 h-16 mx-auto bg-gradient-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center p-2 shadow-lg"
+				>
+					<img
+						src="icon.svg"
+						alt="YourCloud Logo"
+						class="w-16 h-16 grayscale brightness-0 invert"
+					/>
 				</div>
 			</div>
+			<h2 class="text-2xl font-bold text-gray-800 mb-2">Sign In</h2>
+			<p class="text-gray-600/80 text-sm">Welcome back to YourCloud</p>
 		</div>
 
-		<!-- Password Field -->
-		<div>
-			<label for="password">Password:</label>
-			<input
-				type="password"
-				id="password"
-				name="password"
-				[(ngModel)]="password"
-				placeholder="Enter your password"
-				(input)="onFieldChange('password', password)"
-				(blur)="onFieldBlur('password')"
-				[class]="getFieldClass('password')"
-				required
-				autocomplete="current-password"
-			/>
-			<div *ngIf="hasFieldError('password')">
-				<div *ngFor="let error of getFieldErrors('password')">
-					{{ error }}
+		<!-- Messages -->
+		<div
+			*ngIf="infoMessage"
+			class="mb-4 p-3 rounded-lg bg-blue-50/50 backdrop-blur border border-blue-200/30"
+		>
+			<p class="text-blue-700 text-sm">{{ infoMessage }}</p>
+		</div>
+		<div
+			*ngIf="successMessage"
+			class="mb-4 p-3 rounded-lg bg-green-50/50 backdrop-blur border border-green-200/30"
+		>
+			<p class="text-green-700 text-sm">{{ successMessage }}</p>
+		</div>
+		<div
+			*ngIf="errorMessage"
+			class="mb-4 p-3 rounded-lg bg-red-50/50 backdrop-blur border border-red-200/30"
+		>
+			<p class="text-red-700 text-sm">{{ errorMessage }}</p>
+		</div>
+
+		<form (ngSubmit)="onLogin()" #loginForm="ngForm" class="space-y-6">
+			<!-- Email Field -->
+			<div class="space-y-2">
+				<label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+				<input
+					type="email"
+					id="email"
+					name="email"
+					[(ngModel)]="email"
+					placeholder="Enter your email"
+					(input)="onFieldChange('email', email)"
+					(blur)="onFieldBlur('email')"
+					[class]="
+						'glass-input w-full px-4 py-3 rounded-lg bg-white/20 backdrop-blur border transition-all duration-300 placeholder-gray-500 text-gray-800 focus:outline-none focus:ring-2 focus:ring-bright-teal/50 ' +
+						getFieldClass('email')
+					"
+					required
+					autocomplete="email"
+				/>
+				<div *ngIf="hasFieldError('email')" class="space-y-1">
+					<div
+						*ngFor="let error of getFieldErrors('email')"
+						class="text-red-600 text-xs bg-red-50/50 backdrop-blur px-2 py-1 rounded"
+					>
+						{{ error }}
+					</div>
 				</div>
 			</div>
-		</div>
 
-		<!-- Submit Button -->
-		<div>
-			<button type="submit" [disabled]="isSubmitting || !isFormValid()">
-				<span *ngIf="isSubmitting">Logging in...</span>
-				<span *ngIf="!isSubmitting">Login</span>
+			<!-- Password Field -->
+			<div class="space-y-2">
+				<label for="password" class="block text-sm font-medium text-gray-700"
+					>Password</label
+				>
+				<input
+					type="password"
+					id="password"
+					name="password"
+					[(ngModel)]="password"
+					placeholder="Enter your password"
+					(input)="onFieldChange('password', password)"
+					(blur)="onFieldBlur('password')"
+					[class]="
+						'glass-input w-full px-4 py-3 rounded-lg bg-white/20 backdrop-blur border transition-all duration-300 placeholder-gray-500 text-gray-800 focus:outline-none focus:ring-2 focus:ring-bright-teal/50 ' +
+						getFieldClass('password')
+					"
+					required
+					autocomplete="current-password"
+				/>
+				<div *ngIf="hasFieldError('password')" class="space-y-1">
+					<div
+						*ngFor="let error of getFieldErrors('password')"
+						class="text-red-600 text-xs bg-red-50/50 backdrop-blur px-2 py-1 rounded"
+					>
+						{{ error }}
+					</div>
+				</div>
+			</div>
+
+			<!-- Submit Button -->
+			<div class="space-y-4">
+				<button
+					type="submit"
+					[disabled]="isSubmitting || !isFormValid()"
+					class="w-full py-3 px-4 bg-blue-600/50 hover:bg-blue-600/70 disabled:bg-gray-400/50 backdrop-blur text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-blue-400/50 disabled:cursor-not-allowed disabled:transform-none"
+				>
+					<span *ngIf="isSubmitting" class="flex items-center justify-center">
+						<svg
+							class="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+						>
+							<circle
+								class="opacity-25"
+								cx="12"
+								cy="12"
+								r="10"
+								stroke="currentColor"
+								stroke-width="4"
+							></circle>
+							<path
+								class="opacity-75"
+								fill="currentColor"
+								d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+							></path>
+						</svg>
+						Signing in...
+					</span>
+					<span *ngIf="!isSubmitting">Sign In</span>
+				</button>
+			</div>
+		</form>
+
+		<!-- Footer Links -->
+		<div class="mt-6 text-center">
+			<button
+				type="button"
+				(click)="goToRegister()"
+				class="inline-flex items-center gap-2 px-4 py-2 text-gray-700 bg-white/20 backdrop-blur border border-white/30 rounded-lg text-sm transition-all duration-300 hover:bg-white/30 hover:border-white/50 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-bright-teal/50"
+			>
+				<svg
+					class="w-4 h-4"
+					fill="none"
+					stroke="currentColor"
+					viewBox="0 0 24 24"
+					xmlns="http://www.w3.org/2000/svg"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+					></path>
+				</svg>
+				Don't have an account? Create Account
 			</button>
-			<button type="button" (click)="goToRegister()">
-				Go to Register
-			</button>
 		</div>
-	</form>
-
-	<div *ngIf="infoMessage" class="info-message">
-		<p>{{ infoMessage }}</p>
-	</div>
-
-	<div *ngIf="errorMessage" class="error-message">
-		<p>{{ errorMessage }}</p>
-	</div>
-
-	<div *ngIf="successMessage" class="success-message">
-		<p>{{ successMessage }}</p>
 	</div>
 </div>

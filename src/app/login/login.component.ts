@@ -1,28 +1,22 @@
 // src/app/login/login.component.ts
 
-import {
-	Component,
-	Inject,
-	PLATFORM_ID,
-	OnInit,
-	OnDestroy,
-} from "@angular/core";
-import { Router, ActivatedRoute } from "@angular/router";
-import { AuthService } from "../auth.service";
-import { ValidationService, FormErrors } from "../validation.service";
-import { CommonModule } from "@angular/common";
-import { FormsModule } from "@angular/forms";
-import { Subject, debounceTime, distinctUntilChanged } from "rxjs";
+import { Component, Inject, PLATFORM_ID, OnInit, OnDestroy } from '@angular/core';
+import { Router, ActivatedRoute } from '@angular/router';
+import { AuthService } from '../auth.service';
+import { ValidationService, FormErrors } from '../validation.service';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 
 @Component({
-	selector: "app-login",
+	selector: 'app-login',
 	standalone: true,
 	imports: [CommonModule, FormsModule],
-	templateUrl: "./login.component.html",
+	templateUrl: './login.component.html'
 })
 export class LoginComponent implements OnInit, OnDestroy {
-	email: string = "";
-	password: string = "";
+	email: string = '';
+	password: string = '';
 
 	// Form state
 	errors: FormErrors = {};
@@ -31,9 +25,9 @@ export class LoginComponent implements OnInit, OnDestroy {
 	submitAttempted: boolean = false;
 
 	// Messages
-	errorMessage: string = "";
-	successMessage: string = "";
-	infoMessage: string = "";
+	errorMessage: string = '';
+	successMessage: string = '';
+	infoMessage: string = '';
 
 	// Real-time validation
 	private validationSubject = new Subject<{ field: string; value: string }>();
@@ -50,8 +44,7 @@ export class LoginComponent implements OnInit, OnDestroy {
 			.pipe(
 				debounceTime(300),
 				distinctUntilChanged(
-					(prev, curr) =>
-						prev.field === curr.field && prev.value === curr.value
+					(prev, curr) => prev.field === curr.field && prev.value === curr.value
 				)
 			)
 			.subscribe(({ field, value }) => {
@@ -65,14 +58,14 @@ export class LoginComponent implements OnInit, OnDestroy {
 
 	ngOnInit() {
 		// Check for message query parameter
-		this.route.queryParams.subscribe((params) => {
-			if (params["message"]) {
-				this.infoMessage = params["message"];
+		this.route.queryParams.subscribe(params => {
+			if (params['message']) {
+				this.infoMessage = params['message'];
 				// Clear the query parameter from the URL
 				this.router.navigate([], {
 					relativeTo: this.route,
 					queryParams: {},
-					replaceUrl: true,
+					replaceUrl: true
 				});
 			}
 		});
@@ -91,19 +84,18 @@ export class LoginComponent implements OnInit, OnDestroy {
 	// Real-time field validation
 	private validateField(field: string, value: string) {
 		switch (field) {
-			case "email":
-				const emailValidation =
-					this.validationService.validateEmail(value);
+			case 'email':
+				const emailValidation = this.validationService.validateEmail(value);
 				this.updateFieldError(
-					"email",
+					'email',
 					emailValidation.isValid ? null : emailValidation.message!
 				);
 				break;
-			case "password":
+			case 'password':
 				if (!value || value.length === 0) {
-					this.updateFieldError("password", "Password is required");
+					this.updateFieldError('password', 'Password is required');
 				} else {
-					this.updateFieldError("password", null);
+					this.updateFieldError('password', null);
 				}
 				break;
 		}
@@ -142,25 +134,21 @@ export class LoginComponent implements OnInit, OnDestroy {
 
 	// Check if form is valid
 	isFormValid(): boolean {
-		return (
-			Object.keys(this.errors).length === 0 &&
-			!!this.email.trim() &&
-			!!this.password
-		);
+		return Object.keys(this.errors).length === 0 && !!this.email.trim() && !!this.password;
 	}
 
 	onLogin() {
 		this.submitAttempted = true;
 
 		// Mark all fields as touched for validation display
-		Object.keys({ email: true, password: true }).forEach((field) => {
+		Object.keys({ email: true, password: true }).forEach(field => {
 			this.touched[field] = true;
 		});
 
 		// Clear messages when attempting login
-		this.errorMessage = "";
-		this.successMessage = "";
-		this.infoMessage = "";
+		this.errorMessage = '';
+		this.successMessage = '';
+		this.infoMessage = '';
 
 		// Sanitize inputs
 		this.email = this.validationService.sanitizeInput(this.email);
@@ -168,12 +156,12 @@ export class LoginComponent implements OnInit, OnDestroy {
 		// Comprehensive validation
 		const validation = this.validationService.validateLoginForm({
 			email: this.email,
-			password: this.password,
+			password: this.password
 		});
 
 		if (!validation.isValid) {
 			this.errors = validation.errors;
-			this.errorMessage = "Please fix the errors below and try again.";
+			this.errorMessage = 'Please fix the errors below and try again.';
 			return;
 		}
 
@@ -182,57 +170,64 @@ export class LoginComponent implements OnInit, OnDestroy {
 		this.authService
 			.login({
 				email: this.email.toLowerCase().trim(),
-				password: this.password,
+				password: this.password
 			})
 			.subscribe({
-				next: (response) => {
+				next: response => {
 					this.isSubmitting = false;
 					if (response.success) {
 						// Use auth service to store token
 						this.authService.setToken(response.token);
-						this.successMessage =
-							"Login successful! Redirecting...";
-						this.errorMessage = "";
+						this.successMessage = 'Login successful! Redirecting...';
+						this.errorMessage = '';
 
 						// Clear form
-						this.email = "";
-						this.password = "";
+						this.email = '';
+						this.password = '';
 						this.errors = {};
 						this.touched = {};
 
 						// Navigate to main app after successful login
-						this.router.navigate(["/dashboard"]);
+						this.router.navigate(['/dashboard']);
 					} else {
 						this.errorMessage =
-							response.message ||
-							"Login failed. Please check your credentials.";
-						this.successMessage = "";
+							response.message || 'Login failed. Please check your credentials.';
+						this.successMessage = '';
 					}
 				},
-				error: (error) => {
+				error: error => {
 					this.isSubmitting = false;
 
-					// Handle specific error cases
-					if (error.status === 401) {
-						this.errorMessage =
-							"Invalid email or password. Please try again.";
-					} else if (error.status === 429) {
-						this.errorMessage =
-							"Too many login attempts. Please try again later.";
-					} else if (error.status === 422) {
-						this.errorMessage =
-							"Invalid login data. Please check your information.";
+					// First check if the error response has a message from the API
+					let errorMessage = '';
+
+					if (error.error && error.error.message) {
+						// Use the specific message from the API response
+						errorMessage = error.error.message;
+					} else if (error.message) {
+						// Fallback to error.message if available
+						errorMessage = error.message;
 					} else {
-						this.errorMessage =
-							"Login failed. Please check your connection and try again.";
+						// Handle specific error cases by status code as fallback
+						if (error.status === 401) {
+							errorMessage = 'Invalid email or password. Please try again.';
+						} else if (error.status === 429) {
+							errorMessage = 'Too many login attempts. Please try again later.';
+						} else if (error.status === 422) {
+							errorMessage = 'Invalid login data. Please check your information.';
+						} else {
+							errorMessage =
+								'Login failed. Please check your connection and try again.';
+						}
 					}
 
-					this.successMessage = "";
-				},
+					this.errorMessage = errorMessage;
+					this.successMessage = '';
+				}
 			});
 	}
 
 	goToRegister() {
-		this.router.navigate(["/register"]);
+		this.router.navigate(['/register']);
 	}
 }

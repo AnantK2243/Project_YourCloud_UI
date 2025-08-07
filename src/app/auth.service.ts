@@ -1,19 +1,20 @@
 // src/app/auth.service.ts
 
-import { Injectable, Inject, PLATFORM_ID } from "@angular/core";
-import { HttpClient, HttpHeaders } from "@angular/common/http";
-import { Observable, tap } from "rxjs";
-import { isPlatformBrowser } from "@angular/common";
-import { CryptoService } from "./crypto.service";
-import { SessionStorageService } from "./session-storage.service";
-import { base64ToUint8Array, uint8ArrayToBase64 } from "./utils/utils";
+import { Injectable, Inject, PLATFORM_ID } from '@angular/core';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Observable, tap } from 'rxjs';
+import { isPlatformBrowser } from '@angular/common';
+import { CryptoService } from './crypto.service';
+import { SessionStorageService } from './session-storage.service';
+import { base64ToUint8Array, uint8ArrayToBase64 } from './utils/utils';
 
 @Injectable({
-	providedIn: "root",
+	providedIn: 'root'
 })
 export class AuthService {
 	private apiUrl = this.getApiUrl();
 	private userPassword: string | null = null;
+	private userName: string | null = null;
 
 	constructor(
 		private http: HttpClient,
@@ -22,24 +23,31 @@ export class AuthService {
 		private sessionStorage: SessionStorageService
 	) {
 		this.restoreMasterKey();
+		this.restoreUserName();
 	}
 
 	getApiUrl(): string {
-		if (typeof window !== "undefined") {
+		if (typeof window !== 'undefined') {
 			return `${window.location.origin}/api`;
 		}
-		return "https://127.0.0.1:4200/api";
+		return 'https://127.0.0.1:4200/api';
 	}
 
 	getAuthHeaders(): HttpHeaders {
 		const token = this.getToken();
 		const headersConfig: { [header: string]: string } = {
-			"Content-Type": "application/json",
+			'Content-Type': 'application/json'
 		};
 		if (token) {
-			headersConfig["Authorization"] = `Bearer ${token}`;
+			headersConfig['Authorization'] = `Bearer ${token}`;
 		}
 		return new HttpHeaders(headersConfig);
+	}
+
+	// Auto-restore user name on page refresh
+	private restoreUserName(): void {
+		if (!isPlatformBrowser(this.platformId) || !this.isLoggedIn()) return;
+		this.userName = localStorage.getItem('userName');
 	}
 
 	// Auto-restore master key on page refresh
@@ -59,10 +67,7 @@ export class AuthService {
 				const salt = base64ToUint8Array(credentials.salt);
 
 				this.userPassword = credentials.password;
-				await this.cryptoService.generateMasterKey(
-					credentials.password,
-					salt
-				);
+				await this.cryptoService.generateMasterKey(credentials.password, salt);
 			}
 		} catch (error) {
 			this.sessionStorage.clearCredentials();
@@ -86,12 +91,15 @@ export class AuthService {
 					this.setToken(response.token);
 					this.userPassword = credentials.password;
 
+					// Store user name
+					if (response.user?.name) {
+						this.userName = response.user.name;
+						localStorage.setItem('userName', response.user.name);
+					}
+
 					if (response.user?.salt) {
 						const salt = base64ToUint8Array(response.user.salt);
-						await this.cryptoService.generateMasterKey(
-							credentials.password,
-							salt
-						);
+						await this.cryptoService.generateMasterKey(credentials.password, salt);
 						await this.sessionStorage.storeCredentials(
 							credentials.password,
 							response.user.salt
@@ -104,8 +112,10 @@ export class AuthService {
 
 	logout(): void {
 		if (!isPlatformBrowser(this.platformId)) return;
-		localStorage.removeItem("token");
+		localStorage.removeItem('token');
+		localStorage.removeItem('userName');
 		this.userPassword = null;
+		this.userName = null;
 		this.cryptoService.clearKeys();
 		this.sessionStorage.clearCredentials();
 		this.sessionStorage.cleanup();
@@ -115,7 +125,20 @@ export class AuthService {
 		if (!isPlatformBrowser(this.platformId)) {
 			return false;
 		}
-		return !!localStorage.getItem("token");
+		return !!localStorage.getItem('token');
+	}
+
+	getUserName(): string | null {
+		if (this.userName) {
+			return this.userName;
+		}
+
+		if (isPlatformBrowser(this.platformId) && this.isLoggedIn()) {
+			this.userName = localStorage.getItem('userName');
+			return this.userName;
+		}
+
+		return null;
 	}
 
 	async getUserPassword(): Promise<string | null> {
@@ -135,13 +158,13 @@ export class AuthService {
 		if (!isPlatformBrowser(this.platformId)) {
 			return null;
 		}
-		return localStorage.getItem("token");
+		return localStorage.getItem('token');
 	}
 
 	setToken(token: string): void {
 		if (!isPlatformBrowser(this.platformId)) {
 			return;
 		}
-		localStorage.setItem("token", token);
+		localStorage.setItem('token', token);
 	}
 }

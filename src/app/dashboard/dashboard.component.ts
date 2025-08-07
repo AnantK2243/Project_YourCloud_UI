@@ -284,9 +284,9 @@ export class DashboardComponent implements OnInit {
 		);
 	}
 
-	openFileBrowser(node: any) {
+	openFileBrowser(node: StorageNode) {
 		this.router.navigate(['/file-browser', node.node_id], {
-			queryParams: { nodeName: node.label }
+			queryParams: { nodeName: node.node_name }
 		});
 	}
 

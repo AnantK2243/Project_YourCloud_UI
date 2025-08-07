@@ -7,11 +7,14 @@ import {
 	isLoggedIn,
 	getApiUrl,
 	getAuthHeaders,
-	isFormValid,
-	hasFieldError,
-	getFieldErrors,
 	extractErrorMessage
 } from '../../../src/app/utils/auth-utils';
+
+import {
+	isFormValid,
+	hasFieldError,
+	getFieldErrors
+} from '../../../src/app/utils/component-utils';
 
 describe('Frontend Auth Utils', () => {
 	let localStorageMock: any;
@@ -185,7 +188,7 @@ describe('Frontend Auth Utils', () => {
 			const password = 'password123';
 			const errors = {};
 
-			const isValid = isFormValid(email, password, errors);
+			const isValid = isFormValid(errors, ['email', 'password'], { email, password });
 			expect(isValid).toBe(true);
 		});
 
@@ -194,7 +197,7 @@ describe('Frontend Auth Utils', () => {
 			const password = 'password123';
 			const errors = { email: ['Invalid email'] };
 
-			const isValid = isFormValid(email, password, errors);
+			const isValid = isFormValid(errors, ['email', 'password'], { email, password });
 			expect(isValid).toBe(false);
 		});
 
@@ -203,7 +206,7 @@ describe('Frontend Auth Utils', () => {
 			const password = 'password123';
 			const errors = {};
 
-			const isValid = isFormValid(email, password, errors);
+			const isValid = isFormValid(errors, ['email', 'password'], { email, password });
 			expect(isValid).toBe(false);
 		});
 
@@ -212,7 +215,7 @@ describe('Frontend Auth Utils', () => {
 			const password = 'password123';
 			const errors = {};
 
-			const isValid = isFormValid(email, password, errors);
+			const isValid = isFormValid(errors, ['email', 'password'], { email, password });
 			expect(isValid).toBe(false);
 		});
 
@@ -221,7 +224,7 @@ describe('Frontend Auth Utils', () => {
 			const password = '';
 			const errors = {};
 
-			const isValid = isFormValid(email, password, errors);
+			const isValid = isFormValid(errors, ['email', 'password'], { email, password });
 			expect(isValid).toBe(false);
 		});
 
@@ -230,7 +233,7 @@ describe('Frontend Auth Utils', () => {
 			const password = '   ';
 			const errors = {};
 
-			const isValid = isFormValid(email, password, errors);
+			const isValid = isFormValid(errors, ['email', 'password'], { email, password });
 			expect(isValid).toBe(false);
 		});
 	});

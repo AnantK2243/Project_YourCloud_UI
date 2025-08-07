@@ -82,7 +82,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 	private uploadProgressSub: Subscription | undefined;
 	private downloadProgressSub: Subscription | undefined;
 
-	public formatFileSize = formatBytes; // Use enhanced formatBytes instead
+	public formatFileSize = formatBytes;
 	public formatDate = formatDate;
 
 	constructor(

@@ -7,13 +7,13 @@ import { ValidationService, FormErrors } from '../validation.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
-import { 
-	getFieldErrors, 
-	hasFieldError, 
-	isFormValid, 
-	calculatePasswordStrength, 
-	getPasswordStrengthClass, 
-	getPasswordStrengthText 
+import {
+	getFieldErrors,
+	hasFieldError,
+	isFormValid,
+	calculatePasswordStrength,
+	getPasswordStrengthClass,
+	getPasswordStrengthText
 } from '../utils/component-utils';
 
 @Component({
@@ -147,28 +147,24 @@ export class RegisterComponent implements OnDestroy {
 		);
 	}
 
-	// Get field errors for display (using utility)
+	// Get field errors for display
 	getFieldErrors(field: string): string[] {
 		return getFieldErrors(field, this.errors);
 	}
 
-	// Check if field has errors (using utility)
+	// Check if field has errors
 	hasFieldError(field: string): boolean {
 		return hasFieldError(field, this.errors, this.touched, this.submitAttempted);
 	}
 
-	// Check if form is valid (using utility)
+	// Check if form is valid
 	isFormValid(): boolean {
-		return isFormValid(
-			this.errors, 
-			['name', 'email', 'password', 'confirmPassword'], 
-			{ 
-				name: this.name, 
-				email: this.email, 
-				password: this.password, 
-				confirmPassword: this.confirmPassword 
-			}
-		);
+		return isFormValid(this.errors, ['name', 'email', 'password', 'confirmPassword'], {
+			name: this.name,
+			email: this.email,
+			password: this.password,
+			confirmPassword: this.confirmPassword
+		});
 	}
 
 	onRegister() {
@@ -276,7 +272,7 @@ export class RegisterComponent implements OnDestroy {
 		this.router.navigate(['/login']);
 	}
 
-	// Password strength helper methods (using utilities)
+	// Password strength helper methods
 	getPasswordStrengthClass(): string {
 		const result = calculatePasswordStrength(this.password);
 		return getPasswordStrengthClass(result.strength);

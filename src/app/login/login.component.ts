@@ -119,19 +119,22 @@ export class LoginComponent implements OnInit, OnDestroy {
 		);
 	}
 
-	// Get field errors for display (using utility)
+	// Get field errors for display
 	getFieldErrors(field: string): string[] {
 		return getFieldErrors(field, this.errors);
 	}
 
-	// Check if field has errors (using utility)
+	// Check if field has errors
 	hasFieldError(field: string): boolean {
 		return hasFieldError(field, this.errors, this.touched, this.submitAttempted);
 	}
 
-	// Check if form is valid (using utility)
+	// Check if form is valid
 	isFormValid(): boolean {
-		return isFormValid(this.errors, ['email', 'password'], { email: this.email, password: this.password });
+		return isFormValid(this.errors, ['email', 'password'], {
+			email: this.email,
+			password: this.password
+		});
 	}
 
 	onLogin() {

@@ -1,16 +1,75 @@
-<div>
-	<div>
-		<h1>Node Setup Tutorial</h1>
-		<button (click)="goBackToDashboard()">← Back to Dashboard</button>
+<div class="min-h-screen glassmorphism-bg relative overflow-hidden">
+	<!-- Floating Abstract Elements -->
+	<div
+		class="absolute top-20 left-20 w-32 h-32 bg-gradient-to-br from-blue-400/20 to-teal-400/20 rounded-full blur-xl animate-pulse"
+	></div>
+	<div
+		class="absolute bottom-20 right-20 w-48 h-48 bg-gradient-to-br from-teal-400/20 to-blue-600/20 rounded-full blur-2xl animate-pulse"
+		style="animation-delay: 2s"
+	></div>
+	<div
+		class="absolute top-1/2 left-10 w-24 h-24 bg-gradient-to-br from-blue-600/20 to-teal-500/20 rounded-full blur-lg animate-pulse"
+		style="animation-delay: 4s"
+	></div>
+
+	<!-- Header -->
+	<div class="relative z-10 p-6">
+		<div class="flex items-center justify-between mb-8">
+			<!-- Logo and Title -->
+			<div class="flex items-center space-x-3">
+				<div
+					class="w-12 h-12 bg-gradient-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center p-2 shadow-lg"
+				>
+					<img
+						src="icon.svg"
+						alt="YourCloud Logo"
+						class="w-8 h-8 grayscale brightness-0 invert"
+					/>
+				</div>
+				<div>
+					<h1 class="text-3xl font-bold text-gray-800">Node Setup Tutorial</h1>
+					<p class="text-gray-600/80 text-sm">
+						Complete guide to setting up your storage node
+					</p>
+				</div>
+			</div>
+
+			<!-- Back Button -->
+			<button
+				(click)="goBackToDashboard()"
+				class="glass-card bg-white/30 backdrop-blur-lg px-4 py-2 rounded-lg shadow-lg border border-white/20 hover:bg-white/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-bright-teal/50 text-gray-700 font-medium"
+			>
+				← Back to Dashboard
+			</button>
+		</div>
 	</div>
 
-	<div>
-		<section>
-			<h2>Step 1: Install the Storage Client (Requires Rust Compiler)</h2>
-			<div>
-				<h3>Linux/macOS Installation</h3>
-				<div>
-					<pre><code># Clone the repository
+	<!-- Main Content -->
+	<div class="relative z-10 px-6 pb-6">
+		<div class="max-w-6xl mx-auto space-y-8">
+			<!-- Step 1 -->
+			<section
+				class="glass-card bg-white/30 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/20"
+			>
+				<h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+					<span
+						class="w-8 h-8 bg-gradient-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center text-white font-bold text-sm mr-3"
+						>1</span
+					>
+					Install the Storage Client (Requires Rust Compiler)
+				</h2>
+
+				<div class="space-y-6">
+					<div>
+						<h3 class="text-xl font-semibold text-gray-700 mb-4">
+							Linux/macOS Installation
+						</h3>
+						<div
+							class="glass-card bg-white/20 backdrop-blur p-4 rounded-lg border border-white/20"
+						>
+							<pre
+								class="text-sm text-gray-700 overflow-x-auto"
+							><code># Clone the repository
 git clone https://github.com/AnantK2243/Project_YourCloud_Client.git --depth 1
 
 # Navigate to the storage client directory
@@ -29,36 +88,108 @@ source ~/.cargo/env
 # 2. Install it to /usr/local/bin/yourcloud_client
 # 3. Run interactive setup to configure your node
 # 4. Optionally create a systemd service</code></pre>
+						</div>
+					</div>
+
+					<div>
+						<h3 class="text-xl font-semibold text-gray-700 mb-4">
+							What the installer will ask for:
+						</h3>
+						<div
+							class="glass-card bg-white/20 backdrop-blur p-4 rounded-lg border border-white/20"
+						>
+							<ul class="space-y-3 text-gray-700">
+								<li class="flex items-start">
+									<span
+										class="w-2 h-2 bg-bright-teal rounded-full mt-2 mr-3 flex-shrink-0"
+									></span>
+									<div>
+										<strong class="text-deep-blue">Node ID:</strong> From your
+										dashboard registration
+									</div>
+								</li>
+								<li class="flex items-start">
+									<span
+										class="w-2 h-2 bg-bright-teal rounded-full mt-2 mr-3 flex-shrink-0"
+									></span>
+									<div>
+										<strong class="text-deep-blue">Auth Token:</strong> From
+										your dashboard registration
+									</div>
+								</li>
+								<li class="flex items-start">
+									<span
+										class="w-2 h-2 bg-bright-teal rounded-full mt-2 mr-3 flex-shrink-0"
+									></span>
+									<div>
+										<strong class="text-deep-blue">Storage Path:</strong> Where
+										to store files (default: ~/Project_YourCloud)
+									</div>
+								</li>
+								<li class="flex items-start">
+									<span
+										class="w-2 h-2 bg-bright-teal rounded-full mt-2 mr-3 flex-shrink-0"
+									></span>
+									<div>
+										<strong class="text-deep-blue">Storage Size:</strong>
+										Maximum storage in GB (default: 40)
+									</div>
+								</li>
+								<li class="flex items-start">
+									<span
+										class="w-2 h-2 bg-bright-teal rounded-full mt-2 mr-3 flex-shrink-0"
+									></span>
+									<div>
+										<strong class="text-deep-blue">WebSocket URL:</strong> URL
+										for frontend - ONLY CONFIGURE IF SELFHOSTING FRONTEND
+										(default: wss://wss.project-yourcloud.me)
+									</div>
+								</li>
+								<li class="flex items-start">
+									<span
+										class="w-2 h-2 bg-bright-teal rounded-full mt-2 mr-3 flex-shrink-0"
+									></span>
+									<div>
+										<strong class="text-deep-blue">Systemd Setup:</strong>
+										Whether to install as a system service
+									</div>
+								</li>
+							</ul>
+						</div>
+					</div>
+				</div>
+			</section>
+
+			<!-- Step 2 -->
+			<section
+				class="glass-card bg-white/30 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/20"
+			>
+				<h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+					<span
+						class="w-8 h-8 bg-gradient-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center text-white font-bold text-sm mr-3"
+						>2</span
+					>
+					Verify Installation
+				</h2>
+
+				<div class="mb-6">
+					<p class="text-gray-700 leading-relaxed">
+						The installation script will automatically configure everything for you. If
+						you chose systemd setup, your node will start automatically.
+					</p>
 				</div>
 
-				<h3>What the installer will ask for:</h3>
-				<ul>
-					<li><strong>Node ID:</strong> From your dashboard registration</li>
-					<li><strong>Auth Token:</strong> From your dashboard registration</li>
-					<li>
-						<strong>Storage Path:</strong> Where to store files (default:
-						~/Project_YourCloud)
-					</li>
-					<li><strong>Storage Size:</strong> Maximum storage in GB (default: 40)</li>
-					<li>
-						<strong>WebSocket URL:</strong> URL for frontend - ONLY CONFIGURE IF
-						SELFHOSTING FRONTEND (default: wss://wss.project-yourcloud.me)
-					</li>
-					<li><strong>Systemd Setup:</strong> Whether to install as a system service</li>
-				</ul>
-			</div>
-		</section>
-
-		<section>
-			<h2>Step 2: Verify Installation</h2>
-			<p>
-				The installation script will automatically configure everything for you. If you
-				chose systemd setup, your node will start automatically.
-			</p>
-
-			<h3>Manual Commands (if not using systemd)</h3>
-			<div>
-				<pre><code># Start the storage node
+				<div class="space-y-6">
+					<div>
+						<h3 class="text-xl font-semibold text-gray-700 mb-4">
+							Manual Commands (if not using systemd)
+						</h3>
+						<div
+							class="glass-card bg-white/20 backdrop-blur p-4 rounded-lg border border-white/20"
+						>
+							<pre
+								class="text-sm text-gray-700 overflow-x-auto"
+							><code># Start the storage node
 yourcloud_client start
 
 # Check status
@@ -66,54 +197,151 @@ yourcloud_client status
 
 # View help for other commands
 yourcloud_client --help</code></pre>
-			</div>
+						</div>
+					</div>
 
-			<h3>Systemd Commands (if using systemd service)</h3>
-			<div>
-				<pre><code># Check service status
+					<div>
+						<h3 class="text-xl font-semibold text-gray-700 mb-4">
+							Systemd Commands (if using systemd service)
+						</h3>
+						<div
+							class="glass-card bg-white/20 backdrop-blur p-4 rounded-lg border border-white/20"
+						>
+							<pre
+								class="text-sm text-gray-700 overflow-x-auto"
+							><code># Check service status
 sudo systemctl status yourcloud-storage
 
 # Start/stop the service
 sudo systemctl start yourcloud-storage
 sudo systemctl stop yourcloud-storage</code></pre>
-			</div>
-		</section>
+						</div>
+					</div>
+				</div>
+			</section>
 
-		<section>
-			<h2>Step 3: Verify Connection</h2>
-			<p>
-				Go back to your dashboard to verify that your node appears as "online" and is ready
-				to store files.
-			</p>
-			<div>
-				<h3>Troubleshooting</h3>
-				<ul>
-					<li>Ensure your firewall allows connections on the configured port</li>
-					<li>Check that the storage path exists and has proper permissions</li>
-					<li>Verify your Node ID and Auth Token are correctly entered</li>
-					<li>Check the logs for any error messages</li>
-					<li>
-						If using systemd:
-						<code>sudo journalctl -u yourcloud-storage -f</code>
-					</li>
-					<li>If running manually: Check the terminal output for errors</li>
-				</ul>
-			</div>
-		</section>
+			<!-- Step 3 -->
+			<section
+				class="glass-card bg-white/30 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/20"
+			>
+				<h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+					<span
+						class="w-8 h-8 bg-gradient-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center text-white font-bold text-sm mr-3"
+						>3</span
+					>
+					Verify Connection
+				</h2>
 
-		<section>
-			<h2>Additional Information</h2>
-			<div>
-				<h3>Configuration File</h3>
-				<p>
-					Your configuration is automatically saved to:
-					<code>~/.config/Project_YourCloud/config.toml</code>
-				</p>
-				<p>You can edit this file later if needed.</p>
+				<div class="mb-6">
+					<p class="text-gray-700 leading-relaxed">
+						Go back to your dashboard to verify that your node appears as "online" and
+						is ready to store files.
+					</p>
+				</div>
 
-				<h3>Systemd Service Management</h3>
 				<div>
-					<pre><code># Check service status
+					<h3 class="text-xl font-semibold text-gray-700 mb-4">Troubleshooting</h3>
+					<div
+						class="glass-card bg-white/20 backdrop-blur p-4 rounded-lg border border-white/20"
+					>
+						<ul class="space-y-3 text-gray-700">
+							<li class="flex items-start">
+								<span
+									class="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 flex-shrink-0"
+								></span>
+								<span
+									>Ensure your firewall allows connections on the configured
+									port</span
+								>
+							</li>
+							<li class="flex items-start">
+								<span
+									class="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 flex-shrink-0"
+								></span>
+								<span
+									>Check that the storage path exists and has proper
+									permissions</span
+								>
+							</li>
+							<li class="flex items-start">
+								<span
+									class="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 flex-shrink-0"
+								></span>
+								<span
+									>Verify your Node ID and Auth Token are correctly entered</span
+								>
+							</li>
+							<li class="flex items-start">
+								<span
+									class="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 flex-shrink-0"
+								></span>
+								<span>Check the logs for any error messages</span>
+							</li>
+							<li class="flex items-start">
+								<span
+									class="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 flex-shrink-0"
+								></span>
+								<div>
+									If using systemd:
+									<code class="bg-gray-200/50 px-2 py-1 rounded text-xs"
+										>sudo journalctl -u yourcloud-storage -f</code
+									>
+								</div>
+							</li>
+							<li class="flex items-start">
+								<span
+									class="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 flex-shrink-0"
+								></span>
+								<span
+									>If running manually: Check the terminal output for errors</span
+								>
+							</li>
+						</ul>
+					</div>
+				</div>
+			</section>
+
+			<!-- Additional Information -->
+			<section
+				class="glass-card bg-white/30 backdrop-blur-lg p-6 rounded-2xl shadow-lg border border-white/20"
+			>
+				<h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
+					<span
+						class="w-8 h-8 bg-gradient-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center text-white font-bold text-sm mr-3"
+						>ℹ</span
+					>
+					Additional Information
+				</h2>
+
+				<div class="space-y-6">
+					<div>
+						<h3 class="text-xl font-semibold text-gray-700 mb-4">Configuration File</h3>
+						<div
+							class="glass-card bg-white/20 backdrop-blur p-4 rounded-lg border border-white/20"
+						>
+							<p class="text-gray-700 mb-2">
+								Your configuration is automatically saved to:
+							</p>
+							<code
+								class="bg-gray-200/50 px-3 py-2 rounded text-sm text-gray-800 block"
+								>~/.config/Project_YourCloud/config.toml</code
+							>
+							<p class="text-gray-700 mt-2">
+								You can edit this file later if needed.
+							</p>
+						</div>
+					</div>
+
+					<div>
+						<h3 class="text-xl font-semibold text-gray-700 mb-4">
+							Systemd Service Management
+						</h3>
+						<div
+							class="glass-card bg-white/20 backdrop-blur p-4 rounded-lg border border-white/20"
+						>
+							<pre
+								class="text-sm text-gray-700 overflow-x-auto"
+							><code># Check service status
 sudo systemctl status yourcloud-storage
 
 # Enable/disable autostart
@@ -127,12 +355,20 @@ sudo systemctl restart yourcloud-storage
 
 # View service logs
 sudo journalctl -u yourcloud-storage -f</code></pre>
+						</div>
+					</div>
 				</div>
-			</div>
-		</section>
-	</div>
+			</section>
+		</div>
 
-	<div>
-		<button (click)="goBackToDashboard()">Return to Dashboard</button>
+		<!-- Bottom Action -->
+		<div class="max-w-6xl mx-auto mt-8 text-center">
+			<button
+				(click)="goBackToDashboard()"
+				class="glass-card bg-gradient-to-r from-deep-blue to-bright-teal text-white px-8 py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-bright-teal/50 font-medium"
+			>
+				Return to Dashboard
+			</button>
+		</div>
 	</div>
 </div>

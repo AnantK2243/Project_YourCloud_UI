@@ -7,16 +7,29 @@ import { AuthService } from '../auth.service';
 import { SessionHandlerService } from '../session-handler.service';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import {
+	MessageState,
+	ConfirmationState,
+	clearMessages as clearMessageState,
+	setErrorMessage,
+	createConfirmationState,
+	clearConfirmationState
+} from '../utils/component-utils';
+import { validateNodeName } from '../utils/node-utils';
 
 @Component({
-	selector: 'app-dashboarFd',
+	selector: 'app-dashboard',
 	standalone: true,
 	imports: [CommonModule, FormsModule],
 	templateUrl: './dashboard.component.html'
 })
 export class DashboardComponent implements OnInit {
-	warning: string = '';
-	error: string = '';
+	// Message state
+	messageState: MessageState = {
+		warning: '',
+		error: ''
+	};
+
 	loading: boolean = true;
 	userName: string | null = null;
 
@@ -30,10 +43,7 @@ export class DashboardComponent implements OnInit {
 	registrationResult: any = null;
 
 	// Custom confirmation popup
-	showConfirmPopup: boolean = false;
-	confirmTitle: string = '';
-	confirmMessage: string = '';
-	confirmAction: (() => void) | null = null;
+	confirmationState: ConfirmationState = clearConfirmationState();
 
 	userStorageNodes: StorageNode[] = [];
 	private userStorageNodesSub: any;
@@ -90,22 +100,16 @@ export class DashboardComponent implements OnInit {
 	}
 
 	showConfirmation(title: string, message: string, action: () => void) {
-		this.confirmTitle = title;
-		this.confirmMessage = message;
-		this.confirmAction = action;
-		this.showConfirmPopup = true;
+		this.confirmationState = createConfirmationState(title, message, action);
 	}
 
 	hideConfirmation() {
-		this.showConfirmPopup = false;
-		this.confirmTitle = '';
-		this.confirmMessage = '';
-		this.confirmAction = null;
+		this.confirmationState = clearConfirmationState();
 	}
 
 	confirmAndExecute() {
-		if (this.confirmAction) {
-			this.confirmAction();
+		if (this.confirmationState.action) {
+			this.confirmationState.action();
 		}
 		this.hideConfirmation();
 	}
@@ -164,14 +168,20 @@ export class DashboardComponent implements OnInit {
 			// Fetch user storage nodes
 			const response: any = await this.nodeService.loadUserStorageNodes();
 			if (!response.success) {
-				this.error = response.message || 'Failed to fetch storage nodes.';
+				this.messageState = setErrorMessage(
+					this.messageState,
+					response.message || 'Failed to fetch storage nodes.'
+				);
 			}
 		} catch (error: any) {
 			// Check if this is a session/authentication error
 			if (this.sessionHandler.checkAndHandleSessionError(error)) {
 				return;
 			}
-			this.error = error.message || 'An unexpected error occurred';
+			this.messageState = setErrorMessage(
+				this.messageState,
+				error.message || 'An unexpected error occurred'
+			);
 		} finally {
 			this.loading = false;
 		}
@@ -179,8 +189,10 @@ export class DashboardComponent implements OnInit {
 
 	// Register a new node
 	async registerNode() {
-		if (!this.registerNodeName.trim()) {
-			this.registerMessage = 'Please enter a valid Node Name';
+		// Validate node name using utility function
+		const validation = validateNodeName(this.registerNodeName);
+		if (!validation.isValid) {
+			this.registerMessage = validation.message || 'Please enter a valid Node Name';
 			return;
 		}
 
@@ -213,7 +225,10 @@ export class DashboardComponent implements OnInit {
 		this.loading = true;
 		this.clearMessages();
 		if (!nodeId.trim()) {
-			this.error = 'Invalid Node ID provided for status check.';
+			this.messageState = setErrorMessage(
+				this.messageState,
+				'Invalid Node ID provided for status check.'
+			);
 			return;
 		}
 
@@ -222,14 +237,20 @@ export class DashboardComponent implements OnInit {
 			const response: any = await this.nodeService.updateNodeStatus(nodeId);
 
 			if (!response.success) {
-				this.error = response.error || 'Failed to retrieve node status.';
+				this.messageState = setErrorMessage(
+					this.messageState,
+					response.error || 'Failed to retrieve node status.'
+				);
 			}
 		} catch (error: any) {
 			// Check if this is a session/authentication error
 			if (this.sessionHandler.checkAndHandleSessionError(error)) {
 				return;
 			}
-			this.error = error.message || 'An unexpected error occurred';
+			this.messageState = setErrorMessage(
+				this.messageState,
+				error.message || 'An unexpected error occurred'
+			);
 		} finally {
 			this.loading = false;
 		}
@@ -237,7 +258,10 @@ export class DashboardComponent implements OnInit {
 
 	async deleteNode(nodeId: string) {
 		if (!nodeId.trim()) {
-			this.error = 'Invalid Node ID provided for deletion.';
+			this.messageState = setErrorMessage(
+				this.messageState,
+				'Invalid Node ID provided for deletion.'
+			);
 			return;
 		}
 
@@ -258,14 +282,20 @@ export class DashboardComponent implements OnInit {
 		try {
 			const response: any = await this.nodeService.deleteStorageNode(nodeId);
 			if (!response.success) {
-				this.error = response.error || 'Failed to delete storage node.';
+				this.messageState = setErrorMessage(
+					this.messageState,
+					response.error || 'Failed to delete storage node.'
+				);
 			}
 		} catch (error: any) {
 			// Check if this is a session/authentication error
 			if (this.sessionHandler.checkAndHandleSessionError(error)) {
 				return;
 			}
-			this.error = error.message || 'An unexpected error occurred';
+			this.messageState = setErrorMessage(
+				this.messageState,
+				error.message || 'An unexpected error occurred'
+			);
 		} finally {
 			this.loading = false;
 		}
@@ -295,7 +325,27 @@ export class DashboardComponent implements OnInit {
 	}
 
 	clearMessages() {
-		this.warning = '';
-		this.error = '';
+		this.messageState = clearMessageState(this.messageState);
+	}
+
+	// Getters for template compatibility
+	get error(): string {
+		return this.messageState.error;
+	}
+
+	get warning(): string {
+		return this.messageState.warning;
+	}
+
+	get showConfirmPopup(): boolean {
+		return this.confirmationState.show;
+	}
+
+	get confirmTitle(): string {
+		return this.confirmationState.title;
+	}
+
+	get confirmMessage(): string {
+		return this.confirmationState.message;
 	}
 }

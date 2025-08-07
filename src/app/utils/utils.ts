@@ -1,21 +1,21 @@
 // src/app/utils/utils.ts
 
 export function formatFileSize(size: number | undefined): string {
-	if (size === undefined) return "";
-	if (size === 0) return "0 Bytes";
+	if (size === undefined) return '';
+	if (size === 0) return '0 Bytes';
 	const k = 1024;
-	const sizes = ["Bytes", "KB", "MB", "GB"];
+	const sizes = ['Bytes', 'KB', 'MB', 'GB'];
 	const i = Math.floor(Math.log(size) / Math.log(k));
-	return parseFloat((size / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+	return parseFloat((size / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
 export function formatDate(dateString: string | undefined): string {
-	if (!dateString) return "";
+	if (!dateString) return '';
 	return new Date(dateString).toLocaleDateString();
 }
 
 export function uint8ArrayToBase64(array: Uint8Array): string {
-	let binary = "";
+	let binary = '';
 	for (let i = 0; i < array.byteLength; i++) {
 		binary += String.fromCharCode(array[i]);
 	}

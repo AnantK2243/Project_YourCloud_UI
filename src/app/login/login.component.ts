@@ -7,6 +7,7 @@ import { ValidationService, FormErrors } from '../validation.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
+import { getFieldErrors, hasFieldError, isFormValid } from '../utils/component-utils';
 
 @Component({
 	selector: 'app-login',
@@ -118,23 +119,19 @@ export class LoginComponent implements OnInit, OnDestroy {
 		);
 	}
 
-	// Get field errors for display
+	// Get field errors for display (using utility)
 	getFieldErrors(field: string): string[] {
-		return this.errors[field] || [];
+		return getFieldErrors(field, this.errors);
 	}
 
-	// Check if field has errors
+	// Check if field has errors (using utility)
 	hasFieldError(field: string): boolean {
-		return !!(
-			this.errors[field] &&
-			this.errors[field].length > 0 &&
-			(this.touched[field] || this.submitAttempted)
-		);
+		return hasFieldError(field, this.errors, this.touched, this.submitAttempted);
 	}
 
-	// Check if form is valid
+	// Check if form is valid (using utility)
 	isFormValid(): boolean {
-		return Object.keys(this.errors).length === 0 && !!this.email.trim() && !!this.password;
+		return isFormValid(this.errors, ['email', 'password'], { email: this.email, password: this.password });
 	}
 
 	onLogin() {

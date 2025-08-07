@@ -99,3 +99,105 @@ export function isStrongPassword(password: string): boolean {
 export function isValidName(name: string): boolean {
 	return validateName(name).isValid;
 }
+
+// Input sanitization
+export function sanitizeInput(input: string): string {
+	if (!input) return '';
+
+	return input
+		.trim()
+		.replace(/\s+/g, ' ') // Replace multiple spaces with single space
+		.substring(0, 1000); // Limit length to prevent abuse
+}
+
+// Form validation for login
+export interface LoginForm {
+	email: string;
+	password: string;
+}
+
+export function validateLoginForm(form: LoginForm): {
+	isValid: boolean;
+	errors: { [key: string]: string[] };
+} {
+	const errors: { [key: string]: string[] } = {};
+
+	// Validate email
+	const emailResult = validateEmail(form.email);
+	if (!emailResult.isValid && emailResult.message) {
+		errors['email'] = [emailResult.message];
+	}
+
+	// Validate password (basic check for login - just required)
+	if (!form.password || form.password.trim() === '') {
+		errors['password'] = ['Password is required'];
+	}
+
+	return {
+		isValid: Object.keys(errors).length === 0,
+		errors
+	};
+}
+
+// Form validation for registration
+export interface RegisterForm {
+	name: string;
+	email: string;
+	password: string;
+	confirmPassword: string;
+}
+
+export function validateRegisterForm(form: RegisterForm): {
+	isValid: boolean;
+	errors: { [key: string]: string[] };
+} {
+	const errors: { [key: string]: string[] } = {};
+
+	// Validate name
+	const nameResult = validateName(form.name);
+	if (!nameResult.isValid && nameResult.message) {
+		errors['name'] = [nameResult.message];
+	}
+
+	// Validate email
+	const emailResult = validateEmail(form.email);
+	if (!emailResult.isValid && emailResult.message) {
+		errors['email'] = [emailResult.message];
+	}
+
+	// Validate password
+	const passwordResult = validatePasswordStrength(form.password);
+	if (!passwordResult.isValid && passwordResult.message) {
+		errors['password'] = [passwordResult.message];
+	}
+
+	// Validate password confirmation
+	if (!form.confirmPassword || form.confirmPassword.trim() === '') {
+		errors['confirmPassword'] = ['Please confirm your password'];
+	} else if (form.password !== form.confirmPassword) {
+		errors['confirmPassword'] = ['Passwords do not match'];
+	}
+
+	return {
+		isValid: Object.keys(errors).length === 0,
+		errors
+	};
+}
+
+// Field validation class helper
+export function getFieldValidationClass(
+	field: string,
+	errors: { [key: string]: string[] },
+	touched: boolean
+): string {
+	if (!touched) {
+		return 'border-white/30 focus:border-white/50';
+	}
+
+	const hasError = errors[field] && errors[field].length > 0;
+	if (hasError) {
+		return 'border-red-300 focus:border-red-500 focus:ring-red-500';
+	}
+
+	return 'border-green-300 focus:border-green-500 focus:ring-green-500';
+}

@@ -9,6 +9,7 @@ import { SessionHandlerService } from '../session-handler.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { formatFileSize, formatDate } from '../utils/utils';
+import { formatBytes } from '../utils/node-utils';
 
 // Interface for progress tracking
 interface ProgressData {
@@ -81,7 +82,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 	private uploadProgressSub: Subscription | undefined;
 	private downloadProgressSub: Subscription | undefined;
 
-	public formatFileSize = formatFileSize;
+	public formatFileSize = formatBytes; // Use enhanced formatBytes instead
 	public formatDate = formatDate;
 
 	constructor(
@@ -766,7 +767,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 	}
 
 	private updateDownloadProgress(progress: any): void {
-		// TODO: This method should be properly typed, but for now using any to match existing pattern
 		this.downloadStatus = `Downloading ${progress.fileName}`;
 		this.downloadProgress = progress.progress;
 		this.isDownloading = progress.isDownloading;

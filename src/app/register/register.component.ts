@@ -7,6 +7,14 @@ import { ValidationService, FormErrors } from '../validation.service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
+import { 
+	getFieldErrors, 
+	hasFieldError, 
+	isFormValid, 
+	calculatePasswordStrength, 
+	getPasswordStrengthClass, 
+	getPasswordStrengthText 
+} from '../utils/component-utils';
 
 @Component({
 	selector: 'app-register',
@@ -139,28 +147,27 @@ export class RegisterComponent implements OnDestroy {
 		);
 	}
 
-	// Get field errors for display
+	// Get field errors for display (using utility)
 	getFieldErrors(field: string): string[] {
-		return this.errors[field] || [];
+		return getFieldErrors(field, this.errors);
 	}
 
-	// Check if field has errors
+	// Check if field has errors (using utility)
 	hasFieldError(field: string): boolean {
-		return !!(
-			this.errors[field] &&
-			this.errors[field].length > 0 &&
-			(this.touched[field] || this.submitAttempted)
-		);
+		return hasFieldError(field, this.errors, this.touched, this.submitAttempted);
 	}
 
-	// Check if form is valid
+	// Check if form is valid (using utility)
 	isFormValid(): boolean {
-		return (
-			Object.keys(this.errors).length === 0 &&
-			!!this.name.trim() &&
-			!!this.email.trim() &&
-			!!this.password &&
-			!!this.confirmPassword
+		return isFormValid(
+			this.errors, 
+			['name', 'email', 'password', 'confirmPassword'], 
+			{ 
+				name: this.name, 
+				email: this.email, 
+				password: this.password, 
+				confirmPassword: this.confirmPassword 
+			}
 		);
 	}
 
@@ -269,43 +276,19 @@ export class RegisterComponent implements OnDestroy {
 		this.router.navigate(['/login']);
 	}
 
-	// Password strength helper methods
+	// Password strength helper methods (using utilities)
 	getPasswordStrengthClass(): string {
-		const classMap = {
-			weak: 'text-red-500 font-medium',
-			fair: 'text-orange-500 font-medium',
-			good: 'text-yellow-500 font-medium',
-			strong: 'text-green-500 font-medium'
-		};
-		return classMap[this.passwordStrength];
+		const result = calculatePasswordStrength(this.password);
+		return getPasswordStrengthClass(result.strength);
 	}
 
 	getPasswordStrengthText(): string {
-		const strengthMap = {
-			weak: 'Weak',
-			fair: 'Fair',
-			good: 'Good',
-			strong: 'Strong'
-		};
-		return strengthMap[this.passwordStrength];
+		const result = calculatePasswordStrength(this.password);
+		return getPasswordStrengthText(result.strength);
 	}
 
 	getPasswordRequirements(): { text: string; met: boolean }[] {
-		return [
-			{ text: 'At least 8 characters', met: this.password.length >= 8 },
-			{
-				text: 'Contains lowercase letter',
-				met: /[a-z]/.test(this.password)
-			},
-			{
-				text: 'Contains uppercase letter',
-				met: /[A-Z]/.test(this.password)
-			},
-			{ text: 'Contains number', met: /\d/.test(this.password) },
-			{
-				text: 'Contains special character',
-				met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(this.password)
-			}
-		];
+		const result = calculatePasswordStrength(this.password);
+		return result.requirements;
 	}
 }

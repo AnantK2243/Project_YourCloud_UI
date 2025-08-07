@@ -56,26 +56,6 @@ export function getAuthHeaders(): { [key: string]: string } {
 	return headers;
 }
 
-// Form validation utilities
-export function isFormValid(email: string, password: string, errors: FormErrors): boolean {
-	const hasErrors = Object.keys(errors).length > 0;
-	const hasRequiredFields = email.trim() !== '' && password.trim() !== '';
-	return hasRequiredFields && !hasErrors;
-}
-
-export function hasFieldError(
-	field: string,
-	errors: FormErrors,
-	touched: { [key: string]: boolean },
-	submitAttempted: boolean
-): boolean {
-	return !!(errors[field] && (touched[field] || submitAttempted));
-}
-
-export function getFieldErrors(field: string, errors: FormErrors): string[] {
-	return errors[field] || [];
-}
-
 // Error message extraction
 export function extractErrorMessage(error: any): string {
 	if (error?.error?.message) {

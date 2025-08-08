@@ -44,3 +44,5 @@ yarn-error.log*
 
 docker-data/
 .docker/
+
+/src/tailwind.css

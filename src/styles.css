@@ -1,10 +1,10 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-deep-blue: #0000ff;
-  --color-bright-teal: #00ffff;
-  --backdrop-blur-xl: 20px;
-  --backdrop-blur-2xl: 40px;
+	--color-deep-blue: #0000ff;
+	--color-bright-teal: #00ffff;
+	--backdrop-blur-xl: 20px;
+	--backdrop-blur-2xl: 40px;
 }
 
 /*
@@ -16,13 +16,13 @@
   color utility to any element that depends on these defaults.
 */
 @layer base {
-  *,
-  ::after,
-  ::before,
-  ::backdrop,
-  ::file-selector-button {
-    border-color: var(--color-gray-200, currentcolor);
-  }
+	*,
+	::after,
+	::before,
+	::backdrop,
+	::file-selector-button {
+		border-color: var(--color-gray-200, currentcolor);
+	}
 }
 
 /* Custom glassmorphism background for login page */

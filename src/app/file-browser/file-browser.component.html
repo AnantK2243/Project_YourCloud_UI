@@ -4,14 +4,14 @@
   >
   <!-- Floating Abstract Elements -->
   <div
-    class="absolute top-20 left-20 w-32 h-32 bg-gradient-to-br from-blue-400/20 to-teal-400/20 rounded-full blur-xl animate-pulse"
+    class="absolute top-20 left-20 w-32 h-32 bg-linear-to-br from-blue-400/20 to-teal-400/20 rounded-full blur-xl animate-pulse"
   ></div>
   <div
-    class="absolute bottom-20 right-20 w-48 h-48 bg-gradient-to-br from-teal-400/20 to-blue-600/20 rounded-full blur-2xl animate-pulse"
+    class="absolute bottom-20 right-20 w-48 h-48 bg-linear-to-br from-teal-400/20 to-blue-600/20 rounded-full blur-2xl animate-pulse"
     style="animation-delay: 2s"
   ></div>
   <div
-    class="absolute top-1/2 left-10 w-24 h-24 bg-gradient-to-br from-blue-600/20 to-teal-500/20 rounded-full blur-lg animate-pulse"
+    class="absolute top-1/2 left-10 w-24 h-24 bg-linear-to-br from-blue-600/20 to-teal-500/20 rounded-full blur-lg animate-pulse"
     style="animation-delay: 4s"
   ></div>
 
@@ -21,7 +21,7 @@
       <!-- Back to Dashboard Button -->
       <button
         (click)="goBack()"
-        class="glass-card bg-white/30 backdrop-blur-lg p-3 rounded-lg shadow-lg border border-white/20 hover:bg-white/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-bright-teal/50 flex items-center space-x-2"
+        class="glass-card bg-white/30 backdrop-blur-lg p-3 rounded-lg shadow-lg border border-white/20 hover:bg-white/40 transition-all duration-300 focus:outline-hidden focus:ring-2 focus:ring-bright-teal/50 flex items-center space-x-2"
         >
         <svg
           class="w-5 h-5 text-gray-700"
@@ -42,7 +42,7 @@
       <!-- Logo and Title -->
       <div class="flex items-center space-x-3">
         <div
-          class="w-12 h-12 bg-gradient-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center p-2 shadow-lg"
+          class="w-12 h-12 bg-linear-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center p-2 shadow-lg"
           >
           <img
             src="icon.svg"
@@ -86,7 +86,7 @@
             <p class="text-sm font-medium text-gray-700">{{ uploadStatus }}</p>
             <div class="w-full bg-gray-200/50 rounded-full h-2 mt-1">
               <div
-                class="bg-gradient-to-r from-blue-500 to-teal-500 h-2 rounded-full transition-all duration-300"
+                class="bg-linear-to-r from-blue-500 to-teal-500 h-2 rounded-full transition-all duration-300"
                 [style.width.%]="uploadProgress"
               ></div>
             </div>
@@ -124,7 +124,7 @@
             <p class="text-sm font-medium text-gray-700">{{ downloadStatus }}</p>
             <div class="w-full bg-gray-200/50 rounded-full h-2 mt-1">
               <div
-                class="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-300"
+                class="bg-linear-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-300"
                 [style.width.%]="downloadProgress"
               ></div>
             </div>
@@ -157,7 +157,7 @@
             <button
               (click)="leaveDirectory()"
               [disabled]="loading || isDownloading"
-              class="glass-card bg-white/30 backdrop-blur-lg p-2 rounded-lg shadow-lg border border-white/20 hover:bg-white/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-bright-teal/50 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="glass-card bg-white/30 backdrop-blur-lg p-2 rounded-lg shadow-lg border border-white/20 hover:bg-white/40 transition-all duration-300 focus:outline-hidden focus:ring-2 focus:ring-bright-teal/50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
               <svg
                 class="w-5 h-5 text-gray-700"
@@ -196,7 +196,7 @@
             <button
               (click)="showUploadMenu = !showUploadMenu"
               [disabled]="isUploading || isDownloading"
-              class="glass-card bg-white/30 backdrop-blur-lg px-4 py-2 rounded-lg shadow-lg border border-white/20 hover:bg-white/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-bright-teal/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              class="glass-card bg-white/30 backdrop-blur-lg px-4 py-2 rounded-lg shadow-lg border border-white/20 hover:bg-white/40 transition-all duration-300 focus:outline-hidden focus:ring-2 focus:ring-bright-teal/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
               >
               <svg
                 class="w-5 h-5 text-gray-700"
@@ -323,19 +323,19 @@
                 [(ngModel)]="newDirectoryName"
                 placeholder="Enter directory name"
                 (keyup.enter)="createNewDirectory()"
-                class="flex-1 glass-input bg-white/20 backdrop-blur border border-white/30 rounded-lg px-3 py-2 text-gray-700 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-bright-teal/50"
+                class="flex-1 glass-input bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg px-3 py-2 text-gray-700 placeholder-gray-500 focus:outline-hidden focus:ring-2 focus:ring-bright-teal/50"
                 />
               <button
                 (click)="createNewDirectory()"
                 [disabled]="loading"
-                class="glass-card bg-green-500/30 backdrop-blur-lg px-4 py-2 rounded-lg shadow-lg border border-green-400/30 hover:bg-green-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-green-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-green-700 font-medium"
+                class="glass-card bg-green-500/30 backdrop-blur-lg px-4 py-2 rounded-lg shadow-lg border border-green-400/30 hover:bg-green-500/40 transition-all duration-300 focus:outline-hidden focus:ring-2 focus:ring-green-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-green-700 font-medium"
                 >
                 {{ loading ? 'Creating...' : 'Create' }}
               </button>
               <button
                 (click)="cancelCreateDirectory()"
                 [disabled]="loading"
-                class="glass-card bg-red-500/30 backdrop-blur-lg px-4 py-2 rounded-lg shadow-lg border border-red-400/30 hover:bg-red-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-red-700 font-medium"
+                class="glass-card bg-red-500/30 backdrop-blur-lg px-4 py-2 rounded-lg shadow-lg border border-red-400/30 hover:bg-red-500/40 transition-all duration-300 focus:outline-hidden focus:ring-2 focus:ring-red-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-red-700 font-medium"
                 >
                 Cancel
               </button>
@@ -351,7 +351,7 @@
             <button
               (click)="toggleSelectionMode()"
               [disabled]="isUploading || isDownloading"
-              class="glass-card bg-red-500/30 backdrop-blur-lg px-4 py-2 rounded-lg shadow-lg border border-red-400/30 hover:bg-red-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-400/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              class="glass-card bg-red-500/30 backdrop-blur-lg px-4 py-2 rounded-lg shadow-lg border border-red-400/30 hover:bg-red-500/40 transition-all duration-300 focus:outline-hidden focus:ring-2 focus:ring-red-400/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
               >
               <svg
                 class="w-4 h-4 text-red-700"
@@ -377,7 +377,7 @@
 								isUploading ||
 								loading
 							"
-                class="glass-card bg-blue-500/30 backdrop-blur-lg px-3 py-1 rounded-lg shadow-lg border border-blue-400/30 hover:bg-blue-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-blue-700 text-sm font-medium"
+                class="glass-card bg-blue-500/30 backdrop-blur-lg px-3 py-1 rounded-lg shadow-lg border border-blue-400/30 hover:bg-blue-500/40 transition-all duration-300 focus:outline-hidden focus:ring-2 focus:ring-blue-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-blue-700 text-sm font-medium"
                 >
                 Select All
               </button>
@@ -386,7 +386,7 @@
 							[disabled]="
 								selectedItems.size === 0 || isDownloading || isUploading || loading
 							"
-                class="glass-card bg-gray-500/30 backdrop-blur-lg px-3 py-1 rounded-lg shadow-lg border border-gray-400/30 hover:bg-gray-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-gray-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 text-sm font-medium"
+                class="glass-card bg-gray-500/30 backdrop-blur-lg px-3 py-1 rounded-lg shadow-lg border border-gray-400/30 hover:bg-gray-500/40 transition-all duration-300 focus:outline-hidden focus:ring-2 focus:ring-gray-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 text-sm font-medium"
                 >
                 Deselect All
               </button>
@@ -407,7 +407,7 @@
 									isDownloading ||
 									isUploading
 								"
-                  class="glass-card bg-green-500/30 backdrop-blur-lg px-3 py-1 rounded-lg shadow-lg border border-green-400/30 hover:bg-green-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-green-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-green-700 text-sm font-medium"
+                  class="glass-card bg-green-500/30 backdrop-blur-lg px-3 py-1 rounded-lg shadow-lg border border-green-400/30 hover:bg-green-500/40 transition-all duration-300 focus:outline-hidden focus:ring-2 focus:ring-green-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-green-700 text-sm font-medium"
                   >
                   {{ isDownloading ? 'Downloading...' : 'Download Selected' }}
                 </button>
@@ -419,7 +419,7 @@
 									isDownloading ||
 									isUploading
 								"
-                  class="glass-card bg-red-500/30 backdrop-blur-lg px-3 py-1 rounded-lg shadow-lg border border-red-400/30 hover:bg-red-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-red-700 text-sm font-medium"
+                  class="glass-card bg-red-500/30 backdrop-blur-lg px-3 py-1 rounded-lg shadow-lg border border-red-400/30 hover:bg-red-500/40 transition-all duration-300 focus:outline-hidden focus:ring-2 focus:ring-red-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-red-700 text-sm font-medium"
                   >
                   {{ loading ? 'Deleting...' : 'Delete Selected' }}
                 </button>
@@ -531,7 +531,7 @@
           <div class="space-y-1">
             @for (item of directoryList; track item) {
               <div
-                class="glass-card bg-white/20 backdrop-blur-lg p-2 rounded-lg shadow-sm border border-white/20 hover:bg-white/30 transition-all duration-200 group cursor-pointer"
+                class="glass-card bg-white/20 backdrop-blur-lg p-2 rounded-lg shadow-xs border border-white/20 hover:bg-white/30 transition-all duration-200 group cursor-pointer"
                 (click)="handleItemClick(item)"
                 (dblclick)="handleItemDoubleClick(item)"
                 >
@@ -543,11 +543,11 @@
                       [checked]="isItemSelected(item)"
                       (change)="toggleItemSelection(item)"
                       (click)="$event.stopPropagation()"
-                      class="w-4 h-4 text-bright-teal bg-white/50 border-gray-300 rounded focus:ring-bright-teal focus:ring-2"
+                      class="w-4 h-4 text-bright-teal bg-white/50 border-gray-300 rounded-sm focus:ring-bright-teal focus:ring-2"
                       />
                   }
                   <!-- File/Directory Icon -->
-                  <div class="flex-shrink-0">
+                  <div class="shrink-0">
                     @if (item.type === 'directory') {
                       <svg
                         class="w-5 h-5 text-blue-500"
@@ -602,7 +602,7 @@
                   <!-- Action indicator for directories -->
                   @if (!isSelectionMode && item.type === 'directory') {
                     <div
-                      class="flex-shrink-0"
+                      class="shrink-0"
                       >
                       <svg
                         class="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors"
@@ -654,7 +654,7 @@
 <!-- Warning State -->
 @if (warning) {
   <div
-    class="absolute bottom-4 left-4 right-4 p-4 bg-yellow-50/50 backdrop-blur border border-yellow-200/30 rounded-lg"
+    class="absolute bottom-4 left-4 right-4 p-4 bg-yellow-50/50 backdrop-blur-sm border border-yellow-200/30 rounded-lg"
     >
     <div class="flex items-center space-x-3">
       <svg
@@ -681,7 +681,7 @@
 <!-- Confirmation Dialog -->
 @if (showConfirmPopup) {
   <div
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs"
     (click)="hideConfirmation()"
     >
     <div
@@ -711,13 +711,13 @@
         <div class="flex items-center justify-center space-x-3">
           <button
             (click)="hideConfirmation()"
-            class="glass-card bg-gray-500/30 backdrop-blur-lg px-6 py-2 rounded-lg shadow-lg border border-gray-400/30 hover:bg-gray-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-gray-400/50 text-gray-700 font-medium"
+            class="glass-card bg-gray-500/30 backdrop-blur-lg px-6 py-2 rounded-lg shadow-lg border border-gray-400/30 hover:bg-gray-500/40 transition-all duration-300 focus:outline-hidden focus:ring-2 focus:ring-gray-400/50 text-gray-700 font-medium"
             >
             Cancel
           </button>
           <button
             (click)="confirmAndExecute()"
-            class="glass-card bg-red-500/30 backdrop-blur-lg px-6 py-2 rounded-lg shadow-lg border border-red-400/30 hover:bg-red-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-400/50 text-red-700 font-medium"
+            class="glass-card bg-red-500/30 backdrop-blur-lg px-6 py-2 rounded-lg shadow-lg border border-red-400/30 hover:bg-red-500/40 transition-all duration-300 focus:outline-hidden focus:ring-2 focus:ring-red-400/50 text-red-700 font-medium"
             >
             Delete
           </button>

@@ -1,14 +1,14 @@
 <div class="min-h-screen glassmorphism-bg relative overflow-hidden">
 	<!-- Floating Abstract Elements -->
 	<div
-		class="absolute top-20 left-20 w-32 h-32 bg-gradient-to-br from-blue-400/20 to-teal-400/20 rounded-full blur-xl animate-pulse"
+		class="absolute top-20 left-20 w-32 h-32 bg-linear-to-br from-blue-400/20 to-teal-400/20 rounded-full blur-xl animate-pulse"
 	></div>
 	<div
-		class="absolute bottom-20 right-20 w-48 h-48 bg-gradient-to-br from-teal-400/20 to-blue-600/20 rounded-full blur-2xl animate-pulse"
+		class="absolute bottom-20 right-20 w-48 h-48 bg-linear-to-br from-teal-400/20 to-blue-600/20 rounded-full blur-2xl animate-pulse"
 		style="animation-delay: 2s"
 	></div>
 	<div
-		class="absolute top-1/2 left-10 w-24 h-24 bg-gradient-to-br from-blue-600/20 to-teal-500/20 rounded-full blur-lg animate-pulse"
+		class="absolute top-1/2 left-10 w-24 h-24 bg-linear-to-br from-blue-600/20 to-teal-500/20 rounded-full blur-lg animate-pulse"
 		style="animation-delay: 4s"
 	></div>
 
@@ -18,7 +18,7 @@
 			<!-- Logo and Title -->
 			<div class="flex items-center space-x-3">
 				<div
-					class="w-12 h-12 bg-gradient-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center p-2 shadow-lg"
+					class="w-12 h-12 bg-linear-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center p-2 shadow-lg"
 				>
 					<img
 						src="icon.svg"
@@ -37,7 +37,7 @@
 			<!-- Back Button -->
 			<button
 				(click)="goBackToDashboard()"
-				class="glass-card bg-white/30 backdrop-blur-lg px-4 py-2 rounded-lg shadow-lg border border-white/20 hover:bg-white/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-bright-teal/50 text-gray-700 font-medium"
+				class="glass-card bg-white/30 backdrop-blur-lg px-4 py-2 rounded-lg shadow-lg border border-white/20 hover:bg-white/40 transition-all duration-300 focus:outline-hidden focus:ring-2 focus:ring-bright-teal/50 text-gray-700 font-medium"
 			>
 				← Back to Dashboard
 			</button>
@@ -53,7 +53,7 @@
 			>
 				<h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
 					<span
-						class="w-8 h-8 bg-gradient-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center text-white font-bold text-sm mr-3"
+						class="w-8 h-8 bg-linear-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center text-white font-bold text-sm mr-3"
 						>1</span
 					>
 					Install the Storage Client (Requires Rust Compiler)
@@ -65,7 +65,7 @@
 							Linux/macOS Installation
 						</h3>
 						<div
-							class="glass-card bg-white/20 backdrop-blur p-4 rounded-lg border border-white/20"
+							class="glass-card bg-white/20 backdrop-blur-sm p-4 rounded-lg border border-white/20"
 						>
 							<pre
 								class="text-sm text-gray-700 overflow-x-auto"
@@ -96,12 +96,12 @@ source ~/.cargo/env
 							What the installer will ask for:
 						</h3>
 						<div
-							class="glass-card bg-white/20 backdrop-blur p-4 rounded-lg border border-white/20"
+							class="glass-card bg-white/20 backdrop-blur-sm p-4 rounded-lg border border-white/20"
 						>
 							<ul class="space-y-3 text-gray-700">
 								<li class="flex items-start">
 									<span
-										class="w-2 h-2 bg-bright-teal rounded-full mt-2 mr-3 flex-shrink-0"
+										class="w-2 h-2 bg-bright-teal rounded-full mt-2 mr-3 shrink-0"
 									></span>
 									<div>
 										<strong class="text-deep-blue">Node ID:</strong> From your
@@ -110,7 +110,7 @@ source ~/.cargo/env
 								</li>
 								<li class="flex items-start">
 									<span
-										class="w-2 h-2 bg-bright-teal rounded-full mt-2 mr-3 flex-shrink-0"
+										class="w-2 h-2 bg-bright-teal rounded-full mt-2 mr-3 shrink-0"
 									></span>
 									<div>
 										<strong class="text-deep-blue">Auth Token:</strong> From
@@ -119,7 +119,7 @@ source ~/.cargo/env
 								</li>
 								<li class="flex items-start">
 									<span
-										class="w-2 h-2 bg-bright-teal rounded-full mt-2 mr-3 flex-shrink-0"
+										class="w-2 h-2 bg-bright-teal rounded-full mt-2 mr-3 shrink-0"
 									></span>
 									<div>
 										<strong class="text-deep-blue">Storage Path:</strong> Where
@@ -128,7 +128,7 @@ source ~/.cargo/env
 								</li>
 								<li class="flex items-start">
 									<span
-										class="w-2 h-2 bg-bright-teal rounded-full mt-2 mr-3 flex-shrink-0"
+										class="w-2 h-2 bg-bright-teal rounded-full mt-2 mr-3 shrink-0"
 									></span>
 									<div>
 										<strong class="text-deep-blue">Storage Size:</strong>
@@ -137,7 +137,7 @@ source ~/.cargo/env
 								</li>
 								<li class="flex items-start">
 									<span
-										class="w-2 h-2 bg-bright-teal rounded-full mt-2 mr-3 flex-shrink-0"
+										class="w-2 h-2 bg-bright-teal rounded-full mt-2 mr-3 shrink-0"
 									></span>
 									<div>
 										<strong class="text-deep-blue">WebSocket URL:</strong> URL
@@ -147,7 +147,7 @@ source ~/.cargo/env
 								</li>
 								<li class="flex items-start">
 									<span
-										class="w-2 h-2 bg-bright-teal rounded-full mt-2 mr-3 flex-shrink-0"
+										class="w-2 h-2 bg-bright-teal rounded-full mt-2 mr-3 shrink-0"
 									></span>
 									<div>
 										<strong class="text-deep-blue">Systemd Setup:</strong>
@@ -166,7 +166,7 @@ source ~/.cargo/env
 			>
 				<h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
 					<span
-						class="w-8 h-8 bg-gradient-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center text-white font-bold text-sm mr-3"
+						class="w-8 h-8 bg-linear-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center text-white font-bold text-sm mr-3"
 						>2</span
 					>
 					Verify Installation
@@ -185,7 +185,7 @@ source ~/.cargo/env
 							Manual Commands (if not using systemd)
 						</h3>
 						<div
-							class="glass-card bg-white/20 backdrop-blur p-4 rounded-lg border border-white/20"
+							class="glass-card bg-white/20 backdrop-blur-sm p-4 rounded-lg border border-white/20"
 						>
 							<pre
 								class="text-sm text-gray-700 overflow-x-auto"
@@ -205,7 +205,7 @@ yourcloud_client --help</code></pre>
 							Systemd Commands (if using systemd service)
 						</h3>
 						<div
-							class="glass-card bg-white/20 backdrop-blur p-4 rounded-lg border border-white/20"
+							class="glass-card bg-white/20 backdrop-blur-sm p-4 rounded-lg border border-white/20"
 						>
 							<pre
 								class="text-sm text-gray-700 overflow-x-auto"
@@ -226,7 +226,7 @@ sudo systemctl stop yourcloud-storage</code></pre>
 			>
 				<h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
 					<span
-						class="w-8 h-8 bg-gradient-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center text-white font-bold text-sm mr-3"
+						class="w-8 h-8 bg-linear-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center text-white font-bold text-sm mr-3"
 						>3</span
 					>
 					Verify Connection
@@ -242,12 +242,12 @@ sudo systemctl stop yourcloud-storage</code></pre>
 				<div>
 					<h3 class="text-xl font-semibold text-gray-700 mb-4">Troubleshooting</h3>
 					<div
-						class="glass-card bg-white/20 backdrop-blur p-4 rounded-lg border border-white/20"
+						class="glass-card bg-white/20 backdrop-blur-sm p-4 rounded-lg border border-white/20"
 					>
 						<ul class="space-y-3 text-gray-700">
 							<li class="flex items-start">
 								<span
-									class="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 flex-shrink-0"
+									class="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 shrink-0"
 								></span>
 								<span
 									>Ensure your firewall allows connections on the configured
@@ -256,7 +256,7 @@ sudo systemctl stop yourcloud-storage</code></pre>
 							</li>
 							<li class="flex items-start">
 								<span
-									class="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 flex-shrink-0"
+									class="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 shrink-0"
 								></span>
 								<span
 									>Check that the storage path exists and has proper
@@ -265,7 +265,7 @@ sudo systemctl stop yourcloud-storage</code></pre>
 							</li>
 							<li class="flex items-start">
 								<span
-									class="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 flex-shrink-0"
+									class="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 shrink-0"
 								></span>
 								<span
 									>Verify your Node ID and Auth Token are correctly entered</span
@@ -273,24 +273,24 @@ sudo systemctl stop yourcloud-storage</code></pre>
 							</li>
 							<li class="flex items-start">
 								<span
-									class="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 flex-shrink-0"
+									class="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 shrink-0"
 								></span>
 								<span>Check the logs for any error messages</span>
 							</li>
 							<li class="flex items-start">
 								<span
-									class="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 flex-shrink-0"
+									class="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 shrink-0"
 								></span>
 								<div>
 									If using systemd:
-									<code class="bg-gray-200/50 px-2 py-1 rounded text-xs"
+									<code class="bg-gray-200/50 px-2 py-1 rounded-sm text-xs"
 										>sudo journalctl -u yourcloud-storage -f</code
 									>
 								</div>
 							</li>
 							<li class="flex items-start">
 								<span
-									class="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 flex-shrink-0"
+									class="w-2 h-2 bg-red-400 rounded-full mt-2 mr-3 shrink-0"
 								></span>
 								<span
 									>If running manually: Check the terminal output for errors</span
@@ -307,7 +307,7 @@ sudo systemctl stop yourcloud-storage</code></pre>
 			>
 				<h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center">
 					<span
-						class="w-8 h-8 bg-gradient-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center text-white font-bold text-sm mr-3"
+						class="w-8 h-8 bg-linear-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center text-white font-bold text-sm mr-3"
 						>ℹ</span
 					>
 					Additional Information
@@ -317,13 +317,13 @@ sudo systemctl stop yourcloud-storage</code></pre>
 					<div>
 						<h3 class="text-xl font-semibold text-gray-700 mb-4">Configuration File</h3>
 						<div
-							class="glass-card bg-white/20 backdrop-blur p-4 rounded-lg border border-white/20"
+							class="glass-card bg-white/20 backdrop-blur-sm p-4 rounded-lg border border-white/20"
 						>
 							<p class="text-gray-700 mb-2">
 								Your configuration is automatically saved to:
 							</p>
 							<code
-								class="bg-gray-200/50 px-3 py-2 rounded text-sm text-gray-800 block"
+								class="bg-gray-200/50 px-3 py-2 rounded-sm text-sm text-gray-800 block"
 								>~/.config/Project_YourCloud/config.toml</code
 							>
 							<p class="text-gray-700 mt-2">
@@ -337,7 +337,7 @@ sudo systemctl stop yourcloud-storage</code></pre>
 							Systemd Service Management
 						</h3>
 						<div
-							class="glass-card bg-white/20 backdrop-blur p-4 rounded-lg border border-white/20"
+							class="glass-card bg-white/20 backdrop-blur-sm p-4 rounded-lg border border-white/20"
 						>
 							<pre
 								class="text-sm text-gray-700 overflow-x-auto"
@@ -365,7 +365,7 @@ sudo journalctl -u yourcloud-storage -f</code></pre>
 		<div class="max-w-6xl mx-auto mt-8 text-center">
 			<button
 				(click)="goBackToDashboard()"
-				class="glass-card bg-gradient-to-r from-deep-blue to-bright-teal text-white px-8 py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-bright-teal/50 font-medium"
+				class="glass-card bg-linear-to-r from-deep-blue to-bright-teal text-white px-8 py-3 rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 focus:outline-hidden focus:ring-2 focus:ring-bright-teal/50 font-medium"
 			>
 				Return to Dashboard
 			</button>

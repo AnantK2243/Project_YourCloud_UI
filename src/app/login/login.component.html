@@ -3,14 +3,14 @@
   >
   <!-- Floating Abstract Elements -->
   <div
-    class="absolute top-20 left-20 w-32 h-32 bg-gradient-to-br from-blue-400/20 to-teal-400/20 rounded-full blur-xl animate-pulse"
+    class="absolute top-20 left-20 w-32 h-32 bg-linear-to-br from-blue-400/20 to-teal-400/20 rounded-full blur-xl animate-pulse"
   ></div>
   <div
-    class="absolute bottom-20 right-20 w-48 h-48 bg-gradient-to-br from-teal-400/20 to-blue-600/20 rounded-full blur-2xl animate-pulse"
+    class="absolute bottom-20 right-20 w-48 h-48 bg-linear-to-br from-teal-400/20 to-blue-600/20 rounded-full blur-2xl animate-pulse"
     style="animation-delay: 2s"
   ></div>
   <div
-    class="absolute top-1/2 left-10 w-24 h-24 bg-gradient-to-br from-blue-600/20 to-teal-500/20 rounded-full blur-lg animate-pulse"
+    class="absolute top-1/2 left-10 w-24 h-24 bg-linear-to-br from-blue-600/20 to-teal-500/20 rounded-full blur-lg animate-pulse"
     style="animation-delay: 4s"
   ></div>
 
@@ -22,7 +22,7 @@
     <div class="text-center mb-8">
       <div class="mb-4">
         <div
-          class="w-16 h-16 mx-auto bg-gradient-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center p-2 shadow-lg"
+          class="w-16 h-16 mx-auto bg-linear-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center p-2 shadow-lg"
           >
           <img
             src="icon.svg"
@@ -38,21 +38,21 @@
     <!-- Messages -->
     @if (infoMessage) {
       <div
-        class="mb-4 p-3 rounded-lg bg-blue-50/50 backdrop-blur border border-blue-200/30"
+        class="mb-4 p-3 rounded-lg bg-blue-50/50 backdrop-blur-sm border border-blue-200/30"
         >
         <p class="text-blue-700 text-sm">{{ infoMessage }}</p>
       </div>
     }
     @if (successMessage) {
       <div
-        class="mb-4 p-3 rounded-lg bg-green-50/50 backdrop-blur border border-green-200/30"
+        class="mb-4 p-3 rounded-lg bg-green-50/50 backdrop-blur-sm border border-green-200/30"
         >
         <p class="text-green-700 text-sm">{{ successMessage }}</p>
       </div>
     }
     @if (errorMessage) {
       <div
-        class="mb-4 p-3 rounded-lg bg-red-50/50 backdrop-blur border border-red-200/30"
+        class="mb-4 p-3 rounded-lg bg-red-50/50 backdrop-blur-sm border border-red-200/30"
         >
         <p class="text-red-700 text-sm">{{ errorMessage }}</p>
       </div>
@@ -71,7 +71,7 @@
           (input)="onFieldChange('email', email)"
           (blur)="onFieldBlur('email')"
 					[class]="
-						'glass-input w-full px-4 py-3 rounded-lg bg-white/20 backdrop-blur border transition-all duration-300 placeholder-gray-500 text-gray-800 focus:outline-none focus:ring-2 focus:ring-bright-teal/50 ' +
+						'glass-input w-full px-4 py-3 rounded-lg bg-white/20 backdrop-blur-sm border transition-all duration-300 placeholder-gray-500 text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-bright-teal/50 ' +
 						getFieldClass('email')
 					"
           required
@@ -81,7 +81,7 @@
           <div class="space-y-1">
             @for (error of getFieldErrors('email'); track error) {
               <div
-                class="text-red-600 text-xs bg-red-50/50 backdrop-blur px-2 py-1 rounded"
+                class="text-red-600 text-xs bg-red-50/50 backdrop-blur-sm px-2 py-1 rounded-sm"
                 >
                 {{ error }}
               </div>
@@ -104,7 +104,7 @@
             (input)="onFieldChange('password', password)"
             (blur)="onFieldBlur('password')"
 					[class]="
-						'glass-input w-full px-4 py-3 rounded-lg bg-white/20 backdrop-blur border transition-all duration-300 placeholder-gray-500 text-gray-800 focus:outline-none focus:ring-2 focus:ring-bright-teal/50 ' +
+						'glass-input w-full px-4 py-3 rounded-lg bg-white/20 backdrop-blur-sm border transition-all duration-300 placeholder-gray-500 text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-bright-teal/50 ' +
 						getFieldClass('password')
 					"
             required
@@ -114,7 +114,7 @@
             <div class="space-y-1">
               @for (error of getFieldErrors('password'); track error) {
                 <div
-                  class="text-red-600 text-xs bg-red-50/50 backdrop-blur px-2 py-1 rounded"
+                  class="text-red-600 text-xs bg-red-50/50 backdrop-blur-sm px-2 py-1 rounded-sm"
                   >
                   {{ error }}
                 </div>
@@ -128,7 +128,7 @@
           <button
             type="submit"
             [disabled]="isSubmitting || !isFormValid()"
-            class="w-full py-3 px-4 bg-blue-600/50 hover:bg-blue-600/70 disabled:bg-gray-400/50 backdrop-blur text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-blue-400/50 disabled:cursor-not-allowed disabled:transform-none"
+            class="w-full py-3 px-4 bg-blue-600/50 hover:bg-blue-600/70 disabled:bg-gray-400/50 backdrop-blur-sm text-white font-semibold rounded-lg transition-all duration-300 transform hover:scale-[1.02] focus:outline-hidden focus:ring-2 focus:ring-blue-400/50 disabled:cursor-not-allowed disabled:transform-none"
             >
             @if (isSubmitting) {
               <span class="flex items-center justify-center">
@@ -167,7 +167,7 @@
         <button
           type="button"
           (click)="goToRegister()"
-          class="inline-flex items-center gap-2 px-4 py-2 text-gray-700 bg-white/20 backdrop-blur border border-white/30 rounded-lg text-sm transition-all duration-300 hover:bg-white/30 hover:border-white/50 hover:text-gray-800 focus:outline-none focus:ring-2 focus:ring-bright-teal/50"
+          class="inline-flex items-center gap-2 px-4 py-2 text-gray-700 bg-white/20 backdrop-blur-sm border border-white/30 rounded-lg text-sm transition-all duration-300 hover:bg-white/30 hover:border-white/50 hover:text-gray-800 focus:outline-hidden focus:ring-2 focus:ring-bright-teal/50"
           >
           <svg
             class="w-4 h-4"

@@ -10,21 +10,14 @@ module.exports = {
 		'!src/**/*.test.js',
 		'!**/node_modules/**',
 		'!coverage/**',
-		'!dist/**'
+		'!dist/**',
+		'!src/app/**' // exclude Angular frontend
 	],
-	coverageDirectory: 'coverage',
+	coverageDirectory: 'coverage/backend',
 	coverageReporters: ['text', 'lcov', 'html'],
-	// coverageThreshold: {
-	// 	global: {
-	// 		branches: 40,
-	// 		functions: 40,
-	// 		lines: 40,
-	// 		statements: 40
-	// 	}
-	// },
 	clearMocks: true,
 	restoreMocks: true,
 	detectOpenHandles: true,
 	forceExit: true,
-	maxWorkers: 1 // Helps with database connections in tests
+	maxWorkers: 1
 };

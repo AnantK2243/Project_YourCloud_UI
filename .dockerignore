@@ -5,6 +5,7 @@ yarn-error.log*
 .npm
 .yarn
 
+# Build outputs and caches
 dist/
 .angular/
 coverage/
@@ -12,6 +13,7 @@ out-tsc/
 tmp/
 bazel-out/
 
+# Editors & OS
 .vscode/
 .idea/
 *.swp
@@ -30,12 +32,28 @@ Thumbs.db
 .git/
 .gitignore
 
+# Docker files
 Dockerfile*
 docker-compose*.yml
 .dockerignore
 
+# Docs
 *.md
 !README.md
 
 logs/
 *.log
+
+# Tests and specs
+tests/
+src/**/*.spec.ts
+
+# Configs not needed at runtime
+vitest.config.*
+jest*.config.js
+.eslintrc*
+.eslint* 
+.prettier*
+
+# Env files
+.env*

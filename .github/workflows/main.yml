@@ -5,26 +5,7 @@ on:
         branches: [prod, main]
 
 jobs:
-    # Job for main branch - only build
-    build-main:
-        if: github.ref == 'refs/heads/main'
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v4
-            - name: Set up Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: 22.12.0
-                  cache: 'npm'
-            - name: Install dependencies
-              run: npm ci --no-audit --no-fund
-            - name: Build application
-              run: npm run build:prod
-
-    # Job for prod branch - full quality check + build
-    quality-check-and-build:
-        if: github.ref == 'refs/heads/prod'
+    quality-check:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout code
@@ -38,5 +19,19 @@ jobs:
               run: npm ci --no-audit --no-fund
             - name: Run quality checks
               run: npm run quality:check
-            - name: Build production application
-              run: npm run build:prod
+
+    build:
+        if: github.ref == 'refs/heads/prod'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22.12.0
+                  cache: 'npm'
+            - name: Install dependencies
+              run: npm ci --no-audit --no-fund
+            - name: Build application
+              run: npm run build:dev

@@ -136,9 +136,6 @@ describe('Server Middleware and Error Handling', () => {
 			const response = await request(app).get('/test');
 
 			expect(response.status).toBe(200);
-			// In a full server setup, you'd test for security headers like:
-			// expect(response.headers['x-content-type-options']).toBe('nosniff');
-			// expect(response.headers['x-frame-options']).toBe('DENY');
 		});
 	});
 

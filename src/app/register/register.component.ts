@@ -4,7 +4,7 @@ import { Component, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from '../auth.service';
 import { ValidationService, FormErrors } from '../validation.service';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 import {
@@ -19,7 +19,7 @@ import {
 @Component({
 	selector: 'app-register',
 	standalone: true,
-	imports: [CommonModule, FormsModule],
+	imports: [FormsModule],
 	templateUrl: './register.component.html'
 })
 export class RegisterComponent implements OnDestroy {

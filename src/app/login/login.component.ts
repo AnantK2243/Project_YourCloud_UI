@@ -4,7 +4,7 @@ import { Component, Inject, PLATFORM_ID, OnInit, OnDestroy } from '@angular/core
 import { Router, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../auth.service';
 import { ValidationService, FormErrors } from '../validation.service';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 import { getFieldErrors, hasFieldError, isFormValid } from '../utils/component-utils';
@@ -12,7 +12,7 @@ import { getFieldErrors, hasFieldError, isFormValid } from '../utils/component-u
 @Component({
 	selector: 'app-login',
 	standalone: true,
-	imports: [CommonModule, FormsModule],
+	imports: [FormsModule],
 	templateUrl: './login.component.html'
 })
 export class LoginComponent implements OnInit, OnDestroy {

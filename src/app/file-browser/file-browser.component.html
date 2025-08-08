@@ -1,705 +1,729 @@
 <div
-	class="min-h-screen glassmorphism-bg relative overflow-hidden"
-	(click)="onDocumentClick($event)"
->
-	<!-- Floating Abstract Elements -->
-	<div
-		class="absolute top-20 left-20 w-32 h-32 bg-gradient-to-br from-blue-400/20 to-teal-400/20 rounded-full blur-xl animate-pulse"
-	></div>
-	<div
-		class="absolute bottom-20 right-20 w-48 h-48 bg-gradient-to-br from-teal-400/20 to-blue-600/20 rounded-full blur-2xl animate-pulse"
-		style="animation-delay: 2s"
-	></div>
-	<div
-		class="absolute top-1/2 left-10 w-24 h-24 bg-gradient-to-br from-blue-600/20 to-teal-500/20 rounded-full blur-lg animate-pulse"
-		style="animation-delay: 4s"
-	></div>
+  class="min-h-screen glassmorphism-bg relative overflow-hidden"
+  (click)="onDocumentClick($event)"
+  >
+  <!-- Floating Abstract Elements -->
+  <div
+    class="absolute top-20 left-20 w-32 h-32 bg-gradient-to-br from-blue-400/20 to-teal-400/20 rounded-full blur-xl animate-pulse"
+  ></div>
+  <div
+    class="absolute bottom-20 right-20 w-48 h-48 bg-gradient-to-br from-teal-400/20 to-blue-600/20 rounded-full blur-2xl animate-pulse"
+    style="animation-delay: 2s"
+  ></div>
+  <div
+    class="absolute top-1/2 left-10 w-24 h-24 bg-gradient-to-br from-blue-600/20 to-teal-500/20 rounded-full blur-lg animate-pulse"
+    style="animation-delay: 4s"
+  ></div>
 
-	<!-- Header with Navigation -->
-	<header class="relative z-20 p-4">
-		<div class="flex items-center justify-between">
-			<!-- Back to Dashboard Button -->
-			<button
-				(click)="goBack()"
-				class="glass-card bg-white/30 backdrop-blur-lg p-3 rounded-lg shadow-lg border border-white/20 hover:bg-white/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-bright-teal/50 flex items-center space-x-2"
-			>
-				<svg
-					class="w-5 h-5 text-gray-700"
-					fill="none"
-					stroke="currentColor"
-					viewBox="0 0 24 24"
-				>
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M15 19l-7-7 7-7"
-					></path>
-				</svg>
-				<span class="text-gray-700 font-medium">Dashboard</span>
-			</button>
+  <!-- Header with Navigation -->
+  <header class="relative z-20 p-4">
+    <div class="flex items-center justify-between">
+      <!-- Back to Dashboard Button -->
+      <button
+        (click)="goBack()"
+        class="glass-card bg-white/30 backdrop-blur-lg p-3 rounded-lg shadow-lg border border-white/20 hover:bg-white/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-bright-teal/50 flex items-center space-x-2"
+        >
+        <svg
+          class="w-5 h-5 text-gray-700"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M15 19l-7-7 7-7"
+          ></path>
+        </svg>
+        <span class="text-gray-700 font-medium">Dashboard</span>
+      </button>
 
-			<!-- Logo and Title -->
-			<div class="flex items-center space-x-3">
-				<div
-					class="w-12 h-12 bg-gradient-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center p-2 shadow-lg"
-				>
-					<img
-						src="icon.svg"
-						alt="YourCloud Logo"
-						class="w-8 h-8 grayscale brightness-0 invert"
-					/>
-				</div>
-				<div>
-					<h1 class="text-2xl font-bold text-gray-800">{{ nodeName }}</h1>
-					<p class="text-gray-600/80 text-sm">File Browser</p>
-				</div>
-			</div>
+      <!-- Logo and Title -->
+      <div class="flex items-center space-x-3">
+        <div
+          class="w-12 h-12 bg-gradient-to-br from-deep-blue to-bright-teal rounded-full flex items-center justify-center p-2 shadow-lg"
+          >
+          <img
+            src="icon.svg"
+            alt="YourCloud Logo"
+            class="w-8 h-8 grayscale brightness-0 invert"
+            />
+        </div>
+        <div>
+          <h1 class="text-2xl font-bold text-gray-800">{{ nodeName }}</h1>
+          <p class="text-gray-600/80 text-sm">File Browser</p>
+        </div>
+      </div>
 
-			<!-- Spacer for alignment -->
-			<div class="w-24"></div>
-		</div>
-	</header>
+      <!-- Spacer for alignment -->
+      <div class="w-24"></div>
+    </div>
+  </header>
 
-	<!-- Progress Indicators -->
-	<div class="relative z-10 px-4 mb-4">
-		<!-- Upload Progress -->
-		<div
-			*ngIf="isUploading"
-			class="glass-card bg-white/30 backdrop-blur-lg p-4 rounded-lg shadow-lg border border-white/20 mb-4"
-		>
-			<div class="flex items-center space-x-3">
-				<svg
-					class="w-5 h-5 text-blue-600 animate-spin"
-					fill="none"
-					stroke="currentColor"
-					viewBox="0 0 24 24"
-				>
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-					></path>
-				</svg>
-				<div class="flex-1">
-					<p class="text-sm font-medium text-gray-700">{{ uploadStatus }}</p>
-					<div class="w-full bg-gray-200/50 rounded-full h-2 mt-1">
-						<div
-							class="bg-gradient-to-r from-blue-500 to-teal-500 h-2 rounded-full transition-all duration-300"
-							[style.width.%]="uploadProgress"
-						></div>
-					</div>
-					<p *ngIf="uploadChunksInfo" class="text-xs text-gray-600 mt-1">
-						{{ uploadChunksInfo }}
-					</p>
-				</div>
-				<span class="text-sm font-bold text-gray-700">{{ uploadProgress }}%</span>
-			</div>
-		</div>
+  <!-- Progress Indicators -->
+  <div class="relative z-10 px-4 mb-4">
+    <!-- Upload Progress -->
+    @if (isUploading) {
+      <div
+        class="glass-card bg-white/30 backdrop-blur-lg p-4 rounded-lg shadow-lg border border-white/20 mb-4"
+        >
+        <div class="flex items-center space-x-3">
+          <svg
+            class="w-5 h-5 text-blue-600 animate-spin"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            ></path>
+          </svg>
+          <div class="flex-1">
+            <p class="text-sm font-medium text-gray-700">{{ uploadStatus }}</p>
+            <div class="w-full bg-gray-200/50 rounded-full h-2 mt-1">
+              <div
+                class="bg-gradient-to-r from-blue-500 to-teal-500 h-2 rounded-full transition-all duration-300"
+                [style.width.%]="uploadProgress"
+              ></div>
+            </div>
+            @if (uploadChunksInfo) {
+              <p class="text-xs text-gray-600 mt-1">
+                {{ uploadChunksInfo }}
+              </p>
+            }
+          </div>
+          <span class="text-sm font-bold text-gray-700">{{ uploadProgress }}%</span>
+        </div>
+      </div>
+    }
 
-		<!-- Download Progress -->
-		<div
-			*ngIf="isDownloading"
-			class="glass-card bg-white/30 backdrop-blur-lg p-4 rounded-lg shadow-lg border border-white/20 mb-4"
-		>
-			<div class="flex items-center space-x-3">
-				<svg
-					class="w-5 h-5 text-green-600 animate-spin"
-					fill="none"
-					stroke="currentColor"
-					viewBox="0 0 24 24"
-				>
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						stroke-width="2"
-						d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-					></path>
-				</svg>
-				<div class="flex-1">
-					<p class="text-sm font-medium text-gray-700">{{ downloadStatus }}</p>
-					<div class="w-full bg-gray-200/50 rounded-full h-2 mt-1">
-						<div
-							class="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-300"
-							[style.width.%]="downloadProgress"
-						></div>
-					</div>
-					<p *ngIf="downloadChunksInfo" class="text-xs text-gray-600 mt-1">
-						{{ downloadChunksInfo }}
-					</p>
-				</div>
-				<span class="text-sm font-bold text-gray-700">{{ downloadProgress }}%</span>
-			</div>
-		</div>
-	</div>
+    <!-- Download Progress -->
+    @if (isDownloading) {
+      <div
+        class="glass-card bg-white/30 backdrop-blur-lg p-4 rounded-lg shadow-lg border border-white/20 mb-4"
+        >
+        <div class="flex items-center space-x-3">
+          <svg
+            class="w-5 h-5 text-green-600 animate-spin"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            ></path>
+          </svg>
+          <div class="flex-1">
+            <p class="text-sm font-medium text-gray-700">{{ downloadStatus }}</p>
+            <div class="w-full bg-gray-200/50 rounded-full h-2 mt-1">
+              <div
+                class="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-300"
+                [style.width.%]="downloadProgress"
+              ></div>
+            </div>
+            @if (downloadChunksInfo) {
+              <p class="text-xs text-gray-600 mt-1">
+                {{ downloadChunksInfo }}
+              </p>
+            }
+          </div>
+          <span class="text-sm font-bold text-gray-700">{{ downloadProgress }}%</span>
+        </div>
+      </div>
+    }
+  </div>
 
-	<!-- Main File Browser Container -->
-	<div class="relative z-10 px-4 pb-4 h-[calc(100vh-8rem)]">
-		<div
-			class="glass-card bg-white/30 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/20 overflow-hidden relative h-full flex flex-col"
-			style="z-index: 1"
-		>
-			<!-- File Browser Header -->
-			<div
-				class="bg-white/20 backdrop-blur-lg border-b border-white/20 p-4 relative"
-				style="z-index: 1000"
-			>
-				<div class="flex items-center justify-between">
-					<!-- Left side: Up button and path -->
-					<div class="flex items-center space-x-3">
-						<button
-							(click)="leaveDirectory()"
-							[disabled]="loading || isDownloading"
-							class="glass-card bg-white/30 backdrop-blur-lg p-2 rounded-lg shadow-lg border border-white/20 hover:bg-white/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-bright-teal/50 disabled:opacity-50 disabled:cursor-not-allowed"
-						>
-							<svg
-								class="w-5 h-5 text-gray-700"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M5 15l7-7 7 7"
-								></path>
-							</svg>
-						</button>
-						<div class="flex items-center space-x-2">
-							<svg
-								class="w-5 h-5 text-gray-600"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-5l-2-2H5a2 2 0 00-2 2z"
-								></path>
-							</svg>
-							<span class="text-gray-700 font-medium">{{ getPath() }}</span>
-						</div>
-					</div>
+  <!-- Main File Browser Container -->
+  <div class="relative z-10 px-4 pb-4 h-[calc(100vh-8rem)]">
+    <div
+      class="glass-card bg-white/30 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/20 overflow-hidden relative h-full flex flex-col"
+      style="z-index: 1"
+      >
+      <!-- File Browser Header -->
+      <div
+        class="bg-white/20 backdrop-blur-lg border-b border-white/20 p-4 relative"
+        style="z-index: 1000"
+        >
+        <div class="flex items-center justify-between">
+          <!-- Left side: Up button and path -->
+          <div class="flex items-center space-x-3">
+            <button
+              (click)="leaveDirectory()"
+              [disabled]="loading || isDownloading"
+              class="glass-card bg-white/30 backdrop-blur-lg p-2 rounded-lg shadow-lg border border-white/20 hover:bg-white/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-bright-teal/50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+              <svg
+                class="w-5 h-5 text-gray-700"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M5 15l7-7 7 7"
+                ></path>
+              </svg>
+            </button>
+            <div class="flex items-center space-x-2">
+              <svg
+                class="w-5 h-5 text-gray-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-5l-2-2H5a2 2 0 00-2 2z"
+                ></path>
+              </svg>
+              <span class="text-gray-700 font-medium">{{ getPath() }}</span>
+            </div>
+          </div>
 
-					<!-- Right side: Upload menu -->
-					<div class="relative" (click)="stopPropagation($event)">
-						<button
-							(click)="showUploadMenu = !showUploadMenu"
-							[disabled]="isUploading || isDownloading"
-							class="glass-card bg-white/30 backdrop-blur-lg px-4 py-2 rounded-lg shadow-lg border border-white/20 hover:bg-white/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-bright-teal/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-						>
-							<svg
-								class="w-5 h-5 text-gray-700"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-								></path>
-							</svg>
-							<span class="text-gray-700 font-medium">Upload</span>
-							<svg
-								class="w-4 h-4 text-gray-500 transition-transform duration-200"
-								[class.rotate-180]="showUploadMenu"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M19 9l-7 7-7-7"
-								></path>
-							</svg>
-						</button>
+          <!-- Right side: Upload menu -->
+          <div class="relative" (click)="stopPropagation($event)">
+            <button
+              (click)="showUploadMenu = !showUploadMenu"
+              [disabled]="isUploading || isDownloading"
+              class="glass-card bg-white/30 backdrop-blur-lg px-4 py-2 rounded-lg shadow-lg border border-white/20 hover:bg-white/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-bright-teal/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              >
+              <svg
+                class="w-5 h-5 text-gray-700"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                ></path>
+              </svg>
+              <span class="text-gray-700 font-medium">Upload</span>
+              <svg
+                class="w-4 h-4 text-gray-500 transition-transform duration-200"
+                [class.rotate-180]="showUploadMenu"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M19 9l-7 7-7-7"
+                ></path>
+              </svg>
+            </button>
 
-						<!-- Upload Menu Dropdown -->
-						<div
-							*ngIf="showUploadMenu"
-							class="absolute right-0 top-full mt-2 w-56 glass-card bg-white/30 backdrop-blur-lg rounded-lg shadow-xl border border-white/20"
-							style="z-index: 10000"
-						>
-							<button
-								(click)="triggerFileUpload(); showUploadMenu = false"
-								[disabled]="isUploading || isDownloading"
-								class="w-full px-4 py-3 text-left hover:bg-white/20 transition-colors flex items-center space-x-3 rounded-t-lg disabled:opacity-50 disabled:cursor-not-allowed"
-							>
-								<svg
-									class="w-5 h-5 text-gray-600"
-									fill="none"
-									stroke="currentColor"
-									viewBox="0 0 24 24"
-								>
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-									></path>
-								</svg>
-								<span class="text-gray-700 font-medium">Upload Files</span>
-							</button>
-							<button
-								(click)="triggerDirectoryUpload(); showUploadMenu = false"
-								[disabled]="isUploading || isDownloading"
-								class="w-full px-4 py-3 text-left hover:bg-white/20 transition-colors flex items-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed"
-							>
-								<svg
-									class="w-5 h-5 text-gray-600"
-									fill="none"
-									stroke="currentColor"
-									viewBox="0 0 24 24"
-								>
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-5l-2-2H5a2 2 0 00-2 2z"
-									></path>
-								</svg>
-								<span class="text-gray-700 font-medium">Upload Directory</span>
-							</button>
-							<button
-								(click)="startCreatingDirectory(); showUploadMenu = false"
-								[disabled]="isUploading || isCreatingDirectory || isDownloading"
-								class="w-full px-4 py-3 text-left hover:bg-white/20 transition-colors flex items-center space-x-3 rounded-b-lg disabled:opacity-50 disabled:cursor-not-allowed"
-							>
-								<svg
-									class="w-5 h-5 text-gray-600"
-									fill="none"
-									stroke="currentColor"
-									viewBox="0 0 24 24"
-								>
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-									></path>
-								</svg>
-								<span class="text-gray-700 font-medium">Create Directory</span>
-							</button>
-						</div>
-					</div>
-				</div>
+            <!-- Upload Menu Dropdown -->
+            @if (showUploadMenu) {
+              <div
+                class="absolute right-0 top-full mt-2 w-56 glass-card bg-white/30 backdrop-blur-lg rounded-lg shadow-xl border border-white/20"
+                style="z-index: 10000"
+                >
+                <button
+                  (click)="triggerFileUpload(); showUploadMenu = false"
+                  [disabled]="isUploading || isDownloading"
+                  class="w-full px-4 py-3 text-left hover:bg-white/20 transition-colors flex items-center space-x-3 rounded-t-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                  <svg
+                    class="w-5 h-5 text-gray-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    ></path>
+                  </svg>
+                  <span class="text-gray-700 font-medium">Upload Files</span>
+                </button>
+                <button
+                  (click)="triggerDirectoryUpload(); showUploadMenu = false"
+                  [disabled]="isUploading || isDownloading"
+                  class="w-full px-4 py-3 text-left hover:bg-white/20 transition-colors flex items-center space-x-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                  <svg
+                    class="w-5 h-5 text-gray-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-5l-2-2H5a2 2 0 00-2 2z"
+                    ></path>
+                  </svg>
+                  <span class="text-gray-700 font-medium">Upload Directory</span>
+                </button>
+                <button
+                  (click)="startCreatingDirectory(); showUploadMenu = false"
+                  [disabled]="isUploading || isCreatingDirectory || isDownloading"
+                  class="w-full px-4 py-3 text-left hover:bg-white/20 transition-colors flex items-center space-x-3 rounded-b-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                  <svg
+                    class="w-5 h-5 text-gray-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                    ></path>
+                  </svg>
+                  <span class="text-gray-700 font-medium">Create Directory</span>
+                </button>
+              </div>
+            }
+          </div>
+        </div>
 
-				<!-- Directory Creation Form -->
-				<div
-					*ngIf="isCreatingDirectory"
-					class="mt-4 p-4 bg-white/20 backdrop-blur-lg rounded-lg border border-white/20"
-				>
-					<div class="flex items-center space-x-3">
-						<svg
-							class="w-5 h-5 text-gray-600"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-5l-2-2H5a2 2 0 00-2 2z"
-							></path>
-						</svg>
-						<input
-							type="text"
-							[(ngModel)]="newDirectoryName"
-							placeholder="Enter directory name"
-							(keyup.enter)="createNewDirectory()"
-							class="flex-1 glass-input bg-white/20 backdrop-blur border border-white/30 rounded-lg px-3 py-2 text-gray-700 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-bright-teal/50"
-						/>
-						<button
-							(click)="createNewDirectory()"
-							[disabled]="loading"
-							class="glass-card bg-green-500/30 backdrop-blur-lg px-4 py-2 rounded-lg shadow-lg border border-green-400/30 hover:bg-green-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-green-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-green-700 font-medium"
-						>
-							{{ loading ? 'Creating...' : 'Create' }}
-						</button>
-						<button
-							(click)="cancelCreateDirectory()"
-							[disabled]="loading"
-							class="glass-card bg-red-500/30 backdrop-blur-lg px-4 py-2 rounded-lg shadow-lg border border-red-400/30 hover:bg-red-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-red-700 font-medium"
-						>
-							Cancel
-						</button>
-					</div>
-				</div>
+        <!-- Directory Creation Form -->
+        @if (isCreatingDirectory) {
+          <div
+            class="mt-4 p-4 bg-white/20 backdrop-blur-lg rounded-lg border border-white/20"
+            >
+            <div class="flex items-center space-x-3">
+              <svg
+                class="w-5 h-5 text-gray-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-5l-2-2H5a2 2 0 00-2 2z"
+                ></path>
+              </svg>
+              <input
+                type="text"
+                [(ngModel)]="newDirectoryName"
+                placeholder="Enter directory name"
+                (keyup.enter)="createNewDirectory()"
+                class="flex-1 glass-input bg-white/20 backdrop-blur border border-white/30 rounded-lg px-3 py-2 text-gray-700 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-bright-teal/50"
+                />
+              <button
+                (click)="createNewDirectory()"
+                [disabled]="loading"
+                class="glass-card bg-green-500/30 backdrop-blur-lg px-4 py-2 rounded-lg shadow-lg border border-green-400/30 hover:bg-green-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-green-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-green-700 font-medium"
+                >
+                {{ loading ? 'Creating...' : 'Create' }}
+              </button>
+              <button
+                (click)="cancelCreateDirectory()"
+                [disabled]="loading"
+                class="glass-card bg-red-500/30 backdrop-blur-lg px-4 py-2 rounded-lg shadow-lg border border-red-400/30 hover:bg-red-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-red-700 font-medium"
+                >
+                Cancel
+              </button>
+            </div>
+          </div>
+        }
 
-				<!-- Selection Mode Controls (only show when in selection mode) -->
-				<div
-					*ngIf="isSelectionMode && initialized && !loading"
-					class="mt-4 flex items-center justify-between"
-				>
-					<button
-						(click)="toggleSelectionMode()"
-						[disabled]="isUploading || isDownloading"
-						class="glass-card bg-red-500/30 backdrop-blur-lg px-4 py-2 rounded-lg shadow-lg border border-red-400/30 hover:bg-red-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-400/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-					>
-						<svg
-							class="w-4 h-4 text-red-700"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M6 18L18 6M6 6l12 12"
-							></path>
-						</svg>
-						<span class="text-red-700 font-medium">Exit Selection</span>
-					</button>
-
-					<div class="flex items-center space-x-3">
-						<button
-							(click)="selectAllItems()"
+        <!-- Selection Mode Controls (only show when in selection mode) -->
+        @if (isSelectionMode && initialized && !loading) {
+          <div
+            class="mt-4 flex items-center justify-between"
+            >
+            <button
+              (click)="toggleSelectionMode()"
+              [disabled]="isUploading || isDownloading"
+              class="glass-card bg-red-500/30 backdrop-blur-lg px-4 py-2 rounded-lg shadow-lg border border-red-400/30 hover:bg-red-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-400/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              >
+              <svg
+                class="w-4 h-4 text-red-700"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                ></path>
+              </svg>
+              <span class="text-red-700 font-medium">Exit Selection</span>
+            </button>
+            <div class="flex items-center space-x-3">
+              <button
+                (click)="selectAllItems()"
 							[disabled]="
 								directoryList.length === 0 ||
 								isDownloading ||
 								isUploading ||
 								loading
 							"
-							class="glass-card bg-blue-500/30 backdrop-blur-lg px-3 py-1 rounded-lg shadow-lg border border-blue-400/30 hover:bg-blue-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-blue-700 text-sm font-medium"
-						>
-							Select All
-						</button>
-						<button
-							(click)="deselectAllItems()"
+                class="glass-card bg-blue-500/30 backdrop-blur-lg px-3 py-1 rounded-lg shadow-lg border border-blue-400/30 hover:bg-blue-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-blue-700 text-sm font-medium"
+                >
+                Select All
+              </button>
+              <button
+                (click)="deselectAllItems()"
 							[disabled]="
 								selectedItems.size === 0 || isDownloading || isUploading || loading
 							"
-							class="glass-card bg-gray-500/30 backdrop-blur-lg px-3 py-1 rounded-lg shadow-lg border border-gray-400/30 hover:bg-gray-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-gray-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 text-sm font-medium"
-						>
-							Deselect All
-						</button>
-						<span
-							*ngIf="selectedItems.size > 0"
-							class="text-gray-700 font-medium text-sm"
-						>
-							{{ getSelectedCount() }} item(s) selected
-						</span>
-
-						<!-- Batch Operation Buttons (always visible but disabled when no selection) -->
-						<div class="flex items-center space-x-2">
-							<button
-								(click)="downloadSelectedItems()"
+                class="glass-card bg-gray-500/30 backdrop-blur-lg px-3 py-1 rounded-lg shadow-lg border border-gray-400/30 hover:bg-gray-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-gray-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-700 text-sm font-medium"
+                >
+                Deselect All
+              </button>
+              @if (selectedItems.size > 0) {
+                <span
+                  class="text-gray-700 font-medium text-sm"
+                  >
+                  {{ getSelectedCount() }} item(s) selected
+                </span>
+              }
+              <!-- Batch Operation Buttons (always visible but disabled when no selection) -->
+              <div class="flex items-center space-x-2">
+                <button
+                  (click)="downloadSelectedItems()"
 								[disabled]="
 									selectedItems.size === 0 ||
 									loading ||
 									isDownloading ||
 									isUploading
 								"
-								class="glass-card bg-green-500/30 backdrop-blur-lg px-3 py-1 rounded-lg shadow-lg border border-green-400/30 hover:bg-green-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-green-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-green-700 text-sm font-medium"
-							>
-								{{ isDownloading ? 'Downloading...' : 'Download Selected' }}
-							</button>
-							<button
-								(click)="deleteSelectedItems()"
+                  class="glass-card bg-green-500/30 backdrop-blur-lg px-3 py-1 rounded-lg shadow-lg border border-green-400/30 hover:bg-green-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-green-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-green-700 text-sm font-medium"
+                  >
+                  {{ isDownloading ? 'Downloading...' : 'Download Selected' }}
+                </button>
+                <button
+                  (click)="deleteSelectedItems()"
 								[disabled]="
 									selectedItems.size === 0 ||
 									loading ||
 									isDownloading ||
 									isUploading
 								"
-								class="glass-card bg-red-500/30 backdrop-blur-lg px-3 py-1 rounded-lg shadow-lg border border-red-400/30 hover:bg-red-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-red-700 text-sm font-medium"
-							>
-								{{ loading ? 'Deleting...' : 'Delete Selected' }}
-							</button>
-						</div>
-					</div>
-				</div>
-			</div>
+                  class="glass-card bg-red-500/30 backdrop-blur-lg px-3 py-1 rounded-lg shadow-lg border border-red-400/30 hover:bg-red-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-400/50 disabled:opacity-50 disabled:cursor-not-allowed text-red-700 text-sm font-medium"
+                  >
+                  {{ loading ? 'Deleting...' : 'Delete Selected' }}
+                </button>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
 
-			<!-- File Browser Content -->
-			<div class="flex-1 overflow-hidden relative" style="z-index: 1">
-				<!-- Hidden file inputs -->
-				<input
-					type="file"
-					id="fileInput"
-					#fileInput
-					multiple
-					(change)="onFilesSelected($event)"
-					style="display: none"
-					[disabled]="isUploading || isDownloading"
-				/>
-				<input
-					type="file"
-					id="directoryInput"
-					#directoryInput
-					webkitdirectory
-					(change)="onDirectorySelected($event)"
-					style="display: none"
-					[disabled]="isUploading || isDownloading"
-				/>
+      <!-- File Browser Content -->
+      <div class="flex-1 overflow-hidden relative" style="z-index: 1">
+        <!-- Hidden file inputs -->
+        <input
+          type="file"
+          id="fileInput"
+          #fileInput
+          multiple
+          (change)="onFilesSelected($event)"
+          style="display: none"
+          [disabled]="isUploading || isDownloading"
+          />
+        <input
+          type="file"
+          id="directoryInput"
+          #directoryInput
+          webkitdirectory
+          (change)="onDirectorySelected($event)"
+          style="display: none"
+          [disabled]="isUploading || isDownloading"
+          />
 
-				<!-- Loading State -->
-				<div *ngIf="loading" class="flex items-center justify-center h-full">
-					<div class="flex items-center space-x-3">
-						<svg
-							class="w-6 h-6 text-gray-600 animate-spin"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-							></path>
-						</svg>
-						<p class="text-gray-600 font-medium">Loading...</p>
-					</div>
-				</div>
+        <!-- Loading State -->
+        @if (loading) {
+          <div class="flex items-center justify-center h-full">
+            <div class="flex items-center space-x-3">
+              <svg
+                class="w-6 h-6 text-gray-600 animate-spin"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                ></path>
+              </svg>
+              <p class="text-gray-600 font-medium">Loading...</p>
+            </div>
+          </div>
+        }
 
-				<!-- Directory Content -->
-				<div *ngIf="initialized && !loading && !error" class="h-full">
-					<!-- Empty Directory -->
-					<div
-						*ngIf="directoryList.length === 0"
-						class="flex items-center justify-center h-full"
-					>
-						<div class="text-center">
-							<svg
-								class="w-16 h-16 text-gray-400 mx-auto mb-4"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-5l-2-2H5a2 2 0 00-2 2z"
-								></path>
-							</svg>
-							<p class="text-gray-500 text-lg font-medium">This directory is empty</p>
-							<p class="text-gray-400 text-sm mt-1">
-								Upload files or create directories to get started
-							</p>
-						</div>
-					</div>
-
-					<!-- File List -->
-					<div *ngIf="directoryList.length > 0" class="h-full">
-						<div
-							class="h-full p-4 overflow-y-auto custom-scrollbar"
+        <!-- Directory Content -->
+        @if (initialized && !loading && !error) {
+          <div class="h-full">
+            <!-- Empty Directory -->
+            @if (directoryList.length === 0) {
+              <div
+                class="flex items-center justify-center h-full"
+                >
+                <div class="text-center">
+                  <svg
+                    class="w-16 h-16 text-gray-400 mx-auto mb-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-5l-2-2H5a2 2 0 00-2 2z"
+                    ></path>
+                  </svg>
+                  <p class="text-gray-500 text-lg font-medium">This directory is empty</p>
+                  <p class="text-gray-400 text-sm mt-1">
+                    Upload files or create directories to get started
+                  </p>
+                </div>
+              </div>
+            }
+            <!-- File List -->
+            @if (directoryList.length > 0) {
+              <div class="h-full">
+                <div
+                  class="h-full p-4 overflow-y-auto custom-scrollbar"
 							style="
 								scrollbar-width: thin;
 								scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
 							"
-						>
-							<style>
-								.custom-scrollbar::-webkit-scrollbar {
-									width: 8px;
-								}
-								.custom-scrollbar::-webkit-scrollbar-track {
-									background: rgba(255, 255, 255, 0.1);
-									border-radius: 4px;
-								}
-								.custom-scrollbar::-webkit-scrollbar-thumb {
-									background: rgba(255, 255, 255, 0.3);
-									border-radius: 4px;
-								}
-								.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-									background: rgba(255, 255, 255, 0.4);
-								}
-							</style>
-							<div class="space-y-1">
-								<div
-									*ngFor="let item of directoryList"
-									class="glass-card bg-white/20 backdrop-blur-lg p-2 rounded-lg shadow-sm border border-white/20 hover:bg-white/30 transition-all duration-200 group cursor-pointer"
-									(click)="handleItemClick(item)"
-									(dblclick)="handleItemDoubleClick(item)"
-								>
-									<div class="flex items-center space-x-3">
-										<!-- Selection checkbox when in selection mode -->
-										<input
-											*ngIf="isSelectionMode"
-											type="checkbox"
-											[checked]="isItemSelected(item)"
-											(change)="toggleItemSelection(item)"
-											(click)="$event.stopPropagation()"
-											class="w-4 h-4 text-bright-teal bg-white/50 border-gray-300 rounded focus:ring-bright-teal focus:ring-2"
-										/>
+                  >
+                  <style>
+                    .custom-scrollbar::-webkit-scrollbar {
+                    width: 8px;
+                  }
+                  .custom-scrollbar::-webkit-scrollbar-track {
+                  background: rgba(255, 255, 255, 0.1);
+                  border-radius: 4px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb {
+                background: rgba(255, 255, 255, 0.3);
+                border-radius: 4px;
+              }
+              .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+              background: rgba(255, 255, 255, 0.4);
+            }
+          </style>
+          <div class="space-y-1">
+            @for (item of directoryList; track item) {
+              <div
+                class="glass-card bg-white/20 backdrop-blur-lg p-2 rounded-lg shadow-sm border border-white/20 hover:bg-white/30 transition-all duration-200 group cursor-pointer"
+                (click)="handleItemClick(item)"
+                (dblclick)="handleItemDoubleClick(item)"
+                >
+                <div class="flex items-center space-x-3">
+                  <!-- Selection checkbox when in selection mode -->
+                  @if (isSelectionMode) {
+                    <input
+                      type="checkbox"
+                      [checked]="isItemSelected(item)"
+                      (change)="toggleItemSelection(item)"
+                      (click)="$event.stopPropagation()"
+                      class="w-4 h-4 text-bright-teal bg-white/50 border-gray-300 rounded focus:ring-bright-teal focus:ring-2"
+                      />
+                  }
+                  <!-- File/Directory Icon -->
+                  <div class="flex-shrink-0">
+                    @if (item.type === 'directory') {
+                      <svg
+                        class="w-5 h-5 text-blue-500"
+                        fill="currentColor"
+                        viewBox="0 0 24 24"
+                        >
+                        <path
+                          d="M10 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2h-8l-2-2z"
+                          />
+                      </svg>
+                    }
+                    @if (item.type === 'file') {
+                      <svg
+                        class="w-5 h-5 text-gray-500"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        ></path>
+                      </svg>
+                    }
+                  </div>
+                  <!-- Item Details -->
+                  <div class="flex-1 min-w-0">
+                    <div class="flex items-center justify-between">
+                      <h3
+                        class="text-gray-800 font-medium truncate group-hover:text-gray-900 transition-colors text-sm"
+                        >
+                        {{ item.name }}
+                      </h3>
+                      <div
+                        class="flex items-center space-x-3 text-xs text-gray-500"
+                        >
+                        @if (item.type === 'file') {
+                          <span>{{
+                            formatFileSize(item.size)
+                          }}</span>
+                        }
+                        @if (item.type === 'file') {
+                          <span>{{
+                            formatDate(item.createdAt)
+                          }}</span>
+                        }
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Action indicator for directories -->
+                  @if (!isSelectionMode && item.type === 'directory') {
+                    <div
+                      class="flex-shrink-0"
+                      >
+                      <svg
+                        class="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                        >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M9 5l7 7-7 7"
+                        ></path>
+                      </svg>
+                    </div>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+}
 
-										<!-- File/Directory Icon -->
-										<div class="flex-shrink-0">
-											<svg
-												*ngIf="item.type === 'directory'"
-												class="w-5 h-5 text-blue-500"
-												fill="currentColor"
-												viewBox="0 0 24 24"
-											>
-												<path
-													d="M10 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2h-8l-2-2z"
-												/>
-											</svg>
-											<svg
-												*ngIf="item.type === 'file'"
-												class="w-5 h-5 text-gray-500"
-												fill="none"
-												stroke="currentColor"
-												viewBox="0 0 24 24"
-											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-												></path>
-											</svg>
-										</div>
+<!-- Error State -->
+@if (error) {
+  <div class="flex items-center justify-center h-full">
+    <div class="text-center">
+      <svg
+        class="w-16 h-16 text-red-400 mx-auto mb-4"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+        ></path>
+      </svg>
+      <p class="text-red-600 font-medium text-lg">{{ error }}</p>
+    </div>
+  </div>
+}
 
-										<!-- Item Details -->
-										<div class="flex-1 min-w-0">
-											<div class="flex items-center justify-between">
-												<h3
-													class="text-gray-800 font-medium truncate group-hover:text-gray-900 transition-colors text-sm"
-												>
-													{{ item.name }}
-												</h3>
-												<div
-													class="flex items-center space-x-3 text-xs text-gray-500"
-												>
-													<span *ngIf="item.type === 'file'">{{
-														formatFileSize(item.size)
-													}}</span>
-													<span *ngIf="item.type === 'file'">{{
-														formatDate(item.createdAt)
-													}}</span>
-												</div>
-											</div>
-										</div>
+<!-- Warning State -->
+@if (warning) {
+  <div
+    class="absolute bottom-4 left-4 right-4 p-4 bg-yellow-50/50 backdrop-blur border border-yellow-200/30 rounded-lg"
+    >
+    <div class="flex items-center space-x-3">
+      <svg
+        class="w-5 h-5 text-yellow-600"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+        ></path>
+      </svg>
+      <p class="text-yellow-700 font-medium">{{ warning }}</p>
+    </div>
+  </div>
+}
+</div>
+</div>
+</div>
 
-										<!-- Action indicator for directories -->
-										<div
-											*ngIf="!isSelectionMode && item.type === 'directory'"
-											class="flex-shrink-0"
-										>
-											<svg
-												class="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors"
-												fill="none"
-												stroke="currentColor"
-												viewBox="0 0 24 24"
-											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													stroke-width="2"
-													d="M9 5l7 7-7 7"
-												></path>
-											</svg>
-										</div>
-									</div>
-								</div>
-							</div>
-						</div>
-					</div>
-				</div>
-
-				<!-- Error State -->
-				<div *ngIf="error" class="flex items-center justify-center h-full">
-					<div class="text-center">
-						<svg
-							class="w-16 h-16 text-red-400 mx-auto mb-4"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-							></path>
-						</svg>
-						<p class="text-red-600 font-medium text-lg">{{ error }}</p>
-					</div>
-				</div>
-
-				<!-- Warning State -->
-				<div
-					*ngIf="warning"
-					class="absolute bottom-4 left-4 right-4 p-4 bg-yellow-50/50 backdrop-blur border border-yellow-200/30 rounded-lg"
-				>
-					<div class="flex items-center space-x-3">
-						<svg
-							class="w-5 h-5 text-yellow-600"
-							fill="none"
-							stroke="currentColor"
-							viewBox="0 0 24 24"
-						>
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-							></path>
-						</svg>
-						<p class="text-yellow-700 font-medium">{{ warning }}</p>
-					</div>
-				</div>
-			</div>
-		</div>
-	</div>
-
-	<!-- Confirmation Dialog -->
-	<div
-		*ngIf="showConfirmPopup"
-		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
-		(click)="hideConfirmation()"
-	>
-		<div
-			class="glass-card bg-white/30 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/20 p-6 max-w-md mx-4"
-			(click)="$event.stopPropagation()"
-		>
-			<div class="text-center">
-				<div
-					class="w-16 h-16 mx-auto mb-4 bg-red-500/20 rounded-full flex items-center justify-center"
-				>
-					<svg
-						class="w-8 h-8 text-red-600"
-						fill="none"
-						stroke="currentColor"
-						viewBox="0 0 24 24"
-					>
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-						></path>
-					</svg>
-				</div>
-				<h3 class="text-lg font-bold text-gray-800 mb-3">{{ confirmTitle }}</h3>
-				<p class="text-gray-700 mb-6 whitespace-pre-wrap">{{ confirmMessage }}</p>
-				<div class="flex items-center justify-center space-x-3">
-					<button
-						(click)="hideConfirmation()"
-						class="glass-card bg-gray-500/30 backdrop-blur-lg px-6 py-2 rounded-lg shadow-lg border border-gray-400/30 hover:bg-gray-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-gray-400/50 text-gray-700 font-medium"
-					>
-						Cancel
-					</button>
-					<button
-						(click)="confirmAndExecute()"
-						class="glass-card bg-red-500/30 backdrop-blur-lg px-6 py-2 rounded-lg shadow-lg border border-red-400/30 hover:bg-red-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-400/50 text-red-700 font-medium"
-					>
-						Delete
-					</button>
-				</div>
-			</div>
-		</div>
-	</div>
+<!-- Confirmation Dialog -->
+@if (showConfirmPopup) {
+  <div
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    (click)="hideConfirmation()"
+    >
+    <div
+      class="glass-card bg-white/30 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/20 p-6 max-w-md mx-4"
+      (click)="$event.stopPropagation()"
+      >
+      <div class="text-center">
+        <div
+          class="w-16 h-16 mx-auto mb-4 bg-red-500/20 rounded-full flex items-center justify-center"
+          >
+          <svg
+            class="w-8 h-8 text-red-600"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+            ></path>
+          </svg>
+        </div>
+        <h3 class="text-lg font-bold text-gray-800 mb-3">{{ confirmTitle }}</h3>
+        <p class="text-gray-700 mb-6 whitespace-pre-wrap">{{ confirmMessage }}</p>
+        <div class="flex items-center justify-center space-x-3">
+          <button
+            (click)="hideConfirmation()"
+            class="glass-card bg-gray-500/30 backdrop-blur-lg px-6 py-2 rounded-lg shadow-lg border border-gray-400/30 hover:bg-gray-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-gray-400/50 text-gray-700 font-medium"
+            >
+            Cancel
+          </button>
+          <button
+            (click)="confirmAndExecute()"
+            class="glass-card bg-red-500/30 backdrop-blur-lg px-6 py-2 rounded-lg shadow-lg border border-red-400/30 hover:bg-red-500/40 transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-red-400/50 text-red-700 font-medium"
+            >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}
 </div>

@@ -6,7 +6,7 @@ import { Subscription } from 'rxjs';
 import { FileService, DirectoryItem, UploadResult } from '../file.service';
 import { AuthService } from '../auth.service';
 import { SessionHandlerService } from '../session-handler.service';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { formatFileSize, formatDate } from '../utils/utils';
 import { formatBytes } from '../utils/node-utils';
@@ -24,7 +24,7 @@ interface ProgressData {
 @Component({
 	selector: 'app-file-browser',
 	standalone: true,
-	imports: [CommonModule, FormsModule],
+	imports: [FormsModule],
 	templateUrl: './file-browser.component.html'
 })
 export class FileBrowserComponent implements OnInit, OnDestroy {

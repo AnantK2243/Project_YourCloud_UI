@@ -1,5 +1,3 @@
-// src/app/routes/storage.js
-
 // Storage and Node management routes
 const express = require('express');
 const {
@@ -12,8 +10,6 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const bcrypt = require('bcryptjs');
 const { authenticateToken } = require('./auth');
 const { StorageNode, User } = require('../models/User');
-// TODO: IMPLEMENT THESE VALIDATIONS
-// const { validateNodeRegistrationInput, validateChunkId } = require('../utils/validation');
 
 const router = express.Router();
 
@@ -298,17 +294,16 @@ async function sendStorageNodeCommand(req, nodeId, command, timeout = true, comm
 				}, 30000);
 			}
 
-			ws.send(JSON.stringify(fullCommand));
-		} catch (error) {
-			if (command_id || generateCommandId.name) {
-				// Only try to delete if we successfully generated a command ID
-				try {
-					const commandId = command_id || generateCommandId(req);
+			ws.send(JSON.stringify(fullCommand), err => {
+				if (err) {
+					if (timeoutId) {
+						clearTimeout(timeoutId);
+					}
 					pendingCommands.delete(commandId);
-				} catch {
-					// Ignore errors in cleanup
+					reject(err);
 				}
-			}
+			});
+		} catch (error) {
 			reject(error);
 		}
 	});

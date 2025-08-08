@@ -22,7 +22,25 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
-      reportsDirectory: 'coverage/frontend'
+      reportsDirectory: 'coverage/frontend',
+      include: [
+        'src/app/**/*.service.ts',
+        'src/app/**/*.guard.ts',
+        'src/app/**/*.routes.ts',
+        'src/app/utils/**/*.ts'
+      ],
+      exclude: [
+        'src/app/**/*.spec.ts',
+        'src/app/**/index.ts',
+        'src/**/*.d.ts'
+      ],
+      all: false,
+      thresholds: {
+        lines: 55,
+        functions: 70,
+        branches: 60,
+        statements: 55,
+      },
     },
     environmentOptions: {
       jsdom: {

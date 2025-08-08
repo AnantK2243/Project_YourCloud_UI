@@ -72,7 +72,6 @@ const authenticateToken = async (req, res, next) => {
 		}
 
 		try {
-			// Fetch the user from database to check verification status
 			const user = await User.findById(decoded.userId);
 			if (!user) {
 				return res.status(401).json({
@@ -81,7 +80,6 @@ const authenticateToken = async (req, res, next) => {
 				});
 			}
 
-			// Check if user's email is verified
 			if (!user.isVerified) {
 				return res.status(403).json({
 					success: false,
@@ -109,7 +107,6 @@ function blacklistToken(token) {
 	try {
 		const decoded = jwt.decode(token);
 		if (decoded && decoded.exp) {
-			// Store the token until its expiration time
 			tokenBlacklist.set(token, decoded.exp * 1000);
 		}
 	} catch (error) {
@@ -124,7 +121,6 @@ router.post('/register', async (req, res) => {
 	try {
 		const { name, email, password, salt } = req.body;
 
-		// Validate input
 		const validation = validateRegistrationInput({ name, email, password, salt });
 		if (!validation.isValid) {
 			return res.status(400).json({
@@ -134,7 +130,6 @@ router.post('/register', async (req, res) => {
 			});
 		}
 
-		// Check if user already exists
 		const existingUser = await User.findOne({ email: email.toLowerCase() });
 		if (existingUser) {
 			return res.status(400).json({
@@ -143,11 +138,9 @@ router.post('/register', async (req, res) => {
 			});
 		}
 
-		// Hash password with hardcoded salt rounds for better security
 		const saltRounds = 12;
 		const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-		// Create new user with sanitized data
 		const newUser = new User({
 			name: sanitizeString(name.trim()),
 			email: email.toLowerCase().trim(),
@@ -155,12 +148,11 @@ router.post('/register', async (req, res) => {
 			salt: salt,
 			isVerified: false,
 			emailVerificationToken: crypto.randomBytes(32).toString('hex'),
-			emailVerificationExpires: Date.now() + 3600000 // Token expires in 1 hour
+			emailVerificationExpires: Date.now() + 3600000
 		});
 
 		await newUser.save();
 
-		// Send the verification email
 		try {
 			await sendVerificationEmail(newUser.email, newUser.emailVerificationToken);
 			res.status(201).json({
@@ -169,7 +161,6 @@ router.post('/register', async (req, res) => {
 			});
 		} catch (error) {
 			console.error('Failed to send verification email:', error);
-			// TODO: Fix email sending error handling
 			return res.status(500).json({
 				success: false,
 				message: 'User registered, but failed to send verification email.'
@@ -191,7 +182,6 @@ router.post('/login', async (req, res) => {
 	try {
 		const { email, password } = req.body;
 
-		// Validate input
 		const validation = validateLoginInput({ email, password });
 		if (!validation.isValid) {
 			return res.status(400).json({
@@ -201,7 +191,6 @@ router.post('/login', async (req, res) => {
 			});
 		}
 
-		// Find user by email (case insensitive)
 		const user = await User.findOne({ email: email.toLowerCase() });
 		if (!user) {
 			return res.status(400).json({
@@ -210,7 +199,6 @@ router.post('/login', async (req, res) => {
 			});
 		}
 
-		// Check password
 		const isPasswordValid = await bcrypt.compare(password, user.password);
 		if (!isPasswordValid) {
 			return res.status(400).json({
@@ -226,13 +214,12 @@ router.post('/login', async (req, res) => {
 			});
 		}
 
-		// Generate JWT token with enhanced security
 		const token = jwt.sign(
 			{
 				userId: user._id,
 				email: user.email,
 				name: user.name,
-				iat: Math.floor(Date.now() / 1000) // Issued at time
+				iat: Math.floor(Date.now() / 1000)
 			},
 			process.env.JWT_SECRET,
 			{
@@ -266,7 +253,6 @@ router.post('/login', async (req, res) => {
 
 router.get('/verify-email', async (req, res) => {
 	console.log('Email verification endpoint hit');
-	// TODO: Add redirects to proper pages
 	try {
 		const { token } = req.query;
 		if (!token) {
@@ -275,26 +261,22 @@ router.get('/verify-email', async (req, res) => {
 
 		console.log('Received verification token:', token);
 
-		// Find the user with this token and check if it's still valid
 		const user = await User.findOne({
 			emailVerificationToken: token,
-			emailVerificationExpires: { $gt: Date.now() } // Check if the token has not expired
+			emailVerificationExpires: { $gt: Date.now() }
 		});
 
 		if (!user) {
-			// TODO: Add retry with new token or delete the user option
 			return res
 				.status(400)
 				.send('Verification token is invalid or has expired. Please register again.');
 		}
 
-		// If the user is found, verify them
 		user.isVerified = true;
-		user.emailVerificationToken = undefined; // Clear the token fields
+		user.emailVerificationToken = undefined;
 		user.emailVerificationExpires = undefined;
 		await user.save();
 
-		// TODO: Edit or remove
 		res.send('Email successfully verified! You can now log in.');
 	} catch (error) {
 		res.status(500).send('An error occurred during email verification: ' + error.message);

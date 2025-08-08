@@ -5,6 +5,9 @@ FROM node:22-alpine AS builder
 ENV CI=true
 WORKDIR /app
 
+# Upgrade npm to the latest version available
+RUN npm i -g npm@latest && npm --version
+
 # Copy package files and install all dependencies
 COPY package*.json ./
 RUN npm ci --prefer-offline --no-audit --fund=false && npm cache clean --force
@@ -17,6 +20,8 @@ RUN npm run build:prod
 FROM node:22-alpine AS runtime
 
 WORKDIR /app
+
+RUN npm i -g npm@latest && npm --version
 
 # Install only production dependencies
 COPY package*.json ./

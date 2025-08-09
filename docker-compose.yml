@@ -1,8 +1,6 @@
 services:
     project-yourcloud.me:
-        build:
-            context: .
-            dockerfile: Dockerfile
+        image: ghcr.io/anantk2243/project_yourcloud_ui:latest
         container_name: project-yourcloud.me
         ports:
             - "4200:4200"
@@ -23,6 +21,16 @@ services:
         restart: unless-stopped
         depends_on:
             - project-yourcloud.me
+        networks:
+            - yourcloud-network
+
+    watchtower:
+        image: containrrr/watchtower:latest
+        container_name: watchtower
+        restart: unless-stopped
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock
+        command: --interval 300 project-yourcloud.me
         networks:
             - yourcloud-network
 

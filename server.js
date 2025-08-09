@@ -1,3 +1,9 @@
+// File: server.js - Express entrypoint: security, routes, HTTPS, WebSocket manager & graceful shutdown
+/**
+ * Application entrypoint for YourCloud server.
+ * Sets up Express, security middleware, routes, HTTPS, WebSocket manager, and graceful shutdown.
+ */
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -92,7 +98,13 @@ app.use((req, res, next) => {
 	next();
 });
 
-// Database connection
+// -----------------------------------------------------------------------------
+// Database Connection
+// -----------------------------------------------------------------------------
+/**
+ * Connect to MongoDB using MONGODB_URI.
+ * Exits process on failure.
+ */
 async function connectToDatabase() {
 	try {
 		await mongoose.connect(process.env.MONGODB_URI);
@@ -103,7 +115,9 @@ async function connectToDatabase() {
 	}
 }
 
-// Health check endpoints
+// -----------------------------------------------------------------------------
+// Health Checks
+// -----------------------------------------------------------------------------
 app.get('/api/health-check', (req, res) => {
 	const status = {
 		status: 'OK',
@@ -138,7 +152,14 @@ app.use((error, req, res, _next) => {
 	});
 });
 
-// SSL configuration
+// -----------------------------------------------------------------------------
+// SSL Configuration
+// -----------------------------------------------------------------------------
+/**
+ * Load SSL key/cert/ca from configured paths.
+ * Terminates process if files cannot be read.
+ * @returns {Object} HTTPS server SSL options.
+ */
 function getSSLOptions() {
 	const sslOptions = {};
 
@@ -160,7 +181,13 @@ function getSSLOptions() {
 	return sslOptions;
 }
 
-// Start server
+// -----------------------------------------------------------------------------
+// Server Bootstrap
+// -----------------------------------------------------------------------------
+/**
+ * Initialize database, HTTPS server, WebSocket manager and start listening.
+ * Sets up cleanup intervals and graceful shutdown handlers.
+ */
 async function startServer() {
 	try {
 		// Connect to database first
@@ -200,7 +227,7 @@ async function startServer() {
 			wsManager.handleConnection(ws, req);
 		});
 
-		// Cleanup old connection attempts every 5 minutes
+		// Cleanup old connection attempts every 5 minutes (resource control)
 		setInterval(
 			() => {
 				wsManager.cleanup();
@@ -213,7 +240,7 @@ async function startServer() {
 			console.log(`YourCloud server is running on https://0.0.0.0:${APP_PORT}`);
 		});
 
-		// Graceful shutdown
+		// Graceful shutdown (SIGTERM)
 		process.on('SIGTERM', () => {
 			console.log('SIGTERM received, shutting down gracefully');
 			server.close(() => {
@@ -222,7 +249,7 @@ async function startServer() {
 			});
 		});
 
-
+		// Graceful shutdown (SIGINT / Ctrl+C)
 		process.on('SIGINT', () => {
 			console.log('SIGINT signal received: closing HTTP server');
 			server.close(() => {
@@ -236,5 +263,7 @@ async function startServer() {
 	}
 }
 
-// Start the application
+// -----------------------------------------------------------------------------
+// Start Application
+// -----------------------------------------------------------------------------
 startServer();

@@ -1,9 +1,11 @@
-// src/app/models/User.js
+// File: src/models/User.js - Mongoose schemas/models for Users & StorageNodes
 
 // Database models
 const mongoose = require('mongoose');
 
-// Storage Node Schema
+/**
+ * StorageNode schema: tracks node status/metrics & ownership.
+ */
 const StorageNodeSchema = new mongoose.Schema({
 	node_name: String,
 	node_id: { type: String, unique: true, required: true },
@@ -16,7 +18,9 @@ const StorageNodeSchema = new mongoose.Schema({
 	owner_user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
 });
 
-// User Schema for authentication
+/**
+ * User schema: authentication credentials, verification & owned nodes.
+ */
 const UserSchema = new mongoose.Schema({
 	name: { type: String, required: true, maxlength: 50 },
 	email: {
@@ -46,7 +50,4 @@ StorageNodeSchema.index({ owner_user_id: 1 });
 const StorageNode = mongoose.model('StorageNodes', StorageNodeSchema);
 const User = mongoose.model('Users', UserSchema);
 
-module.exports = {
-	StorageNode,
-	User
-};
+module.exports = { StorageNode, User };

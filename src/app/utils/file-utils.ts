@@ -1,7 +1,8 @@
-// src/app/utils/file-utils.ts
+// File: src/app/utils/file-utils.ts - File selection, path, type and validation helpers
 
 // File download utilities
 export function downloadBlob(blob: Blob, filename: string): void {
+	// Create a temporary link to trigger a browser download
 	const url = window.URL.createObjectURL(blob);
 	const link = document.createElement('a');
 	link.href = url;
@@ -22,6 +23,7 @@ export interface FileItem {
 }
 
 export function isItemSelected(item: FileItem, selectedItems: FileItem[]): boolean {
+	// Check whether an item is in the current selection
 	return selectedItems.some(
 		selected =>
 			selected.name === item.name &&
@@ -31,6 +33,7 @@ export function isItemSelected(item: FileItem, selectedItems: FileItem[]): boole
 }
 
 export function toggleItemSelection(item: FileItem, selectedItems: FileItem[]): FileItem[] {
+	// Add or remove an item from the selection
 	const isSelected = isItemSelected(item, selectedItems);
 
 	if (isSelected) {
@@ -48,15 +51,18 @@ export function toggleItemSelection(item: FileItem, selectedItems: FileItem[]): 
 }
 
 export function selectAllItems(items: FileItem[]): FileItem[] {
+	// Return a copy selecting all items
 	return [...items];
 }
 
 export function clearSelection(): FileItem[] {
+	// Return an empty selection
 	return [];
 }
 
 // Path utilities
 export function joinPath(basePath: string, ...segments: string[]): string {
+	// Join path segments ensuring single slashes
 	const cleanBase = basePath.replace(/\/+$/, ''); // Remove trailing slashes
 	const cleanSegments = segments
 		.filter(segment => segment) // Remove empty segments
@@ -70,6 +76,7 @@ export function joinPath(basePath: string, ...segments: string[]): string {
 }
 
 export function getParentPath(path: string): string {
+	// Get parent directory path from a full path
 	if (!path || path === '/') {
 		return '/';
 	}
@@ -85,6 +92,7 @@ export function getParentPath(path: string): string {
 }
 
 export function getFileName(path: string): string {
+	// Extract the last segment (file or folder name)
 	if (!path) {
 		return '';
 	}
@@ -101,6 +109,7 @@ export function getFileName(path: string): string {
 
 // File type utilities
 export function getFileExtension(filename: string): string {
+	// Return lower‑case extension without the dot
 	const lastDotIndex = filename.lastIndexOf('.');
 	if (lastDotIndex === -1 || lastDotIndex === 0) {
 		return '';
@@ -109,24 +118,28 @@ export function getFileExtension(filename: string): string {
 }
 
 export function isImageFile(filename: string): boolean {
+	// Check if file has a common image extension
 	const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'];
 	const extension = getFileExtension(filename);
 	return imageExtensions.includes(extension);
 }
 
 export function isVideoFile(filename: string): boolean {
+	// Check if file has a common video extension
 	const videoExtensions = ['mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'mkv'];
 	const extension = getFileExtension(filename);
 	return videoExtensions.includes(extension);
 }
 
 export function isAudioFile(filename: string): boolean {
+	// Check if file has a common audio extension
 	const audioExtensions = ['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'];
 	const extension = getFileExtension(filename);
 	return audioExtensions.includes(extension);
 }
 
 export function isDocumentFile(filename: string): boolean {
+	// Check if file has a common document extension
 	const documentExtensions = ['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt'];
 	const extension = getFileExtension(filename);
 	return documentExtensions.includes(extension);
@@ -134,6 +147,7 @@ export function isDocumentFile(filename: string): boolean {
 
 // Validation utilities
 export function validateFileName(name: string): { isValid: boolean; message?: string } {
+	// Validate a file name against length, chars and reserved words
 	if (!name || name.trim() === '') {
 		return { isValid: false, message: 'File name cannot be empty' };
 	}
@@ -183,6 +197,7 @@ export function validateFileName(name: string): { isValid: boolean; message?: st
 }
 
 export function validateDirectoryName(name: string): { isValid: boolean; message?: string } {
+	// Validate a directory name (reuses file name rules)
 	if (!name || name.trim() === '') {
 		return { isValid: false, message: 'Directory name cannot be empty' };
 	}

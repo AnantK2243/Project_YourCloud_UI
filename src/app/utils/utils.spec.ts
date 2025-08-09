@@ -1,6 +1,8 @@
+// File: src/app/utils/utils.spec.ts - Tests general formatting and base64 helpers
 import { formatFileSize, formatDate, uint8ArrayToBase64, base64ToUint8Array } from './utils';
 
 describe('utils', () => {
+	// Suite: file size/date + base64 conversions
 	it('formats file sizes', () => {
 		expect(formatFileSize(undefined)).toBe('');
 		expect(formatFileSize(0)).toBe('0 Bytes');

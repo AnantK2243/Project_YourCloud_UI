@@ -1,9 +1,11 @@
+// File: src/app/crypto.service.spec.ts - Tests CryptoService key derivation, encrypt/decrypt ops
 import { TestBed } from '@angular/core/testing';
 import { CryptoService } from './crypto.service';
 
 // Note: These tests run in jsdom with WebCrypto available via setup
 
 describe('CryptoService', () => {
+	// Suite: validates primitives (salt, key, encrypt/decrypt, root chunk)
 	let service: CryptoService;
 
 	beforeEach(() => {

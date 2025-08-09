@@ -1,3 +1,4 @@
+// File: src/app/dashboard/dashboard.component.spec.ts - Tests DashboardComponent creation & service interactions
 import { DashboardComponent } from './dashboard.component';
 
 class NodeServiceStub {
@@ -22,6 +23,7 @@ class SessionHandlerServiceStub {
 }
 
 describe('DashboardComponent (unit)', () => {
+	// Suite: instantiation only; heavy logic in NodeService / AuthService
 	it('creates component', () => {
 		const comp = new DashboardComponent(
 			new NodeServiceStub() as any,

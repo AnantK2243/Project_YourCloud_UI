@@ -75,7 +75,7 @@ describe('Storage Routes', () => {
 
 			expect(response.status).toBe(400);
 			expect(response.body.success).toBe(false);
-			expect(response.body.error).toContain('node_name is required');
+			expect(response.body.message).toContain('node_name is required');
 		});
 	});
 

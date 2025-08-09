@@ -1,10 +1,15 @@
-// src/app/websocket/SecureWebSocketManager.js
+// File: src/websocket/SecureWebSocketManager.js - Secure WS manager: auth, rate limiting, command & frame handling
 
 // WebSocket security and connection management
 const WebSocket = require('ws');
 const bcrypt = require('bcryptjs');
 const { StorageNode } = require('../models/User');
 
+/**
+ * Secure WebSocket manager for storage nodes.
+ * Handles authentication, connection/state tracking, command lifecycle, and
+ * binary frame reconstruction for chunk transfers.
+ */
 class SecureWebSocketManager {
 	constructor() {
 		this.connections = new Map();
@@ -172,7 +177,18 @@ class SecureWebSocketManager {
 
 					ws.send(JSON.stringify(command));
 				} catch (error) {
-					console.error('WebSocket authentication error:', error);
+					const msg = error && error.message ? error.message : String(error);
+					// Suppress noisy log when node simply isn't registered yet
+					if (msg.includes('Storage node not found')) {
+						if (process.env.WS_DEBUG_EXPECTED === 'true') {
+							console.debug(
+								'WebSocket auth attempt for unregistered node (suppressed):',
+								msg
+							);
+						}
+					} else {
+						console.error('WebSocket authentication error:', error);
+					}
 					ws.close(1002, 'Authentication failed');
 				}
 			});

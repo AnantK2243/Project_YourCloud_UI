@@ -1,7 +1,9 @@
+// File: src/app/app.routes.spec.ts - Tests top-level route configuration and guards
 import { describe, it, expect } from 'vitest';
 import { routes } from './app.routes';
 
 describe('App Routes', () => {
+	// Suite: verifies redirects and guard presence for core routes
 	it('redirects "" to /login', () => {
 		const first = routes[0];
 		expect(first.path).toBe('');

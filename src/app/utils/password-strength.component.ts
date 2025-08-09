@@ -1,10 +1,10 @@
-// src/app/utils/password-strength.component.ts
+// File: src/app/utils/password-strength.component.ts - Simple password strength/requirements display component
 
-import { Component, Input } from "@angular/core";
-import { CommonModule } from "@angular/common";
+import { Component, Input } from '@angular/core';
+import { CommonModule } from '@angular/common';
 
 @Component({
-	selector: "app-password-strength",
+	selector: 'app-password-strength',
 	standalone: true,
 	imports: [CommonModule],
 	template: `
@@ -13,24 +13,25 @@ import { CommonModule } from "@angular/common";
 			<div *ngIf="showRequirements">
 				<div>Requirements:</div>
 				<ul>
-					<li
-						*ngFor="let req of requirements"
-						[style.color]="req.met ? 'green' : 'red'"
-					>
-						{{ req.text }} {{ req.met ? "✓" : "✗" }}
+					<li *ngFor="let req of requirements" [style.color]="req.met ? 'green' : 'red'">
+						{{ req.text }} {{ req.met ? '✓' : '✗' }}
 					</li>
 				</ul>
 			</div>
 		</div>
-	`,
+	`
 })
 export class PasswordStrengthComponent {
-	@Input() password: string = "";
+	// Password to evaluate
+	@Input() password: string = '';
+	// Toggle strength label visibility
 	@Input() showStrength: boolean = true;
+	// Toggle detailed requirements list
 	@Input() showRequirements: boolean = false;
 
-	get strength(): "weak" | "fair" | "good" | "strong" {
-		if (!this.password) return "weak";
+	get strength(): 'weak' | 'fair' | 'good' | 'strong' {
+		// Compute qualitative strength score from heuristic rules
+		if (!this.password) return 'weak';
 
 		let score = 0;
 
@@ -43,8 +44,7 @@ export class PasswordStrengthComponent {
 		if (/[a-z]/.test(this.password)) score++;
 		if (/[A-Z]/.test(this.password)) score++;
 		if (/\d/.test(this.password)) score++;
-		if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(this.password))
-			score++;
+		if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(this.password)) score++;
 
 		// Bonus for mixed case and numbers
 		if (/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(this.password)) score++;
@@ -53,40 +53,40 @@ export class PasswordStrengthComponent {
 		if (/(.)\1{2,}/.test(this.password)) score--;
 		if (/123|abc|qwe|password|admin/i.test(this.password)) score -= 2;
 
-		if (score <= 2) return "weak";
-		if (score <= 4) return "fair";
-		if (score <= 6) return "good";
-		return "strong";
+		if (score <= 2) return 'weak';
+		if (score <= 4) return 'fair';
+		if (score <= 6) return 'good';
+		return 'strong';
 	}
 
 	get strengthText(): string {
+		// Human readable strength label
 		const strengthMap = {
-			weak: "Weak",
-			fair: "Fair",
-			good: "Good",
-			strong: "Strong",
+			weak: 'Weak',
+			fair: 'Fair',
+			good: 'Good',
+			strong: 'Strong'
 		};
 		return strengthMap[this.strength];
 	}
 
 	get requirements(): { text: string; met: boolean }[] {
+		// List of requirement checks with pass/fail state
 		return [
-			{ text: "At least 8 characters", met: this.password.length >= 8 },
+			{ text: 'At least 8 characters', met: this.password.length >= 8 },
 			{
-				text: "Contains lowercase letter",
-				met: /[a-z]/.test(this.password),
+				text: 'Contains lowercase letter',
+				met: /[a-z]/.test(this.password)
 			},
 			{
-				text: "Contains uppercase letter",
-				met: /[A-Z]/.test(this.password),
+				text: 'Contains uppercase letter',
+				met: /[A-Z]/.test(this.password)
 			},
-			{ text: "Contains number", met: /\d/.test(this.password) },
+			{ text: 'Contains number', met: /\d/.test(this.password) },
 			{
-				text: "Contains special character",
-				met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(
-					this.password
-				),
-			},
+				text: 'Contains special character',
+				met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(this.password)
+			}
 		];
 	}
 }

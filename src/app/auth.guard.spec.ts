@@ -1,3 +1,4 @@
+// File: src/app/auth.guard.spec.ts - Tests AuthGuard & GuestGuard navigation logic
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
@@ -11,6 +12,7 @@ const authStub: Pick<AuthService, 'isLoggedIn'> = {
 };
 
 describe('Route Guards (integration)', () => {
+	// Suite: ensures guards allow/block & redirect correctly based on token
 	let router: Router;
 
 	beforeEach(() => {

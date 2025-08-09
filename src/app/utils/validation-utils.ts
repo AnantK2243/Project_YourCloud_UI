@@ -1,12 +1,14 @@
-// src/app/utils/validation-utils.ts
+// File: src/app/utils/validation-utils.ts - Field, credential and form validation helpers
 
 export interface ValidationResult {
+	// Basic validation result structure
 	isValid: boolean;
 	message?: string;
 }
 
 // Email validation
 export function validateEmail(email: string): ValidationResult {
+	// Validate email format, length and presence
 	if (!email || email.trim() === '') {
 		return { isValid: false, message: 'Email is required' };
 	}
@@ -28,6 +30,7 @@ export function validateEmail(email: string): ValidationResult {
 
 // Password strength validation
 export function validatePasswordStrength(password: string): ValidationResult {
+	// Enforce length, case, number and special char requirements
 	if (!password || password.trim() === '') {
 		return { isValid: false, message: 'Password is required' };
 	}
@@ -61,6 +64,7 @@ export function validatePasswordStrength(password: string): ValidationResult {
 
 // Name validation
 export function validateName(name: string): ValidationResult {
+	// Validate display name length and character set
 	if (!name || name.trim() === '') {
 		return { isValid: false, message: 'Name is required' };
 	}
@@ -85,33 +89,32 @@ export function validateName(name: string): ValidationResult {
 	return { isValid: true };
 }
 
-// Simple email validation (for cases where we just need boolean)
+// Simple email validation (boolean only)
 export function isValidEmail(email: string): boolean {
 	return validateEmail(email).isValid;
 }
 
-// Simple password validation (for cases where we just need boolean)
+// Simple password validation (boolean only)
 export function isStrongPassword(password: string): boolean {
 	return validatePasswordStrength(password).isValid;
 }
 
-// Simple name validation (for cases where we just need boolean)
+// Simple name validation (boolean only)
 export function isValidName(name: string): boolean {
 	return validateName(name).isValid;
 }
 
 // Input sanitization
 export function sanitizeInput(input: string): string {
+	// Trim, collapse spaces and cap length
 	if (!input) return '';
 
-	return input
-		.trim()
-		.replace(/\s+/g, ' ') // Replace multiple spaces with single space
-		.substring(0, 1000); // Limit length to prevent abuse
+	return input.trim().replace(/\s+/g, ' ').substring(0, 1000); // Limit length to prevent abuse
 }
 
 // Form validation for login
 export interface LoginForm {
+	// Login form shape
 	email: string;
 	password: string;
 }
@@ -120,6 +123,7 @@ export function validateLoginForm(form: LoginForm): {
 	isValid: boolean;
 	errors: { [key: string]: string[] };
 } {
+	// Validate login form returning error map
 	const errors: { [key: string]: string[] } = {};
 
 	// Validate email
@@ -141,6 +145,7 @@ export function validateLoginForm(form: LoginForm): {
 
 // Form validation for registration
 export interface RegisterForm {
+	// Registration form shape
 	name: string;
 	email: string;
 	password: string;
@@ -151,6 +156,7 @@ export function validateRegisterForm(form: RegisterForm): {
 	isValid: boolean;
 	errors: { [key: string]: string[] };
 } {
+	// Validate registration form structure and matching passwords
 	const errors: { [key: string]: string[] } = {};
 
 	// Validate name
@@ -190,6 +196,7 @@ export function getFieldValidationClass(
 	errors: { [key: string]: string[] },
 	touched: boolean
 ): string {
+	// Return CSS class based on field validation state
 	if (!touched) {
 		return 'border-white/30 focus:border-white/50';
 	}

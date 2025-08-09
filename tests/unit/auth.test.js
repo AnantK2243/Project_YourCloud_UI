@@ -87,17 +87,13 @@ describe('Auth Routes', () => {
 			await user.save();
 
 			// Then login
-			const loginData = {
-				email: 'login@example.com',
-				password: 'StrongPass123'
-			};
-
+			const loginData = { email: 'login@example.com', password: 'StrongPass123' };
 			const response = await request(app).post('/api/auth/login').send(loginData);
 
 			expect(response.status).toBe(200);
 			expect(response.body.success).toBe(true);
-			expect(response.body).toHaveProperty('token');
-			expect(response.body.user).toHaveProperty('id');
+			expect(response.body.data).toHaveProperty('token');
+			expect(response.body.data.user).toHaveProperty('id');
 		});
 
 		test('should reject login with invalid email', async () => {

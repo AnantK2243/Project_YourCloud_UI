@@ -1,3 +1,4 @@
+// File: src/app/register/register.component.spec.ts - Tests RegisterComponent creation & basic wiring
 import { RegisterComponent } from './register.component';
 import { ValidationService } from '../validation.service';
 
@@ -13,6 +14,7 @@ class RouterStub {
 }
 
 describe('RegisterComponent (unit)', () => {
+	// Suite: minimal instantiation test (logic mostly in services)
 	it('creates component', () => {
 		const comp = new RegisterComponent(
 			new AuthServiceStub() as any,

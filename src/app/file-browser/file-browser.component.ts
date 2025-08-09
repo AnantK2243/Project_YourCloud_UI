@@ -1,5 +1,6 @@
-// src/app/file-browser/file-browser.component.ts
+// File: src/app/file-browser/file-browser.component.ts - Encrypted file browser with upload/download and batch ops.
 
+/** Encrypted file browser: navigate directories, upload/download, batch ops. */
 import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Subscription } from 'rxjs';
@@ -186,54 +187,55 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 		});
 	}
 
+	/** Trigger native file picker. */
 	triggerFileUpload(): void {
 		this.fileInput.nativeElement.click();
 		this.showUploadMenu = false; // Close menu after triggering
 	}
-
+	/** Trigger native directory picker. */
 	triggerDirectoryUpload(): void {
 		this.directoryInput.nativeElement.click();
 		this.showUploadMenu = false; // Close menu after triggering
 	}
-
+	/** Toggle upload menu visibility. */
 	toggleUploadMenu(): void {
 		this.showUploadMenu = !this.showUploadMenu;
 	}
-
+	/** Close upload menu. */
 	closeUploadMenu(): void {
 		this.showUploadMenu = false;
 	}
-
+	/** Global doc click handler. */
 	onDocumentClick(event: Event): void {
 		// Close upload menu if clicking outside
 		this.showUploadMenu = false;
 	}
-
+	/** Stop click bubbling. */
 	stopPropagation(event: Event): void {
 		event.stopPropagation();
 	}
-
+	/** Begin new directory creation. */
 	startCreatingDirectory(): void {
 		this.isCreatingDirectory = true;
 		this.newDirectoryName = '';
 		this.error = '';
 	}
-
+	/** Cancel directory creation UI. */
 	cancelCreateDirectory(): void {
 		this.isCreatingDirectory = false;
 		this.newDirectoryName = '';
 	}
-
+	/** Clear error/warning messages. */
 	clearMessages(): void {
 		this.error = '';
 		this.warning = '';
 	}
-
+	/** Disable selection mode and clear selection. */
 	toggleSelectionMode(): void {
 		this.isSelectionMode = false;
 		this.selectedItems.clear();
 	}
-
+	/** Toggle selection of an item. */
 	toggleItemSelection(item: DirectoryItem): void {
 		if (this.selectedItems.has(item)) {
 			this.selectedItems.delete(item);
@@ -241,24 +243,23 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 			this.selectedItems.add(item);
 		}
 	}
-
+	/** True if item selected. */
 	isItemSelected(item: DirectoryItem): boolean {
 		return this.selectedItems.has(item);
 	}
-
+	/** Select all current items. */
 	selectAllItems(): void {
 		this.directoryList.forEach(item => this.selectedItems.add(item));
 	}
-
+	/** Clear all selections. */
 	deselectAllItems(): void {
 		this.selectedItems.clear();
 	}
-
+	/** Count of selected items. */
 	getSelectedCount(): number {
 		return this.selectedItems.size;
 	}
-
-	// Handle single click with delay to allow for double-click
+	/** Handle single click (with delay). */
 	handleItemClick(item: DirectoryItem): void {
 		// Clear any existing timeout
 		if (this.clickTimeout) {
@@ -278,8 +279,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 			this.clickTimeout = null;
 		}, this.clickDelay);
 	}
-
-	// Handle double-click to navigate into directories
+	/** Handle double click to enter directory. */
 	handleItemDoubleClick(item: DirectoryItem): void {
 		// Clear the single click timeout since this is a double click
 		if (this.clickTimeout) {
@@ -292,8 +292,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 			this.enterDirectory(item);
 		}
 	}
-
-	// Click handling methods for single/double click behavior
+	/** Wrapper for single click path. */
 	onItemSingleClick(item: DirectoryItem): void {
 		// Clear any existing timeout
 		if (this.clickTimeout) {
@@ -306,7 +305,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 			this.clickTimeout = null;
 		}, this.clickDelay);
 	}
-
+	/** Wrapper for double click path. */
 	onItemDoubleClick(item: DirectoryItem): void {
 		// Clear the single click timeout since this is a double click
 		if (this.clickTimeout) {
@@ -316,7 +315,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 
 		this.handleDoubleClick(item);
 	}
-
 	private handleSingleClick(item: DirectoryItem): void {
 		// Single click activates selection mode and selects the item
 		if (!this.isSelectionMode) {
@@ -324,7 +322,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 		}
 		this.toggleItemSelection(item);
 	}
-
 	private handleDoubleClick(item: DirectoryItem): void {
 		// Double click navigates into directories (only if not in selection mode or deactivate selection mode first)
 		if (item.type === 'directory') {
@@ -335,7 +332,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 			this.enterDirectory(item);
 		}
 	}
-
 	private handleError(error: any, defaultMessage: string): boolean {
 		// Check if this is a session/authentication error
 		if (this.sessionHandler.checkAndHandleSessionError(error)) {
@@ -345,7 +341,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 		this.error = error.message || defaultMessage;
 		return false; // Continue with normal error handling
 	}
-
 	private async executeWithErrorHandling<T>(
 		operation: () => Promise<T>,
 		errorMessage: string
@@ -365,7 +360,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 			this.loading = false;
 		}
 	}
-
+	/** Navigate back to dashboard or warn if transfers active. */
 	goBack(): void {
 		if (this.isUploading || this.isDownloading) {
 			this.showConfirmation(
@@ -377,6 +372,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 			this.router.navigate(['/dashboard']);
 		}
 	}
+	/** Current path string (truncated if long). */
 	getPath(): string {
 		const fullPath = this.directoryPath.join('/') || '/';
 
@@ -395,7 +391,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 		const truncated = [pathParts[0], '...', ...pathParts.slice(-2)].join('/');
 		return truncated;
 	}
-
+	/** Initialize filesystem for node. */
 	async initializeFileSystem() {
 		this.loading = true;
 		this.clearMessages();
@@ -432,7 +428,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 			this.directoryList = contents;
 		});
 	}
-
+	/** Handle file input change. */
 	async onFilesSelected(event: Event): Promise<void> {
 		const input = event.target as HTMLInputElement;
 		const files = input.files;
@@ -463,7 +459,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 		// Reset input regardless of result
 		input.value = '';
 	}
-
+	/** Handle directory input change. */
 	async onDirectorySelected(event: Event): Promise<void> {
 		const input = event.target as HTMLInputElement;
 		const files = input.files;
@@ -491,7 +487,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 		// Reset input regardless of result
 		input.value = '';
 	}
-
 	private async handleSingleFileUpload(file: File): Promise<UploadResult> {
 		// First, try to upload without overwrite
 		let result = await this.fileService.uploadFile(file, file.name, false);
@@ -512,7 +507,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 
 		return result;
 	}
-
 	private async handleMultipleFilesUpload(files: FileList): Promise<UploadResult> {
 		// Check for conflicts first
 		const conflicts: string[] = [];
@@ -554,7 +548,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 		// Upload with the user's choice
 		return await this.fileService.uploadMultipleFiles(files, overwriteAll);
 	}
-
 	private async getDownloadData(item: DirectoryItem): Promise<{ blob: Blob; fileName: string }> {
 		let blob: Blob;
 		let fileName: string;
@@ -575,7 +568,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 
 		return { blob, fileName };
 	}
-
 	private triggerDownload(blob: Blob, fileName: string): void {
 		const url = window.URL.createObjectURL(blob);
 		const a = document.createElement('a');
@@ -587,7 +579,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 		window.URL.revokeObjectURL(url);
 		a.remove();
 	}
-
+	/** Enter directory by item. */
 	async enterDirectory(item: DirectoryItem): Promise<void> {
 		if (item.type !== 'directory') {
 			return;
@@ -602,7 +594,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 			'Failed to enter directory'
 		);
 	}
-
+	/** Leave current directory. */
 	async leaveDirectory(): Promise<void> {
 		if (this.directoryPath.length <= 1) {
 			return;
@@ -617,7 +609,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 			'Failed to leave directory'
 		);
 	}
-
 	private async navigateDirectory(
 		serviceCall: () => Promise<{ success: boolean; message?: string }>,
 		pathUpdate: () => void,
@@ -644,7 +635,7 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 			this.loading = false;
 		}
 	}
-
+	/** Create a new subdirectory. */
 	async createNewDirectory(): Promise<void> {
 		if (!this.validateDirectoryName()) {
 			return;
@@ -663,7 +654,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 			}
 		}, 'Failed to create directory');
 	}
-
 	private validateDirectoryName(): boolean {
 		if (!this.newDirectoryName.trim()) {
 			this.warning = 'Directory name cannot be empty';
@@ -678,13 +668,11 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 
 		return true;
 	}
-
 	private resetDirectoryCreation(): void {
 		this.isCreatingDirectory = false;
 		this.newDirectoryName = '';
 	}
-
-	// Batch operations
+	/** Batch: download selected items. */
 	async downloadSelectedItems(): Promise<void> {
 		if (this.selectedItems.size === 0) {
 			this.warning = 'No items selected for download';
@@ -709,7 +697,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 			}
 		}
 	}
-
 	private async downloadMultipleItemsAsZip(): Promise<void> {
 		// Import JSZip dynamically if not already imported
 		const JSZip = (await import('jszip')).default;
@@ -765,14 +752,13 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 			totalChunks: totalItems
 		});
 	}
-
 	private updateDownloadProgress(progress: any): void {
 		this.downloadStatus = `Downloading ${progress.fileName}`;
 		this.downloadProgress = progress.progress;
 		this.isDownloading = progress.isDownloading;
 		this.downloadChunksInfo = `Items: ${progress.chunksDownloaded}/${progress.totalChunks}`;
 	}
-
+	/** Batch: delete selected items recursively. */
 	async deleteSelectedItems(): Promise<void> {
 		if (this.selectedItems.size === 0) {
 			this.warning = 'No items selected for deletion';
@@ -806,7 +792,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 			this.performDeleteSelectedItems()
 		);
 	}
-
 	private async performDeleteSelectedItems(): Promise<void> {
 		this.loading = true;
 		this.clearMessages();
@@ -864,7 +849,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 			this.loading = false;
 		}
 	}
-
 	private async performBatchDeletion(item: DirectoryItem): Promise<void> {
 		// For batch operations, always try recursive deletion without individual prompts
 		let result = await this.fileService.deleteItem(item, true);
@@ -873,7 +857,6 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 			throw new Error(result.message || 'Failed to delete item');
 		}
 	}
-
 	private validateItemForDeletion(item: DirectoryItem): boolean {
 		if (item.type === 'file' && !item.fileChunks[0]) {
 			this.error = 'Cannot delete: Invalid item (missing file chunk(s))';
@@ -885,47 +868,43 @@ export class FileBrowserComponent implements OnInit, OnDestroy {
 		}
 		return true;
 	}
-
-	// Confirmation popup methods
+	/** Show confirmation modal. */
 	showConfirmation(title: string, message: string, action: () => void): void {
 		this.confirmTitle = title;
 		this.confirmMessage = message;
 		this.confirmAction = action;
 		this.showConfirmPopup = true;
 	}
-
+	/** Hide confirmation modal. */
 	hideConfirmation(): void {
 		this.showConfirmPopup = false;
 		this.confirmTitle = '';
 		this.confirmMessage = '';
 		this.confirmAction = null;
 	}
-
+	/** Run stored confirm action. */
 	confirmAndExecute(): void {
 		if (this.confirmAction) {
 			this.confirmAction();
 		}
 		this.hideConfirmation();
 	}
-
-	// File info popup methods
+	/** Show file info popup. */
 	showFileInfo(item: DirectoryItem): void {
 		this.selectedFileInfo = item;
 		this.showFileInfoPopup = true;
 	}
-
+	/** Hide file info popup. */
 	hideFileInfo(): void {
 		this.showFileInfoPopup = false;
 		this.selectedFileInfo = null;
 	}
-
-	// Helper method to get file extension
+	/** Extract file extension. */
 	getFileExtension(filename: string): string {
 		const lastDot = filename.lastIndexOf('.');
 		return lastDot !== -1 ? filename.substring(lastDot + 1).toLowerCase() : '';
 	}
-
-	// Helper method to get file type description
+	/** Human-friendly file type text. */
 	getFileTypeDescription(item: DirectoryItem): string {
 		if (item.type === 'directory') {
 			return 'Directory';

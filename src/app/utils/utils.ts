@@ -1,6 +1,7 @@
-// src/app/utils/utils.ts
+// File: src/app/utils/utils.ts - Generic formatting and base64 helpers
 
 export function formatFileSize(size: number | undefined): string {
+	// Format bytes into human readable size (up to GB)
 	if (size === undefined) return '';
 	if (size === 0) return '0 Bytes';
 	const k = 1024;
@@ -10,11 +11,13 @@ export function formatFileSize(size: number | undefined): string {
 }
 
 export function formatDate(dateString: string | undefined): string {
+	// Convert ISO string to locale date string
 	if (!dateString) return '';
 	return new Date(dateString).toLocaleDateString();
 }
 
 export function uint8ArrayToBase64(array: Uint8Array): string {
+	// Convert Uint8Array -> base64 string
 	let binary = '';
 	for (let i = 0; i < array.byteLength; i++) {
 		binary += String.fromCharCode(array[i]);
@@ -23,6 +26,7 @@ export function uint8ArrayToBase64(array: Uint8Array): string {
 }
 
 export function base64ToUint8Array(base64: string): Uint8Array {
+	// Convert base64 string -> Uint8Array
 	const binary = atob(base64);
 	const bytes = new Uint8Array(binary.length);
 	for (let i = 0; i < binary.length; i++) {

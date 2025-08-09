@@ -1,4 +1,4 @@
-// src/app/dashboard/dashboard.component.ts
+// File: src/app/dashboard/dashboard.component.ts - User dashboard for node management & navigation.
 
 import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
 import { Router } from '@angular/router';
@@ -23,6 +23,7 @@ import { validateNodeName } from '../utils/node-utils';
 	imports: [CommonModule, FormsModule],
 	templateUrl: './dashboard.component.html'
 })
+/** User dashboard: manage storage nodes, status polling, and navigation. */
 export class DashboardComponent implements OnInit {
 	// Message state
 	messageState: MessageState = {
@@ -76,6 +77,7 @@ export class DashboardComponent implements OnInit {
 		this.stopStatusUpdateInterval();
 	}
 
+	/** Open node registration popup. */
 	showNodeRegistrationPopup() {
 		this.showRegisterPopup = true;
 		this.registerNodeName = '';
@@ -84,6 +86,7 @@ export class DashboardComponent implements OnInit {
 		this.isMenuOpen = false; // Close menu when opening popup
 	}
 
+	/** Hide node registration popup. */
 	hideNodeRegistrationPopup() {
 		this.showRegisterPopup = false;
 		this.registerNodeName = '';
@@ -91,22 +94,27 @@ export class DashboardComponent implements OnInit {
 		this.registrationResult = null;
 	}
 
+	/** Toggle hamburger menu. */
 	toggleMenu() {
 		this.isMenuOpen = !this.isMenuOpen;
 	}
 
+	/** Close hamburger menu. */
 	closeMenu() {
 		this.isMenuOpen = false;
 	}
 
+	/** Show generic confirmation dialog. */
 	showConfirmation(title: string, message: string, action: () => void) {
 		this.confirmationState = createConfirmationState(title, message, action);
 	}
 
+	/** Hide confirmation dialog. */
 	hideConfirmation() {
 		this.confirmationState = clearConfirmationState();
 	}
 
+	/** Execute stored confirm action. */
 	confirmAndExecute() {
 		if (this.confirmationState.action) {
 			this.confirmationState.action();
@@ -114,6 +122,7 @@ export class DashboardComponent implements OnInit {
 		this.hideConfirmation();
 	}
 
+	/** Start periodic node status polling. */
 	startStatusUpdateInterval() {
 		// Guard against multiple intervals
 		if (this.statusUpdateInterval) {
@@ -129,6 +138,7 @@ export class DashboardComponent implements OnInit {
 		}, this.STATUS_UPDATE_INTERVAL);
 	}
 
+	/** Stop status polling interval. */
 	stopStatusUpdateInterval() {
 		if (this.statusUpdateInterval) {
 			clearInterval(this.statusUpdateInterval);
@@ -136,6 +146,7 @@ export class DashboardComponent implements OnInit {
 		}
 	}
 
+	/** Refresh status for all nodes in background. */
 	async updateAllNodeStatuses() {
 		// Only update if we have nodes and we're not currently loading
 		if (this.userStorageNodes.length === 0 || this.loading) {
@@ -161,6 +172,7 @@ export class DashboardComponent implements OnInit {
 		}
 	}
 
+	/** Force reload of user storage node list. */
 	async refreshStorageNodes() {
 		this.loading = true;
 		this.clearMessages();
@@ -187,7 +199,7 @@ export class DashboardComponent implements OnInit {
 		}
 	}
 
-	// Register a new node
+	/** Register a new node. */
 	async registerNode() {
 		// Validate node name using utility function
 		const validation = validateNodeName(this.registerNodeName);
@@ -220,7 +232,7 @@ export class DashboardComponent implements OnInit {
 		}
 	}
 
-	// Check the status of a node
+	/** Update single node status. */
 	async checkNodeStatus(nodeId: string) {
 		this.loading = true;
 		this.clearMessages();
@@ -256,6 +268,7 @@ export class DashboardComponent implements OnInit {
 		}
 	}
 
+	/** Prompt and delete a node. */
 	async deleteNode(nodeId: string) {
 		if (!nodeId.trim()) {
 			this.messageState = setErrorMessage(
@@ -275,6 +288,7 @@ export class DashboardComponent implements OnInit {
 		);
 	}
 
+	/** Perform confirmed node deletion. */
 	async performDeleteNode(nodeId: string) {
 		this.loading = true;
 		this.clearMessages();
@@ -301,6 +315,7 @@ export class DashboardComponent implements OnInit {
 		}
 	}
 
+	/** Logout with confirmation. */
 	logout() {
 		// Show custom confirmation dialog
 		this.showConfirmation(
@@ -314,21 +329,24 @@ export class DashboardComponent implements OnInit {
 		);
 	}
 
+	/** Navigate to file browser for node. */
 	openFileBrowser(node: StorageNode) {
 		this.router.navigate(['/file-browser', node.node_id], {
 			queryParams: { nodeName: node.node_name }
 		});
 	}
 
+	/** Navigate to storage setup help. */
 	openStorageSetupInstructions() {
 		this.router.navigate(['/storage-setup-instructions']);
 	}
 
+	/** Clear current messages. */
 	clearMessages() {
 		this.messageState = clearMessageState(this.messageState);
 	}
 
-	// Getters for template compatibility
+	// Getters used in template
 	get error(): string {
 		return this.messageState.error;
 	}

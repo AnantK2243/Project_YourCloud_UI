@@ -35,7 +35,7 @@ describe('Storage Routes - Advanced Tests', () => {
 
 			expect(response.status).toBe(400);
 			expect(response.body.success).toBe(false);
-			expect(response.body.error).toContain('node_name is required');
+			expect(response.body.message).toContain('node_name is required');
 		});
 
 		test('should handle invalid user authentication', async () => {
@@ -88,11 +88,8 @@ describe('Storage Routes - Advanced Tests', () => {
 				.send(Buffer.from('test data'));
 
 			expect(response.status).toBe(503);
-			// Check for either error message format
-			expect(
-				response.body.error.includes('not connected') ||
-					response.body.error.includes('not available')
-			).toBe(true);
+			const msg = response.body.message || '';
+			expect(msg.includes('not connected') || msg.includes('not available')).toBe(true);
 		});
 
 		test('should reject chunk operations without authentication', async () => {

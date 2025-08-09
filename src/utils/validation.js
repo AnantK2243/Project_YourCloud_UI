@@ -1,8 +1,13 @@
-// src/app/utils/validation.js
+// File: src/utils/validation.js - Validation & sanitization helpers for auth, nodes & chunks
 
 // Input validation utilities
 const validator = require('validator');
 
+/**
+ * Validate registration payload.
+ * @param {{name:string,email:string,password:string,salt:string}} data
+ * @returns {{isValid:boolean, errors:string[]}}
+ */
 function validateRegistrationInput(data) {
 	const errors = [];
 
@@ -50,6 +55,11 @@ function validateRegistrationInput(data) {
 	};
 }
 
+/**
+ * Validate login payload.
+ * @param {{email:string,password:string}} data
+ * @returns {{isValid:boolean, errors:string[]}}
+ */
 function validateLoginInput(data) {
 	const errors = [];
 
@@ -75,6 +85,11 @@ function validateLoginInput(data) {
 	};
 }
 
+/**
+ * Validate storage node registration payload.
+ * @param {{node_id:string,label:string,auth_token:string}} data
+ * @returns {{isValid:boolean, errors:string[]}}
+ */
 function validateNodeRegistrationInput(data) {
 	const errors = [];
 
@@ -110,6 +125,11 @@ function validateNodeRegistrationInput(data) {
 	};
 }
 
+/**
+ * Validate a chunk identifier (expects UUID v4).
+ * @param {string} chunkId
+ * @returns {boolean}
+ */
 function validateChunkId(chunkId) {
 	if (!chunkId || typeof chunkId !== 'string') {
 		return false;
@@ -120,6 +140,11 @@ function validateChunkId(chunkId) {
 	return uuidPattern.test(chunkId);
 }
 
+/**
+ * Basic HTML/JS injection sanitization for user-provided strings.
+ * @param {string} str
+ * @returns {string}
+ */
 function sanitizeString(str) {
 	if (typeof str !== 'string' || str === null || str === undefined) {
 		return '';

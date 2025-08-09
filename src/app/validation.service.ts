@@ -1,6 +1,6 @@
-// src/app/validation.service.ts
+// File: src/app/validation.service.ts - Form and field validation helpers (email, password, names).
 
-import { Injectable } from "@angular/core";
+import { Injectable } from '@angular/core';
 
 export interface ValidationResult {
 	isValid: boolean;
@@ -12,13 +12,14 @@ export interface FormErrors {
 }
 
 @Injectable({
-	providedIn: "root",
+	providedIn: 'root'
 })
+/** Form + field validation utilities (email, password, names, forms). */
 export class ValidationService {
-	// Email validation with comprehensive checks
+	/** Validate email syntax + length. */
 	validateEmail(email: string): ValidationResult {
 		if (!email || email.trim().length === 0) {
-			return { isValid: false, message: "Email is required" };
+			return { isValid: false, message: 'Email is required' };
 		}
 
 		const trimmedEmail = email.trim();
@@ -26,7 +27,7 @@ export class ValidationService {
 		if (trimmedEmail.length > 254) {
 			return {
 				isValid: false,
-				message: "Email is too long (max 254 characters)",
+				message: 'Email is too long (max 254 characters)'
 			};
 		}
 
@@ -37,73 +38,67 @@ export class ValidationService {
 		if (!emailRegex.test(trimmedEmail)) {
 			return {
 				isValid: false,
-				message: "Please enter a valid email address",
+				message: 'Please enter a valid email address'
 			};
 		}
 
 		return { isValid: true };
 	}
 
-	// Password validation with detailed feedback
+	/** Validate password complexity & disallow weak patterns. */
 	validatePassword(password: string): ValidationResult {
 		if (!password || password.length === 0) {
-			return { isValid: false, message: "Password is required" };
+			return { isValid: false, message: 'Password is required' };
 		}
 
 		const errors: string[] = [];
 
 		if (password.length < 8) {
-			errors.push("at least 8 characters");
+			errors.push('at least 8 characters');
 		}
 
 		if (password.length > 128) {
-			errors.push("maximum 128 characters");
+			errors.push('maximum 128 characters');
 		}
 
 		if (!/(?=.*[a-z])/.test(password)) {
-			errors.push("at least one lowercase letter");
+			errors.push('at least one lowercase letter');
 		}
 
 		if (!/(?=.*[A-Z])/.test(password)) {
-			errors.push("at least one uppercase letter");
+			errors.push('at least one uppercase letter');
 		}
 
 		if (!/(?=.*\d)/.test(password)) {
-			errors.push("at least one number");
+			errors.push('at least one number');
 		}
 
 		if (!/(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?])/.test(password)) {
-			errors.push(
-				"at least one special character (!@#$%^&*()_+-=[]{};':\"\\|,.<>/?)"
-			);
+			errors.push('at least one special character (!@#$%^&*()_+-=[]{};\':"\\|,.<>/?)');
 		}
 
 		// Check for common weak patterns
 		if (/(.)\1{2,}/.test(password)) {
-			errors.push("no more than 2 consecutive identical characters");
+			errors.push('no more than 2 consecutive identical characters');
 		}
 
 		if (/123|abc|qwe|password|admin/i.test(password)) {
-			errors.push(
-				"no common weak patterns (123, abc, qwe, password, admin)"
-			);
+			errors.push('no common weak patterns (123, abc, qwe, password, admin)');
 		}
 
 		if (errors.length > 0) {
 			return {
 				isValid: false,
-				message: `Password must contain: ${errors.join(", ")}`,
+				message: `Password must contain: ${errors.join(', ')}`
 			};
 		}
 
 		return { isValid: true };
 	}
 
-	// Password strength assessment
-	assessPasswordStrength(
-		password: string
-	): "weak" | "fair" | "good" | "strong" {
-		if (!password) return "weak";
+	/** Assess password strength bucket. */
+	assessPasswordStrength(password: string): 'weak' | 'fair' | 'good' | 'strong' {
+		if (!password) return 'weak';
 
 		let score = 0;
 
@@ -125,16 +120,16 @@ export class ValidationService {
 		if (/(.)\1{2,}/.test(password)) score--;
 		if (/123|abc|qwe|password|admin/i.test(password)) score -= 2;
 
-		if (score <= 2) return "weak";
-		if (score <= 4) return "fair";
-		if (score <= 6) return "good";
-		return "strong";
+		if (score <= 2) return 'weak';
+		if (score <= 4) return 'fair';
+		if (score <= 6) return 'good';
+		return 'strong';
 	}
 
-	// Name validation
+	/** Validate display name. */
 	validateName(name: string): ValidationResult {
 		if (!name || name.trim().length === 0) {
-			return { isValid: false, message: "Name is required" };
+			return { isValid: false, message: 'Name is required' };
 		}
 
 		const trimmedName = name.trim();
@@ -142,14 +137,14 @@ export class ValidationService {
 		if (trimmedName.length < 2) {
 			return {
 				isValid: false,
-				message: "Name must be at least 2 characters long",
+				message: 'Name must be at least 2 characters long'
 			};
 		}
 
 		if (trimmedName.length > 50) {
 			return {
 				isValid: false,
-				message: "Name must be less than 50 characters",
+				message: 'Name must be less than 50 characters'
 			};
 		}
 
@@ -157,8 +152,7 @@ export class ValidationService {
 		if (!/^[a-zA-Z\s'\-\.]+$/.test(trimmedName)) {
 			return {
 				isValid: false,
-				message:
-					"Name can only contain letters, spaces, hyphens, apostrophes, and periods",
+				message: 'Name can only contain letters, spaces, hyphens, apostrophes, and periods'
 			};
 		}
 
@@ -166,38 +160,34 @@ export class ValidationService {
 		if (/\s{2,}/.test(trimmedName)) {
 			return {
 				isValid: false,
-				message: "Name cannot contain multiple consecutive spaces",
+				message: 'Name cannot contain multiple consecutive spaces'
 			};
 		}
 
 		if (/^[\s'\-\.]|[\s'\-\.]$/.test(trimmedName)) {
 			return {
 				isValid: false,
-				message:
-					"Name cannot start or end with spaces, hyphens, apostrophes, or periods",
+				message: 'Name cannot start or end with spaces, hyphens, apostrophes, or periods'
 			};
 		}
 
 		return { isValid: true };
 	}
 
-	// Password confirmation validation
-	validatePasswordConfirmation(
-		password: string,
-		confirmPassword: string
-	): ValidationResult {
+	/** Confirm password matches original. */
+	validatePasswordConfirmation(password: string, confirmPassword: string): ValidationResult {
 		if (!confirmPassword || confirmPassword.length === 0) {
-			return { isValid: false, message: "Please confirm your password" };
+			return { isValid: false, message: 'Please confirm your password' };
 		}
 
 		if (password !== confirmPassword) {
-			return { isValid: false, message: "Passwords do not match" };
+			return { isValid: false, message: 'Passwords do not match' };
 		}
 
 		return { isValid: true };
 	}
 
-	// Comprehensive form validation
+	/** Registration form validation aggregate. */
 	validateRegistrationForm(data: {
 		name: string;
 		email: string;
@@ -208,17 +198,17 @@ export class ValidationService {
 
 		const nameValidation = this.validateName(data.name);
 		if (!nameValidation.isValid) {
-			errors["name"] = [nameValidation.message!];
+			errors['name'] = [nameValidation.message!];
 		}
 
 		const emailValidation = this.validateEmail(data.email);
 		if (!emailValidation.isValid) {
-			errors["email"] = [emailValidation.message!];
+			errors['email'] = [emailValidation.message!];
 		}
 
 		const passwordValidation = this.validatePassword(data.password);
 		if (!passwordValidation.isValid) {
-			errors["password"] = [passwordValidation.message!];
+			errors['password'] = [passwordValidation.message!];
 		}
 
 		const confirmPasswordValidation = this.validatePasswordConfirmation(
@@ -226,15 +216,16 @@ export class ValidationService {
 			data.confirmPassword
 		);
 		if (!confirmPasswordValidation.isValid) {
-			errors["confirmPassword"] = [confirmPasswordValidation.message!];
+			errors['confirmPassword'] = [confirmPasswordValidation.message!];
 		}
 
 		return {
 			isValid: Object.keys(errors).length === 0,
-			errors,
+			errors
 		};
 	}
 
+	/** Login form validation aggregate. */
 	validateLoginForm(data: { email: string; password: string }): {
 		isValid: boolean;
 		errors: FormErrors;
@@ -242,43 +233,37 @@ export class ValidationService {
 		const errors: FormErrors = {};
 
 		if (!data.email || data.email.trim().length === 0) {
-			errors["email"] = ["Email is required"];
+			errors['email'] = ['Email is required'];
 		} else {
 			const emailValidation = this.validateEmail(data.email);
 			if (!emailValidation.isValid) {
-				errors["email"] = [emailValidation.message!];
+				errors['email'] = [emailValidation.message!];
 			}
 		}
 
 		if (!data.password || data.password.length === 0) {
-			errors["password"] = ["Password is required"];
+			errors['password'] = ['Password is required'];
 		}
 
 		return {
 			isValid: Object.keys(errors).length === 0,
-			errors,
+			errors
 		};
 	}
 
-	// Real-time validation for better UX
-	getFieldValidationClass(
-		fieldName: string,
-		errors: FormErrors,
-		touched: boolean
-	): string {
-		if (!touched) return "";
-		return errors[fieldName] && errors[fieldName].length > 0
-			? "invalid"
-			: "valid";
+	/** Field validity CSS class helper. */
+	getFieldValidationClass(fieldName: string, errors: FormErrors, touched: boolean): string {
+		if (!touched) return '';
+		return errors[fieldName] && errors[fieldName].length > 0 ? 'invalid' : 'valid';
 	}
 
-	// Sanitize input to prevent XSS
+	/** Basic input sanitization (defensive). */
 	sanitizeInput(input: string): string {
-		if (!input) return "";
+		if (!input) return '';
 		return input
 			.trim()
-			.replace(/[<>]/g, "") // Remove angle brackets
-			.replace(/javascript:/gi, "") // Remove javascript: protocol
-			.replace(/on\w+=/gi, ""); // Remove event handlers
+			.replace(/[<>]/g, '') // Remove angle brackets
+			.replace(/javascript:/gi, '') // Remove javascript: protocol
+			.replace(/on\w+=/gi, ''); // Remove event handlers
 	}
 }

@@ -1,3 +1,4 @@
+// File: src/app/utils/component-utils.spec.ts - Tests form/message helper utilities
 import {
 	getFieldErrors,
 	hasFieldError,
@@ -14,6 +15,7 @@ import {
 } from './component-utils';
 
 describe('component-utils', () => {
+	// Suite: validates form state helpers & message state transitions
 	describe('form helpers', () => {
 		it('getFieldErrors returns array or empty', () => {
 			const errors = { email: ['Invalid'], password: [] } as any;

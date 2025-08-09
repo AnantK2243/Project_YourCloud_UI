@@ -1,12 +1,12 @@
-// src/app/file.service.ts
+// File: src/app/file.service.ts - Encrypted virtual filesystem ops: dirs, chunked file upload/download, progress.
 
-import { Injectable } from "@angular/core";
-import { HttpClient, HttpHeaders } from "@angular/common/http";
-import { BehaviorSubject } from "rxjs";
-import { AuthService } from "./auth.service";
-import { CryptoService } from "./crypto.service";
-import { firstValueFrom } from "rxjs";
-import JSZip from "jszip";
+import { Injectable } from '@angular/core';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { BehaviorSubject } from 'rxjs';
+import { AuthService } from './auth.service';
+import { CryptoService } from './crypto.service';
+import { firstValueFrom } from 'rxjs';
+import JSZip from 'jszip';
 
 // Progress tracking interfaces
 export interface ProgressData {
@@ -46,12 +46,12 @@ export interface UploadResult {
 
 export type DirectoryItem =
 	| {
-			type: "directory";
+			type: 'directory';
 			name: string;
 			chunkId: string;
 	  }
 	| {
-			type: "file";
+			type: 'file';
 			name: string;
 			size: number;
 			createdAt: string;
@@ -59,11 +59,11 @@ export type DirectoryItem =
 	  };
 
 @Injectable({
-	providedIn: "root",
+	providedIn: 'root'
 })
+/** File service: encrypted directory + file CRUD, chunk transfer & progress tracking. */
 export class FileService {
 	private apiUrl: string;
-	private apiHeaders: HttpHeaders;
 
 	// Directory state
 	private directory = new BehaviorSubject<Directory | null>(null);
@@ -71,20 +71,20 @@ export class FileService {
 
 	// Upload progress tracking
 	private uploadProgress = new BehaviorSubject<ProgressData>({
-		fileName: "",
+		fileName: '',
 		progress: 0,
 		isUploading: false,
 		chunksUploaded: 0,
-		totalChunks: 0,
+		totalChunks: 0
 	});
 
 	// Download progress tracking
 	private downloadProgress = new BehaviorSubject<DownloadProgressData>({
-		fileName: "",
+		fileName: '',
 		progress: 0,
 		isDownloading: false,
 		chunksDownloaded: 0,
-		totalChunks: 0,
+		totalChunks: 0
 	});
 
 	private readonly CHUNK_SIZE = 64 * 1024 * 1024; // 64 MB
@@ -95,80 +95,88 @@ export class FileService {
 		private cryptoService: CryptoService
 	) {
 		this.apiUrl = this.authService.getApiUrl();
-		this.apiHeaders = this.authService.getAuthHeaders();
 	}
 
+	/** Get current directory model (null if not initialized). */
 	getCurrentDirectory(): Directory | null {
 		return this.directory.getValue();
 	}
 
+	/** Observable upload progress stream. */
 	getUploadProgress() {
 		return this.uploadProgress.asObservable();
 	}
 
+	/** Snapshot of current upload progress. */
 	getCurrentUploadProgress() {
 		return this.uploadProgress.getValue();
 	}
 
+	/** Observable download progress stream. */
 	getDownloadProgress() {
 		return this.downloadProgress.asObservable();
 	}
 
+	/** Snapshot of current download progress. */
 	getCurrentDownloadProgress() {
 		return this.downloadProgress.getValue();
 	}
 
-	// Helper methods for common operations
+	/** Ensure a storage node has been selected. */
 	private validateStorageNode(): void {
 		if (!this.storageNodeId) {
-			throw new Error("Node ID not available");
+			throw new Error('Node ID not available');
 		}
 	}
 
+	/** Ensure directory loaded and return it. */
 	private validateCurrentDirectory(): Directory {
 		const currentDirectory = this.directory.getValue();
 		if (!currentDirectory) {
-			throw new Error("Current directory is not initialized");
+			throw new Error('Current directory is not initialized');
 		}
 		return currentDirectory;
 	}
 
+	/** Merge upload progress delta. */
 	private updateUploadProgress(progress: Partial<ProgressData>): void {
 		this.uploadProgress.next({
 			...this.uploadProgress.getValue(),
-			...progress,
+			...progress
 		});
 	}
 
-	private updateDownloadProgress(
-		progress: Partial<DownloadProgressData>
-	): void {
+	/** Merge download progress delta. */
+	private updateDownloadProgress(progress: Partial<DownloadProgressData>): void {
 		this.downloadProgress.next({
 			...this.downloadProgress.getValue(),
-			...progress,
+			...progress
 		});
 	}
 
+	/** Reset upload progress state. */
 	private resetUploadProgress(): void {
 		this.updateUploadProgress({
-			fileName: "",
+			fileName: '',
 			progress: 0,
 			isUploading: false,
 			chunksUploaded: 0,
-			totalChunks: 0,
+			totalChunks: 0
 		});
 	}
 
+	/** Reset download progress state. */
 	private resetDownloadProgress(): void {
 		this.updateDownloadProgress({
-			fileName: "",
+			fileName: '',
 			progress: 0,
 			isDownloading: false,
 			chunksDownloaded: 0,
-			totalChunks: 0,
+			totalChunks: 0
 		});
 	}
 
+	/** Initialize root directory (derive chunk, fetch or create). */
 	async initializePage(
 		password: string,
 		nodeId: string
@@ -181,13 +189,12 @@ export class FileService {
 		} catch (error: any) {
 			return {
 				success: false,
-				message: `Error during initialization: ${
-					error.message || error
-				}`,
+				message: `Error during initialization: ${error.message || error}`
 			};
 		}
 	}
 
+	/** Setup root directory from chunk (create if missing). */
 	private async initializeRootDirectory(
 		rootChunkId: string
 	): Promise<{ success: boolean; message?: string }> {
@@ -201,18 +208,19 @@ export class FileService {
 			}
 			return { success: true };
 		} catch (error: any) {
-			if (error?.status === 404 && error.message?.includes("not found")) {
+			if (error?.status === 404 && error.message?.includes('not found')) {
 				return await this.createNewRootDirectory(rootChunkId);
 			}
 			throw error;
 		}
 	}
 
+	/** Create brand new empty root directory. */
 	private async createNewRootDirectory(
 		rootChunkId: string
 	): Promise<{ success: boolean; message?: string }> {
 		try {
-			const newRoot = await this.createDirectory("", "", rootChunkId);
+			const newRoot = await this.createDirectory('', '', rootChunkId);
 			this.directory.next(newRoot);
 			return { success: true };
 		} catch (creationError: any) {
@@ -220,11 +228,12 @@ export class FileService {
 				success: false,
 				message: `Failed to create a new root chunk: ${
 					creationError.message || creationError
-				}`,
+				}`
 			};
 		}
 	}
 
+	/** Create a directory object (optionally with provided chunkId). */
 	private async createDirectory(
 		name: string,
 		parentId: string,
@@ -234,12 +243,13 @@ export class FileService {
 			chunkId: chunkId || this.cryptoService.generateUUID(),
 			name,
 			parentId: parentId,
-			contents: [],
+			contents: []
 		};
 
 		return await this.storeDirectory(newDirectory);
 	}
 
+	/** Persist updated directory JSON (delete old -> store new -> clone). */
 	private async updateDirectory(): Promise<void> {
 		this.validateStorageNode();
 		let currentDirectory = this.validateCurrentDirectory();
@@ -255,15 +265,13 @@ export class FileService {
 		this.directory.next(updatedDirectory);
 	}
 
+	/** Store directory JSON; regenerate chunkId on conflict. */
 	private async storeDirectory(directory: Directory): Promise<Directory> {
 		this.validateStorageNode();
 
 		while (true) {
 			try {
-				await this.encryptAndStoreChunk(
-					JSON.stringify(directory),
-					directory.chunkId
-				);
+				await this.encryptAndStoreChunk(JSON.stringify(directory), directory.chunkId);
 				return directory;
 			} catch (error: any) {
 				if (error?.status === 409) {
@@ -276,9 +284,8 @@ export class FileService {
 		}
 	}
 
-	public async createSubdirectory(
-		name: string
-	): Promise<{ success: boolean; message?: string }> {
+	/** Create a new subdirectory in the current directory. */
+	public async createSubdirectory(name: string): Promise<{ success: boolean; message?: string }> {
 		try {
 			this.validateStorageNode();
 			const currentDirectory = this.validateCurrentDirectory();
@@ -287,15 +294,12 @@ export class FileService {
 			if (this.checkIfItemExists(currentDirectory, name)) {
 				return {
 					success: false,
-					message: `Directory "${name}" already exists`,
+					message: `Directory "${name}" already exists`
 				};
 			}
 
 			// Create the new directory
-			const newDirectory = await this.createDirectory(
-				name,
-				currentDirectory.chunkId
-			);
+			const newDirectory = await this.createDirectory(name, currentDirectory.chunkId);
 
 			// Add the new directory to the current directory
 			this.addDirectoryToContents(currentDirectory, newDirectory);
@@ -307,29 +311,29 @@ export class FileService {
 		} catch (error) {
 			return {
 				success: false,
-				message: `Error Creating Subdirectory: ${error}`,
+				message: `Error Creating Subdirectory: ${error}`
 			};
 		}
 	}
 
+	/** Check if name exists within directory. */
 	private checkIfItemExists(directory: Directory, name: string): boolean {
-		return directory.contents.some((item) => item.name === name);
+		return directory.contents.some(item => item.name === name);
 	}
 
-	private addDirectoryToContents(
-		currentDirectory: Directory,
-		newDirectory: Directory
-	): void {
+	/** Add new directory entry to contents. */
+	private addDirectoryToContents(currentDirectory: Directory, newDirectory: Directory): void {
 		currentDirectory.contents = [
 			...currentDirectory.contents,
 			{
-				type: "directory",
+				type: 'directory',
 				name: newDirectory.name,
-				chunkId: newDirectory.chunkId,
-			},
+				chunkId: newDirectory.chunkId
+			}
 		];
 	}
 
+	/** Change current working directory to provided chunk id. */
 	public async changeDirectory(
 		directoryChunkId: string
 	): Promise<{ success: boolean; message?: string }> {
@@ -348,11 +352,12 @@ export class FileService {
 		} catch (error) {
 			return {
 				success: false,
-				message: `Error changing directory ${error}`,
+				message: `Error changing directory ${error}`
 			};
 		}
 	}
 
+	/** Leave current directory (go to parent). */
 	public async leaveDirectory(): Promise<{
 		success: boolean;
 		message?: string;
@@ -361,6 +366,7 @@ export class FileService {
 		return this.changeDirectory(currentDirectory.parentId);
 	}
 
+	/** Get sorted contents (dirs then files). */
 	public async getDirectoryContents(): Promise<DirectoryItem[]> {
 		const currentDirectory = this.directory.getValue();
 		if (!currentDirectory) {
@@ -369,44 +375,46 @@ export class FileService {
 
 		// Filter and sort directories and files, then concatenate
 		const directories = currentDirectory.contents
-			.filter((item) => item.type === "directory")
+			.filter(item => item.type === 'directory')
 			.sort((a, b) => a.name.localeCompare(b.name));
 		const files = currentDirectory.contents
-			.filter((item) => item.type === "file")
+			.filter(item => item.type === 'file')
 			.sort((a, b) => a.name.localeCompare(b.name));
 
 		return [...directories, ...files];
 	}
 
+	/** HTTP auth headers shortcut. */
+	private get authHeaders(): HttpHeaders {
+		return this.authService.getAuthHeaders();
+	}
+
+	/** Fetch encrypted chunk and return decrypted JSON string. */
 	private async fetchAndDecryptChunk(chunkId: string): Promise<string> {
 		this.validateStorageNode();
-
 		try {
 			const response: any = await firstValueFrom(
-				this.http.get(
-					`${this.apiUrl}/nodes/${this.storageNodeId}/chunks/${chunkId}`,
-					{
-						headers: this.apiHeaders,
-						responseType: "arraybuffer" as "arraybuffer",
-					}
-				)
+				this.http.get(`${this.apiUrl}/nodes/${this.storageNodeId}/chunks/${chunkId}`, {
+					headers: this.authHeaders,
+					responseType: 'arraybuffer' as 'arraybuffer'
+				})
 			);
-
 			return await this.processChunkResponse(response);
 		} catch (error) {
 			throw this.processChunkError(error);
 		}
 	}
 
+	/** Process raw chunk HTTP response (extract IV + decrypt). */
 	private async processChunkResponse(response: any): Promise<string> {
 		if (!response || response.byteLength === 0) {
-			throw new Error("No data received when fetching chunk");
+			throw new Error('No data received when fetching chunk');
 		}
 
 		const responseBuffer = new Uint8Array(response);
 
 		if (responseBuffer.length < 12) {
-			throw new Error("Invalid chunk data: too short");
+			throw new Error('Invalid chunk data: too short');
 		}
 
 		// Extract IV and encrypted content
@@ -422,29 +430,24 @@ export class FileService {
 		return await this.decryptChunkData(encryptedArrayBuffer, iv);
 	}
 
-	private async decryptChunkData(
-		encryptedData: ArrayBuffer,
-		iv: Uint8Array
-	): Promise<string> {
-		const decryptedData = await this.cryptoService.decryptData(
-			encryptedData,
-			iv
-		);
+	/** Decrypt chunk payload. */
+	private async decryptChunkData(encryptedData: ArrayBuffer, iv: Uint8Array): Promise<string> {
+		const decryptedData = await this.cryptoService.decryptData(encryptedData, iv);
 		return new TextDecoder().decode(decryptedData);
 	}
 
+	/** Build readable error from chunk fetch failure. */
 	private processChunkError(error: any): Error {
 		const errAny = error as any;
 		if (errAny && errAny.error instanceof ArrayBuffer) {
 			const errorString = this.decodeErrorBuffer(errAny.error);
 			const jsonError = this.tryParseJsonError(errorString);
-
-			if (jsonError?.error) {
-				const err: any = new Error(jsonError.error);
+			if (jsonError?.message) {
+				const err: any = new Error(jsonError.message);
 				if (errAny.status) err.status = errAny.status;
 				return err;
 			} else {
-				const err: any = new Error(errorString || "Unknown error");
+				const err: any = new Error(errorString || 'Unknown error');
 				if (errAny.status) err.status = errAny.status;
 				return err;
 			}
@@ -452,14 +455,16 @@ export class FileService {
 		return error;
 	}
 
+	/** Decode ArrayBuffer -> string safely. */
 	private decodeErrorBuffer(errorBuffer: ArrayBuffer): string {
 		try {
 			return new TextDecoder().decode(errorBuffer);
 		} catch (e) {
-			return "";
+			return '';
 		}
 	}
 
+	/** Try parse JSON error payload. */
 	private tryParseJsonError(errorString: string): any {
 		try {
 			return JSON.parse(errorString);
@@ -468,10 +473,8 @@ export class FileService {
 		}
 	}
 
-	private async encryptAndStoreChunk(
-		data: string,
-		chunkId: string
-	): Promise<void> {
+	/** Encrypt and store directory/file chunk (prepend IV). */
+	private async encryptAndStoreChunk(data: string, chunkId: string): Promise<void> {
 		this.validateStorageNode();
 
 		// Encrypt the chunk data
@@ -480,29 +483,19 @@ export class FileService {
 			await this.cryptoService.encryptData(dataBuffer);
 
 		// Prepare final data with IV prepended
-		const finalData = this.prepareFinalChunkData(
-			encryptedData,
-			encryptionIv
-		);
+		const finalData = this.prepareFinalChunkData(encryptedData, encryptionIv);
 
 		await firstValueFrom(
 			this.http.post(
 				`${this.apiUrl}/nodes/${this.storageNodeId}/chunks/${chunkId}`,
 				new Blob([finalData]),
-				{
-					headers: this.apiHeaders.set(
-						"Content-Type",
-						"application/octet-stream"
-					),
-				}
+				{ headers: this.authHeaders.set('Content-Type', 'application/octet-stream') }
 			)
 		);
 	}
 
-	private prepareFinalChunkData(
-		encryptedData: ArrayBuffer,
-		iv: Uint8Array
-	): ArrayBuffer {
+	/** Concatenate IV + encrypted bytes. */
+	private prepareFinalChunkData(encryptedData: ArrayBuffer, iv: Uint8Array): ArrayBuffer {
 		const finalData = new ArrayBuffer(iv.length + encryptedData.byteLength);
 		const finalView = new Uint8Array(finalData);
 		finalView.set(iv);
@@ -510,17 +503,18 @@ export class FileService {
 		return finalData;
 	}
 
+	/** Delete a chunk by id. */
 	private async deleteChunk(chunkId: string): Promise<void> {
 		this.validateStorageNode();
 
 		await firstValueFrom(
-			this.http.delete(
-				`${this.apiUrl}/nodes/${this.storageNodeId}/chunks/${chunkId}`,
-				{ headers: this.apiHeaders }
-			)
+			this.http.delete(`${this.apiUrl}/nodes/${this.storageNodeId}/chunks/${chunkId}`, {
+				headers: this.authHeaders
+			})
 		);
 	}
 
+	/** Delete file or directory (optional recursive). */
 	public async deleteItem(
 		item: DirectoryItem,
 		recursive: boolean = false
@@ -532,7 +526,7 @@ export class FileService {
 		if (!this.storageNodeId) {
 			return {
 				success: false,
-				message: "Node ID not available",
+				message: 'Node ID not available'
 			};
 		}
 
@@ -540,20 +534,20 @@ export class FileService {
 		if (!currentDirectory) {
 			return {
 				success: false,
-				message: "Current directory is not initialized",
+				message: 'Current directory is not initialized'
 			};
 		}
 
 		// Check if item exists in the current directory
-		const existingItem = currentDirectory.contents.find((i) => i === item);
+		const existingItem = currentDirectory.contents.find(i => i === item);
 		if (!existingItem) {
 			return {
 				success: false,
-				message: "Item not found in current directory",
+				message: 'Item not found in current directory'
 			};
 		}
 
-		if (item.type === "file") {
+		if (item.type === 'file') {
 			try {
 				// Delete all data chunks that make up this file
 				for (const dataChunkId of item.fileChunks) {
@@ -562,7 +556,7 @@ export class FileService {
 
 				// Remove the file from the directory
 				currentDirectory.contents = currentDirectory.contents.filter(
-					(dirItem) => !(dirItem.type === "file" && dirItem === item)
+					dirItem => !(dirItem.type === 'file' && dirItem === item)
 				);
 
 				// Update the directory metadata
@@ -572,10 +566,10 @@ export class FileService {
 			} catch (error) {
 				return {
 					success: false,
-					message: `Error deleting file: ${error}`,
+					message: `Error deleting file: ${error}`
 				};
 			}
-		} else if (item.type === "directory") {
+		} else if (item.type === 'directory') {
 			try {
 				// First, fetch the directory to check if it's empty
 				const targetDirectory = JSON.parse(
@@ -588,7 +582,7 @@ export class FileService {
 						return {
 							success: false,
 							message: `Cannot delete "${item.name}": Directory is not empty. Please delete all files and subdirectories first.`,
-							requiresConfirmation: true,
+							requiresConfirmation: true
 						};
 					}
 
@@ -601,11 +595,7 @@ export class FileService {
 
 				// Remove the directory from the parent directory
 				currentDirectory.contents = currentDirectory.contents.filter(
-					(dirItem) =>
-						!(
-							dirItem.type === "directory" &&
-							dirItem.chunkId === item.chunkId
-						)
+					dirItem => !(dirItem.type === 'directory' && dirItem.chunkId === item.chunkId)
 				);
 
 				// Update the parent directory metadata
@@ -615,20 +605,19 @@ export class FileService {
 			} catch (error) {
 				return {
 					success: false,
-					message: `Error deleting directory: ${error}`,
+					message: `Error deleting directory: ${error}`
 				};
 			}
 		} else {
 			return {
 				success: false,
-				message: "Unknown item type. Cannot delete.",
+				message: 'Unknown item type. Cannot delete.'
 			};
 		}
 	}
 
-	private async deleteDirectoryRecursively(
-		directory: Directory
-	): Promise<void> {
+	/** Recursively delete directory tree (stack based). */
+	private async deleteDirectoryRecursively(directory: Directory): Promise<void> {
 		const stack: Directory[] = [directory];
 
 		while (stack.length > 0) {
@@ -636,12 +625,12 @@ export class FileService {
 			if (!currentDirectory) continue;
 
 			for (const item of currentDirectory.contents) {
-				if (item.type === "file") {
+				if (item.type === 'file') {
 					// Delete all data chunks that make up this file
 					for (const dataChunkId of item.fileChunks) {
 						await this.deleteChunk(dataChunkId);
 					}
-				} else if (item.type === "directory") {
+				} else if (item.type === 'directory') {
 					// Fetch the subdirectory and push it onto the stack
 					const subDirectory = JSON.parse(
 						await this.fetchAndDecryptChunk(item.chunkId)
@@ -655,6 +644,7 @@ export class FileService {
 		}
 	}
 
+	/** Upload single file (optionally overwriting existing). */
 	public async uploadFile(
 		file: globalThis.File,
 		fileName: string,
@@ -665,7 +655,7 @@ export class FileService {
 			if (!file) {
 				return {
 					success: false,
-					message: "No file provided for upload.",
+					message: 'No file provided for upload.'
 				};
 			}
 
@@ -687,19 +677,19 @@ export class FileService {
 			this.resetUploadProgress();
 			return {
 				success: false,
-				message:
-					error.message || "An error occurred during file upload.",
+				message: error.message || 'An error occurred during file upload.'
 			};
 		}
 	}
 
+	/** Handle overwrite logic (delete existing if allowed). */
 	private async handleFileOverwrite(
 		currentDirectory: Directory,
 		fileName: string,
 		overwrite: boolean
 	): Promise<UploadResult> {
 		const existingFile = currentDirectory.contents.find(
-			(item) => item.type === "file" && item.name === fileName
+			item => item.type === 'file' && item.name === fileName
 		);
 
 		if (existingFile) {
@@ -707,14 +697,14 @@ export class FileService {
 				return {
 					success: false,
 					message: `File "${fileName}" already exists in this directory`,
-					requiresConfirmation: true,
+					requiresConfirmation: true
 				};
 			} else {
 				const deleteResult = await this.deleteItem(existingFile, false);
 				if (!deleteResult.success) {
 					return {
 						success: false,
-						message: `Failed to overwrite existing file: ${deleteResult.message}`,
+						message: `Failed to overwrite existing file: ${deleteResult.message}`
 					};
 				}
 			}
@@ -723,14 +713,12 @@ export class FileService {
 		return { success: true };
 	}
 
+	/** Perform actual multi-chunk upload for a file. */
 	private async performFileUpload(
 		file: globalThis.File,
 		fileName: string
 	): Promise<UploadResult> {
-		const metadataSizeEstimate = await this.estimateFileMetadataSize(
-			fileName,
-			file.size
-		);
+		const metadataSizeEstimate = await this.estimateFileMetadataSize(fileName, file.size);
 		const fileBuffer = await file.arrayBuffer();
 		const totalSize = fileBuffer.byteLength;
 		const numChunks = Math.ceil(totalSize / this.CHUNK_SIZE);
@@ -741,7 +729,7 @@ export class FileService {
 			progress: 0,
 			isUploading: true,
 			chunksUploaded: 0,
-			totalChunks: numChunks,
+			totalChunks: numChunks
 		});
 
 		const chunkIds = await this.uploadFileChunks(
@@ -761,12 +749,13 @@ export class FileService {
 			progress: 100,
 			isUploading: false,
 			chunksUploaded: numChunks,
-			totalChunks: numChunks,
+			totalChunks: numChunks
 		});
 
 		return { success: true };
 	}
 
+	/** Slice file buffer, encrypt & upload chunks sequentially. */
 	private async uploadFileChunks(
 		fileBuffer: ArrayBuffer,
 		totalSize: number,
@@ -781,13 +770,9 @@ export class FileService {
 			const end = Math.min(start + this.CHUNK_SIZE, totalSize);
 			const chunkData = fileBuffer.slice(start, end);
 
-			const dataReservationSize =
-				i === 0 ? metadataSizeEstimate + totalSize : 0;
+			const dataReservationSize = i === 0 ? metadataSizeEstimate + totalSize : 0;
 
-			const chunkId = await this.uploadFileChunk(
-				chunkData,
-				dataReservationSize
-			);
+			const chunkId = await this.uploadFileChunk(chunkData, dataReservationSize);
 			chunkIds.push(chunkId);
 
 			// Update progress
@@ -797,13 +782,14 @@ export class FileService {
 				progress,
 				isUploading: true,
 				chunksUploaded: i + 1,
-				totalChunks: numChunks,
+				totalChunks: numChunks
 			});
 		}
 
 		return chunkIds;
 	}
 
+	/** Add uploaded file metadata then persist directory. */
 	private async addFileToDirectory(
 		fileName: string,
 		fileSize: number,
@@ -812,16 +798,17 @@ export class FileService {
 		const currentDirectory = this.validateCurrentDirectory();
 
 		currentDirectory.contents.push({
-			type: "file",
+			type: 'file',
 			name: fileName,
 			size: fileSize,
 			createdAt: new Date().toISOString(),
-			fileChunks: chunkIds,
+			fileChunks: chunkIds
 		});
 
 		await this.updateDirectory();
 	}
 
+	/** Upload multiple files with aggregated progress. */
 	public async uploadMultipleFiles(
 		files: FileList,
 		overwriteConflicts: boolean = false
@@ -831,7 +818,7 @@ export class FileService {
 			if (!files || files.length === 0) {
 				return {
 					success: false,
-					message: "No files provided for upload.",
+					message: 'No files provided for upload.'
 				};
 			}
 
@@ -839,7 +826,7 @@ export class FileService {
 				uploaded: 0,
 				failed: 0,
 				skipped: 0,
-				errors: [] as string[],
+				errors: [] as string[]
 			};
 			const totalFiles = files.length;
 
@@ -853,20 +840,16 @@ export class FileService {
 					uploadStats.uploaded
 				);
 
-				await this.processFileUpload(
-					file,
-					overwriteConflicts,
-					uploadStats
-				);
+				await this.processFileUpload(file, overwriteConflicts, uploadStats);
 			}
 
 			// Complete progress tracking
 			this.updateUploadProgress({
-				fileName: "",
+				fileName: '',
 				progress: 100,
 				isUploading: false,
 				chunksUploaded: uploadStats.uploaded,
-				totalChunks: totalFiles,
+				totalChunks: totalFiles
 			});
 
 			return this.buildMultipleFilesResult(uploadStats, totalFiles);
@@ -874,13 +857,12 @@ export class FileService {
 			this.resetUploadProgress();
 			return {
 				success: false,
-				message:
-					error.message ||
-					"An error occurred during multiple file upload.",
+				message: error.message || 'An error occurred during multiple file upload.'
 			};
 		}
 	}
 
+	/** Update multi-file progress line. */
 	private updateMultipleFilesProgress(
 		fileName: string,
 		current: number,
@@ -892,26 +874,18 @@ export class FileService {
 			progress: Math.round((uploaded / total) * 100),
 			isUploading: true,
 			chunksUploaded: uploaded,
-			totalChunks: total,
+			totalChunks: total
 		});
 	}
 
+	/** Upload one file within multi-file session. */
 	private async processFileUpload(
 		file: File,
 		overwriteConflicts: boolean,
-		stats: {
-			uploaded: number;
-			failed: number;
-			skipped: number;
-			errors: string[];
-		}
+		stats: { uploaded: number; failed: number; skipped: number; errors: string[] }
 	): Promise<void> {
 		try {
-			const result = await this.uploadFile(
-				file,
-				file.name,
-				overwriteConflicts
-			);
+			const result = await this.uploadFile(file, file.name, overwriteConflicts);
 
 			if (result.success) {
 				stats.uploaded++;
@@ -923,57 +897,46 @@ export class FileService {
 			}
 		} catch (error: any) {
 			stats.failed++;
-			stats.errors.push(
-				`${file.name}: ${error.message || "Unknown error"}`
-			);
+			stats.errors.push(`${file.name}: ${error.message || 'Unknown error'}`);
 		}
 	}
 
+	/** Build result summary for multi-file upload. */
 	private buildMultipleFilesResult(
-		stats: {
-			uploaded: number;
-			failed: number;
-			skipped: number;
-			errors: string[];
-		},
+		stats: { uploaded: number; failed: number; skipped: number; errors: string[] },
 		totalFiles: number
 	): UploadResult {
+		// Summarize outcome: success if at least one uploaded; include counts for clarity
 		if (stats.failed === 0 && stats.skipped === 0) {
-			return { success: true };
+			return { success: true, message: `All ${stats.uploaded} files uploaded successfully` };
 		} else if (stats.uploaded === 0) {
 			return {
 				success: false,
-				message: `All uploads failed: ${stats.errors.join("; ")}`,
+				message: `All uploads failed: ${stats.errors.join('; ')}`
 			};
 		} else {
-			const messages = [];
-			if (stats.uploaded > 0)
-				messages.push(`${stats.uploaded} files uploaded successfully`);
-			if (stats.skipped > 0)
-				messages.push(`${stats.skipped} files skipped (already exist)`);
+			const messages = [] as string[];
+			if (stats.uploaded > 0) messages.push(`${stats.uploaded} uploaded`);
+			if (stats.skipped > 0) messages.push(`${stats.skipped} skipped`);
 			if (stats.failed > 0)
-				messages.push(
-					`${stats.failed} files failed: ${stats.errors.join("; ")}`
-				);
-
+				messages.push(`${stats.failed} failed: ${stats.errors.join('; ')}`);
 			return {
 				success: stats.uploaded > 0,
-				message: messages.join(", "),
+				message: messages.join(', ')
 			};
 		}
 	}
 
-	public async uploadDirectory(
-		files: FileList
-	): Promise<{ success: boolean; message?: string }> {
+	/** Upload entire directory tree (HTML5 directory selection). */
+	public async uploadDirectory(files: FileList): Promise<{ success: boolean; message?: string }> {
 		if (!this.storageNodeId) {
 			return {
 				success: false,
-				message: "No active storage node selected.",
+				message: 'No active storage node selected.'
 			};
 		}
 		if (!files || files.length === 0) {
-			return { success: false, message: "No files provided for upload." };
+			return { success: false, message: 'No files provided for upload.' };
 		}
 
 		try {
@@ -982,20 +945,15 @@ export class FileService {
 			if (!originalDirectory) {
 				return {
 					success: false,
-					message: "Current directory is not initialized",
+					message: 'Current directory is not initialized'
 				};
 			}
 
 			// Build directory structure and create directories
-			const directoryMap = await this.buildAndCreateDirectoryStructure(
-				files
-			);
+			const directoryMap = await this.buildAndCreateDirectoryStructure(files);
 
 			// Upload all files to their respective directories
-			const result = await this.uploadFilesToDirectories(
-				files,
-				directoryMap
-			);
+			const result = await this.uploadFilesToDirectories(files, directoryMap);
 
 			// Ensure we're back at the original directory
 			await this.changeDirectory(originalDirectory.chunkId);
@@ -1004,32 +962,29 @@ export class FileService {
 		} catch (error: any) {
 			return {
 				success: false,
-				message:
-					error.message ||
-					"An error occurred during directory upload.",
+				message: error.message || 'An error occurred during directory upload.'
 			};
 		}
 	}
 
-	private async buildAndCreateDirectoryStructure(
-		files: FileList
-	): Promise<Map<string, string>> {
+	/** Build + create needed directory hierarchy for batch upload. */
+	private async buildAndCreateDirectoryStructure(files: FileList): Promise<Map<string, string>> {
 		// Map of directory path -> chunkId for fast lookup during file uploads
 		const directoryMap = new Map<string, string>();
 		const originalDirectory = this.directory.getValue();
 		if (!originalDirectory) {
-			throw new Error("Current directory is not initialized");
+			throw new Error('Current directory is not initialized');
 		}
 
 		// Add current directory as root
-		directoryMap.set("", originalDirectory.chunkId);
+		directoryMap.set('', originalDirectory.chunkId);
 
 		// Collect all unique directory paths that need to be created
 		const allPaths = new Set<string>();
 		for (let i = 0; i < files.length; i++) {
 			const file = files[i];
 			const relativePath = (file as any).webkitRelativePath || file.name;
-			const pathParts = relativePath.split("/");
+			const pathParts = relativePath.split('/');
 
 			// If file is in subdirectories, collect all parent paths
 			if (pathParts.length > 1) {
@@ -1038,7 +993,7 @@ export class FileService {
 
 				// Add all parent paths (e.g., for "a/b/c", add "a" and "a/b")
 				for (let j = 1; j <= dirParts.length; j++) {
-					const path = dirParts.slice(0, j).join("/");
+					const path = dirParts.slice(0, j).join('/');
 					allPaths.add(path);
 				}
 			}
@@ -1046,14 +1001,14 @@ export class FileService {
 
 		// Sort paths by depth to create parent directories first
 		const sortedPaths = Array.from(allPaths).sort((a, b) => {
-			return a.split("/").length - b.split("/").length;
+			return a.split('/').length - b.split('/').length;
 		});
 
 		// Create directories iteratively
 		for (const path of sortedPaths) {
-			const pathParts = path.split("/");
+			const pathParts = path.split('/');
 			const dirName = pathParts[pathParts.length - 1];
-			const parentPath = pathParts.slice(0, -1).join("/");
+			const parentPath = pathParts.slice(0, -1).join('/');
 
 			// Get parent directory chunkId
 			const parentChunkId = directoryMap.get(parentPath);
@@ -1067,42 +1022,36 @@ export class FileService {
 			// Check if directory already exists
 			const currentDir = this.directory.getValue();
 			if (!currentDir) {
-				throw new Error("Failed to navigate to parent directory");
+				throw new Error('Failed to navigate to parent directory');
 			}
 
-			let dirChunkId = "";
+			let dirChunkId = '';
 			const existingDir = currentDir.contents.find(
-				(item) => item.type === "directory" && item.name === dirName
+				item => item.type === 'directory' && item.name === dirName
 			);
 
-			if (existingDir && existingDir.type === "directory") {
+			if (existingDir && existingDir.type === 'directory') {
 				// Directory already exists
 				dirChunkId = existingDir.chunkId;
 			} else {
 				// Create new directory
 				const result = await this.createSubdirectory(dirName);
 				if (!result.success) {
-					throw new Error(
-						`Failed to create directory ${dirName}: ${result.message}`
-					);
+					throw new Error(`Failed to create directory ${dirName}: ${result.message}`);
 				}
 
 				// Get the newly created directory's chunkId
 				const updatedDir = this.directory.getValue();
 				if (!updatedDir) {
-					throw new Error(
-						"Failed to get updated directory after creation"
-					);
+					throw new Error('Failed to get updated directory after creation');
 				}
 
 				const newDir = updatedDir.contents.find(
-					(item) => item.type === "directory" && item.name === dirName
+					item => item.type === 'directory' && item.name === dirName
 				);
 
-				if (!newDir || newDir.type !== "directory") {
-					throw new Error(
-						`Failed to find newly created directory: ${dirName}`
-					);
+				if (!newDir || newDir.type !== 'directory') {
+					throw new Error(`Failed to find newly created directory: ${dirName}`);
 				}
 
 				dirChunkId = newDir.chunkId;
@@ -1115,6 +1064,7 @@ export class FileService {
 		return directoryMap;
 	}
 
+	/** Upload files into their target directories. */
 	private async uploadFilesToDirectories(
 		files: FileList,
 		directoryMap: Map<string, string>
@@ -1127,7 +1077,7 @@ export class FileService {
 		for (let i = 0; i < files.length; i++) {
 			const file = files[i];
 			const relativePath = (file as any).webkitRelativePath || file.name;
-			const pathParts = relativePath.split("/");
+			const pathParts = relativePath.split('/');
 			const fileName = pathParts[pathParts.length - 1];
 
 			// Update progress
@@ -1136,22 +1086,20 @@ export class FileService {
 				progress: Math.round((uploadedFiles / totalFiles) * 100),
 				isUploading: true,
 				chunksUploaded: uploadedFiles,
-				totalChunks: totalFiles,
+				totalChunks: totalFiles
 			});
 
 			try {
 				// Determine target directory path
-				let targetDirectoryPath = "";
+				let targetDirectoryPath = '';
 				if (pathParts.length > 1) {
-					targetDirectoryPath = pathParts.slice(0, -1).join("/");
+					targetDirectoryPath = pathParts.slice(0, -1).join('/');
 				}
 
 				// Get the target directory chunkId
 				const targetChunkId = directoryMap.get(targetDirectoryPath);
 				if (!targetChunkId) {
-					throw new Error(
-						`Target directory not found for path: ${targetDirectoryPath}`
-					);
+					throw new Error(`Target directory not found for path: ${targetDirectoryPath}`);
 				}
 
 				// Navigate to target directory
@@ -1167,57 +1115,49 @@ export class FileService {
 				}
 			} catch (error: any) {
 				failedFiles++;
-				errors.push(
-					`${relativePath}: ${error.message || "Unknown error"}`
-				);
+				errors.push(`${relativePath}: ${error.message || 'Unknown error'}`);
 			}
 		}
 
 		// Complete progress tracking
 		this.uploadProgress.next({
-			fileName: "",
+			fileName: '',
 			progress: 100,
 			isUploading: false,
 			chunksUploaded: uploadedFiles,
-			totalChunks: totalFiles,
+			totalChunks: totalFiles
 		});
 
-		if (failedFiles === 0) {
-			return { success: true };
-		} else if (uploadedFiles === 0) {
-			return {
-				success: false,
-				message: `All uploads failed: ${errors.join("; ")}`,
-			};
-		} else {
-			return {
-				success: true,
-				message: `${uploadedFiles} files uploaded successfully, ${failedFiles} failed: ${errors.join(
-					"; "
-				)}`,
-			};
+		// Build standardized message similar to buildMultipleFilesResult
+		const parts: string[] = [];
+		parts.push(`uploaded: ${uploadedFiles}`);
+		parts.push(`failed: ${failedFiles}`);
+		const baseMessage = `Directory upload summary (${uploadedFiles + failedFiles}/${totalFiles} processed)`;
+		if (failedFiles > 0) {
+			parts.push(`errors: ${errors.join('; ')}`);
 		}
+		const message = `${baseMessage} => ${parts.join(', ')}`;
+		// Success if at least one file uploaded
+		return {
+			success: uploadedFiles > 0 && failedFiles === 0 ? true : uploadedFiles > 0,
+			message
+		};
 	}
 
-	private async uploadFileChunk(
-		data: ArrayBuffer,
-		data_size: number
-	): Promise<string> {
+	/** Encrypt + upload a single chunk (prepare, send, complete). */
+	private async uploadFileChunk(data: ArrayBuffer, data_size: number): Promise<string> {
 		this.validateStorageNode();
-
 		// Prepare upload session
 		const { chunkId, uploadUrl, temporaryObjectName } =
 			await this.prepareUploadSession(data_size);
-
 		// Encrypt and upload data
 		await this.encryptAndUploadChunk(data, uploadUrl);
-
 		// Complete the transfer
 		await this.completeChunkTransfer(chunkId, temporaryObjectName);
-
 		return chunkId;
 	}
 
+	/** Prepare upload session (reserve space, get URL). */
 	private async prepareUploadSession(data_size: number): Promise<{
 		chunkId: string;
 		uploadUrl: string;
@@ -1226,41 +1166,30 @@ export class FileService {
 		const prepareResponse = await firstValueFrom(
 			this.http.post<any>(
 				`${this.apiUrl}/nodes/${this.storageNodeId}/chunks/upload-sessions`,
-				{ data_size: data_size },
-				{ headers: this.apiHeaders }
+				{ data_size },
+				{ headers: this.authHeaders }
 			)
 		);
-
 		if (!prepareResponse.success) {
-			throw new Error(
-				prepareResponse.error || "Failed to prepare upload."
-			);
+			throw new Error(prepareResponse.message || 'Failed to prepare upload.');
 		}
-
 		return prepareResponse.data;
 	}
 
-	private async encryptAndUploadChunk(
-		data: ArrayBuffer,
-		uploadUrl: string
-	): Promise<void> {
-		const { encryptedData, iv } = await this.cryptoService.encryptData(
-			new Uint8Array(data)
-		);
-
-		const finalPayload = new Uint8Array(
-			iv.length + encryptedData.byteLength
-		);
+	/** Encrypt bytes and PUT to pre-signed URL. */
+	private async encryptAndUploadChunk(data: ArrayBuffer, uploadUrl: string): Promise<void> {
+		const { encryptedData, iv } = await this.cryptoService.encryptData(new Uint8Array(data));
+		const finalPayload = new Uint8Array(iv.length + encryptedData.byteLength);
 		finalPayload.set(iv);
 		finalPayload.set(new Uint8Array(encryptedData), iv.length);
-
 		await firstValueFrom(
 			this.http.put(uploadUrl, new Blob([finalPayload]), {
-				headers: { "Content-Type": "application/octet-stream" },
+				headers: { 'Content-Type': 'application/octet-stream' }
 			})
 		);
 	}
 
+	/** Finalize chunk transfer (promote temp object). */
 	private async completeChunkTransfer(
 		chunkId: string,
 		temporaryObjectName: string
@@ -1269,24 +1198,21 @@ export class FileService {
 			this.http.put<any>(
 				`${this.apiUrl}/nodes/${this.storageNodeId}/chunks/${chunkId}`,
 				{ temporaryObjectName },
-				{ headers: this.apiHeaders }
+				{ headers: this.authHeaders }
 			)
 		);
-
 		if (!completeResponse.success) {
-			throw new Error(
-				completeResponse.error ||
-					"Backend failed to complete the transfer."
-			);
+			throw new Error(completeResponse.message || 'Backend failed to complete the transfer.');
 		}
 	}
 
+	/** Download full file (chunks) and return Blob. */
 	public async downloadFile(item: DirectoryItem): Promise<Blob> {
 		this.validateStorageNode();
 		this.validateCurrentDirectory();
 
-		if (item.type !== "file") {
-			throw new Error("Selected item is not a file.");
+		if (item.type !== 'file') {
+			throw new Error('Selected item is not a file.');
 		}
 
 		try {
@@ -1297,17 +1223,11 @@ export class FileService {
 				progress: 0,
 				isDownloading: true,
 				chunksDownloaded: 0,
-				totalChunks: totalChunks,
+				totalChunks: totalChunks
 			});
 
-			const decryptedChunks = await this.downloadAndDecryptChunks(
-				item,
-				totalChunks
-			);
-			const reassembledBlob = this.reassembleFileChunks(
-				decryptedChunks,
-				item.size
-			);
+			const decryptedChunks = await this.downloadAndDecryptChunks(item, totalChunks);
+			const reassembledBlob = this.reassembleFileChunks(decryptedChunks, item.size);
 
 			// Complete download progress tracking
 			this.updateDownloadProgress({
@@ -1315,7 +1235,7 @@ export class FileService {
 				progress: 100,
 				isDownloading: false,
 				chunksDownloaded: totalChunks,
-				totalChunks: totalChunks,
+				totalChunks: totalChunks
 			});
 
 			return reassembledBlob;
@@ -1325,8 +1245,9 @@ export class FileService {
 		}
 	}
 
+	/** Download & decrypt all file chunks with progress. */
 	private async downloadAndDecryptChunks(
-		item: DirectoryItem & { type: "file" },
+		item: DirectoryItem & { type: 'file' },
 		totalChunks: number
 	): Promise<ArrayBuffer[]> {
 		const decryptedChunks: ArrayBuffer[] = [];
@@ -1344,17 +1265,15 @@ export class FileService {
 				progress,
 				isDownloading: true,
 				chunksDownloaded,
-				totalChunks,
+				totalChunks
 			});
 		}
 
 		return decryptedChunks;
 	}
 
-	private reassembleFileChunks(
-		decryptedChunks: ArrayBuffer[],
-		totalSize: number
-	): Blob {
+	/** Reassemble decrypted chunks into Blob. */
+	private reassembleFileChunks(decryptedChunks: ArrayBuffer[], totalSize: number): Blob {
 		const reassembledBuffer = new Uint8Array(totalSize);
 		let offset = 0;
 
@@ -1366,11 +1285,12 @@ export class FileService {
 		return new Blob([reassembledBuffer]);
 	}
 
+	/** Download directory recursively as ZIP. */
 	public async downloadDirectory(item: DirectoryItem): Promise<Blob> {
 		this.validateStorageNode();
 
-		if (item.type !== "directory") {
-			throw new Error("Selected item is not a directory.");
+		if (item.type !== 'directory') {
+			throw new Error('Selected item is not a directory.');
 		}
 
 		try {
@@ -1382,20 +1302,20 @@ export class FileService {
 				progress: 0,
 				isDownloading: true,
 				chunksDownloaded: 0,
-				totalChunks: 0,
+				totalChunks: 0
 			});
 
 			const originalDirectory = this.validateCurrentDirectory();
 			const zip = new JSZip();
 
 			// Recursively add directory contents to ZIP
-			await this.addDirectoryToZip(zip, item, "");
+			await this.addDirectoryToZip(zip, item, '');
 
 			// Return to original directory
 			await this.changeDirectory(originalDirectory.chunkId);
 
 			// Generate ZIP file
-			const zipBlob = await zip.generateAsync({ type: "blob" });
+			const zipBlob = await zip.generateAsync({ type: 'blob' });
 
 			// Complete download progress tracking
 			this.updateDownloadProgress({
@@ -1403,7 +1323,7 @@ export class FileService {
 				progress: 100,
 				isDownloading: false,
 				chunksDownloaded: 0,
-				totalChunks: 0,
+				totalChunks: 0
 			});
 
 			return zipBlob;
@@ -1413,12 +1333,13 @@ export class FileService {
 		}
 	}
 
+	/** Recursively add directory contents to ZIP. */
 	private async addDirectoryToZip(
 		zip: JSZip,
 		directoryItem: DirectoryItem,
 		basePath: string
 	): Promise<void> {
-		if (directoryItem.type !== "directory") {
+		if (directoryItem.type !== 'directory') {
 			return;
 		}
 
@@ -1429,9 +1350,7 @@ export class FileService {
 		const directory = this.validateCurrentDirectory();
 
 		// Create the directory path in ZIP
-		const currentPath = basePath
-			? `${basePath}/${directoryItem.name}`
-			: directoryItem.name;
+		const currentPath = basePath ? `${basePath}/${directoryItem.name}` : directoryItem.name;
 
 		zip.folder(currentPath);
 
@@ -1439,24 +1358,26 @@ export class FileService {
 		await this.processDirectoryItems(zip, directory.contents, currentPath);
 	}
 
+	/** Process items (files/subdirs) for ZIP. */
 	private async processDirectoryItems(
 		zip: JSZip,
 		items: DirectoryItem[],
 		currentPath: string
 	): Promise<void> {
 		for (const item of items) {
-			if (item.type === "file") {
+			if (item.type === 'file') {
 				await this.addFileToZip(zip, item, currentPath);
-			} else if (item.type === "directory") {
+			} else if (item.type === 'directory') {
 				// Recursively add subdirectory
 				await this.addDirectoryToZip(zip, item, currentPath);
 			}
 		}
 	}
 
+	/** Download, decrypt and add file to ZIP. */
 	private async addFileToZip(
 		zip: JSZip,
-		item: DirectoryItem & { type: "file" },
+		item: DirectoryItem & { type: 'file' },
 		currentPath: string
 	): Promise<void> {
 		try {
@@ -1472,7 +1393,7 @@ export class FileService {
 				progress: 50,
 				isDownloading: true,
 				chunksDownloaded: 0,
-				totalChunks: 0,
+				totalChunks: 0
 			});
 		} catch (error) {
 			console.warn(`Failed to download file ${item.name}:`, error);
@@ -1480,18 +1401,16 @@ export class FileService {
 		}
 	}
 
+	/** Download & decrypt single chunk (session lifecycle). */
 	private async downloadFileChunk(chunkId: string): Promise<ArrayBuffer> {
 		this.validateStorageNode();
 
 		try {
 			// Prepare download session
-			const { downloadUrl, temporaryObjectName } =
-				await this.prepareDownloadSession(chunkId);
+			const { downloadUrl, temporaryObjectName } = await this.prepareDownloadSession(chunkId);
 
 			// Download and decrypt data
-			const decryptedData = await this.downloadAndDecryptChunk(
-				downloadUrl
-			);
+			const decryptedData = await this.downloadAndDecryptChunk(downloadUrl);
 
 			// Cleanup temporary object
 			await this.cleanupDownloadSession(chunkId, temporaryObjectName);
@@ -1499,56 +1418,48 @@ export class FileService {
 			return decryptedData;
 		} catch (error: any) {
 			throw new Error(
-				error.message ||
-					`An unknown error occurred during download of chunk ${chunkId}.`
+				error.message || `An unknown error occurred during download of chunk ${chunkId}.`
 			);
 		}
 	}
 
-	private async prepareDownloadSession(chunkId: string): Promise<{
-		downloadUrl: string;
-		temporaryObjectName: string;
-	}> {
+	/** Prepare download session (signed URL). */
+	private async prepareDownloadSession(
+		chunkId: string
+	): Promise<{ downloadUrl: string; temporaryObjectName: string }> {
 		const prepareResponse = await firstValueFrom(
 			this.http.post<any>(
 				`${this.apiUrl}/nodes/${this.storageNodeId}/chunks/${chunkId}/download-sessions`,
 				{},
-				{ headers: this.apiHeaders }
+				{ headers: this.authHeaders }
 			)
 		);
 
 		if (!prepareResponse.success) {
-			throw new Error(
-				prepareResponse.error || "Failed to prepare download."
-			);
+			throw new Error(prepareResponse.message || 'Failed to prepare download.');
 		}
 
 		return prepareResponse.data;
 	}
 
-	private async downloadAndDecryptChunk(
-		downloadUrl: string
-	): Promise<ArrayBuffer> {
+	/** GET encrypted chunk via signed URL then decrypt. */
+	private async downloadAndDecryptChunk(downloadUrl: string): Promise<ArrayBuffer> {
 		const encryptedFileBuffer = await firstValueFrom(
-			this.http.get(downloadUrl, {
-				responseType: "arraybuffer",
-			})
+			this.http.get(downloadUrl, { responseType: 'arraybuffer' })
 		);
 
 		const encryptedDataWithIv = new Uint8Array(encryptedFileBuffer);
 		if (encryptedDataWithIv.length < 12) {
-			throw new Error("Downloaded data is too short to be valid.");
+			throw new Error('Downloaded data is too short to be valid.');
 		}
 
 		const iv = encryptedDataWithIv.slice(0, 12);
 		const encryptedContent = encryptedDataWithIv.slice(12);
 
-		return await this.cryptoService.decryptData(
-			encryptedContent.buffer,
-			iv
-		);
+		return await this.cryptoService.decryptData(encryptedContent.buffer, iv);
 	}
 
+	/** Best-effort cleanup of temporary download object. */
 	private async cleanupDownloadSession(
 		chunkId: string,
 		temporaryObjectName: string
@@ -1557,10 +1468,7 @@ export class FileService {
 			await firstValueFrom(
 				this.http.delete(
 					`${this.apiUrl}/nodes/${this.storageNodeId}/chunks/${chunkId}/download-sessions`,
-					{
-						headers: this.apiHeaders,
-						body: { temporaryObjectName },
-					}
+					{ headers: this.authHeaders, body: { temporaryObjectName } }
 				)
 			);
 		} catch (cleanupError) {
@@ -1572,50 +1480,42 @@ export class FileService {
 		}
 	}
 
-	async estimateFileMetadataSize(
-		fileName: string,
-		fileSize: number
-	): Promise<number> {
-		// Estimate the storage delta of a file upload
+	/** Estimate directory metadata growth for file upload. */
+	async estimateFileMetadataSize(fileName: string, fileSize: number): Promise<number> {
 		const currentDirectory = this.directory.getValue();
 		if (!currentDirectory) {
-			throw new Error("Current directory is not initialized");
+			throw new Error('Current directory is not initialized');
 		}
 
-		const num_chunks = fileSize / this.CHUNK_SIZE;
+		// Use Math.ceil to ensure we reflect the actual number of chunks allocated elsewhere
+		const num_chunks = Math.ceil(fileSize / this.CHUNK_SIZE);
+		const chunkIdArr = Array.from(
+			{ length: num_chunks },
+			(_, i) => `temp-mock-file-id-${i.toString().padStart(8, '0')}-mock-uuid`
+		);
 
-		const chunkIdArr = Array.from({ length: num_chunks }, (_, i) => {
-			return `temp-mock-file-id-${i
-				.toString()
-				.padStart(8, "0")}-mock-uuid`;
-		});
-
-		// Create a mock file
 		const mockFileItem: DirectoryItem = {
-			type: "file",
+			type: 'file',
 			name: fileName,
 			size: fileSize,
 			createdAt: new Date().toISOString(),
-			fileChunks: chunkIdArr,
+			fileChunks: chunkIdArr
 		};
 
-		// Create a mock directory structure with the new file added
 		const mockDirectory = {
 			...currentDirectory,
-			contents: [...currentDirectory.contents, mockFileItem],
+			contents: [...currentDirectory.contents, mockFileItem]
 		};
 
-		// Calculate the size difference more accurately
 		const currentJsonString = JSON.stringify(currentDirectory);
 		const mockJsonString = JSON.stringify(mockDirectory);
 
 		const currentSize = new TextEncoder().encode(currentJsonString).length;
 		const mockSize = new TextEncoder().encode(mockJsonString).length;
 
-		// Calculate the difference + encryption overhead for the additional data
 		const sizeDifference = mockSize - currentSize;
-		const estimatedSize = sizeDifference + 32;
+		const estimatedSize = sizeDifference + 32; // encryption overhead buffer
 
-		return Math.max(estimatedSize, 300); // Minimum 300 bytes for any file addition
+		return Math.max(estimatedSize, 300);
 	}
 }

@@ -1,4 +1,4 @@
-// src/app/auth.service.ts
+// File: src/app/auth.service.ts - Auth: register, login, token & master key handling.
 
 import { Injectable, Inject, PLATFORM_ID } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
@@ -11,6 +11,7 @@ import { base64ToUint8Array, uint8ArrayToBase64 } from './utils/utils';
 @Injectable({
 	providedIn: 'root'
 })
+/** Auth/session operations & key derivation. */
 export class AuthService {
 	private apiUrl = this.getApiUrl();
 	private userPassword: string | null = null;
@@ -26,6 +27,7 @@ export class AuthService {
 		this.restoreUserName();
 	}
 
+	/** Get API base URL (browser origin aware, SSR fallback). */
 	getApiUrl(): string {
 		if (typeof window !== 'undefined') {
 			return `${window.location.origin}/api`;
@@ -33,6 +35,7 @@ export class AuthService {
 		return 'https://127.0.0.1:4200/api';
 	}
 
+	/** Build Authorization + JSON headers using current token. */
 	getAuthHeaders(): HttpHeaders {
 		const token = this.getToken();
 		const headersConfig: { [header: string]: string } = {
@@ -44,13 +47,13 @@ export class AuthService {
 		return new HttpHeaders(headersConfig);
 	}
 
-	// Auto-restore user name on page refresh
+	/** Restore cached user name post-refresh if logged in. */
 	private restoreUserName(): void {
 		if (!isPlatformBrowser(this.platformId) || !this.isLoggedIn()) return;
 		this.userName = localStorage.getItem('userName');
 	}
 
-	// Auto-restore master key on page refresh
+	/** Restore master key & password from session storage if active. */
 	private async restoreMasterKey(): Promise<void> {
 		if (!isPlatformBrowser(this.platformId) || !this.isLoggedIn()) return;
 
@@ -75,6 +78,7 @@ export class AuthService {
 		}
 	}
 
+	/** Register new user (salt generated client-side). */
 	register(userData: any): Observable<any> {
 		// Generate salt for new user
 		if (isPlatformBrowser(this.platformId)) {
@@ -84,25 +88,23 @@ export class AuthService {
 		return this.http.post(`${this.apiUrl}/register`, userData);
 	}
 
+	/** Authenticate and derive master key on success. */
 	login(credentials: any): Observable<any> {
 		return this.http.post(`${this.apiUrl}/login`, credentials).pipe(
 			tap(async (response: any) => {
-				if (response.success && isPlatformBrowser(this.platformId)) {
-					this.setToken(response.token);
+				if (response.success && response.data && isPlatformBrowser(this.platformId)) {
+					this.setToken(response.data.token);
 					this.userPassword = credentials.password;
-
-					// Store user name
-					if (response.user?.name) {
-						this.userName = response.user.name;
-						localStorage.setItem('userName', response.user.name);
+					if (response.data.user?.name) {
+						this.userName = response.data.user.name;
+						localStorage.setItem('userName', response.data.user.name);
 					}
-
-					if (response.user?.salt) {
-						const salt = base64ToUint8Array(response.user.salt);
+					if (response.data.user?.salt) {
+						const salt = base64ToUint8Array(response.data.user.salt);
 						await this.cryptoService.generateMasterKey(credentials.password, salt);
 						await this.sessionStorage.storeCredentials(
 							credentials.password,
-							response.user.salt
+							response.data.user.salt
 						);
 					}
 				}
@@ -110,6 +112,7 @@ export class AuthService {
 		);
 	}
 
+	/** Clear auth artifacts and cryptographic material. */
 	logout(): void {
 		if (!isPlatformBrowser(this.platformId)) return;
 		localStorage.removeItem('token');
@@ -121,6 +124,7 @@ export class AuthService {
 		this.sessionStorage.cleanup();
 	}
 
+	/** True if browser localStorage contains a token. */
 	isLoggedIn(): boolean {
 		if (!isPlatformBrowser(this.platformId)) {
 			return false;
@@ -128,6 +132,7 @@ export class AuthService {
 		return !!localStorage.getItem('token');
 	}
 
+	/** Cached or restored display name. */
 	getUserName(): string | null {
 		if (this.userName) {
 			return this.userName;
@@ -141,6 +146,7 @@ export class AuthService {
 		return null;
 	}
 
+	/** Retrieve (and lazily restore) plain password. */
 	async getUserPassword(): Promise<string | null> {
 		if (this.userPassword) {
 			return this.userPassword;
@@ -154,6 +160,7 @@ export class AuthService {
 		return null;
 	}
 
+	/** Read token from localStorage. */
 	getToken(): string | null {
 		if (!isPlatformBrowser(this.platformId)) {
 			return null;
@@ -161,6 +168,7 @@ export class AuthService {
 		return localStorage.getItem('token');
 	}
 
+	/** Persist JWT token to localStorage. */
 	setToken(token: string): void {
 		if (!isPlatformBrowser(this.platformId)) {
 			return;

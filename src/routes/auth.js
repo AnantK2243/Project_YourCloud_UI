@@ -1,6 +1,5 @@
-// src/app/routes/auth.js
+// File: src/routes/auth.js - Auth routes: register/login/logout, email verify, JWT middleware & token blacklist mgmt
 
-// Authentication routes and middleware
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -12,13 +11,20 @@ const {
 } = require('../utils/validation');
 const crypto = require('crypto');
 const { sendVerificationEmail } = require('../utils/emailService');
+const { apiSuccess, apiError } = require('./apiResponse');
 
 const router = express.Router();
+
+// -----------------------------------------------------------------------------
+// Token Blacklist Maintenance
+// -----------------------------------------------------------------------------
 
 // Token blacklist for logout functionality
 const tokenBlacklist = new Map();
 
-// Function to clean up expired tokens from the blacklist
+/**
+ * Remove expired JWT entries from in-memory blacklist.
+ */
 function cleanupExpiredTokens() {
 	const now = Date.now();
 	let cleanedCount = 0;
@@ -43,48 +49,40 @@ if (process.env.NODE_ENV !== 'test') {
 	console.log(`Token blacklist cleanup job scheduled to run every ${hours} hours.`);
 }
 
-// JWT Authentication middleware
+// -----------------------------------------------------------------------------
+// JWT Authentication Middleware
+// -----------------------------------------------------------------------------
+
+/**
+ * Express middleware that validates Bearer JWT, attaches decoded user payload.
+ * Rejects invalid, expired, blacklisted or unverified tokens.
+ */
 const authenticateToken = async (req, res, next) => {
 	const authHeader = req.headers['authorization'];
 	const token = authHeader && authHeader.split(' ')[1];
 
 	if (!token) {
-		return res.status(401).json({
-			success: false,
-			message: 'Access token required'
-		});
+		return apiError(res, 401, 'Access token required');
 	}
 
 	// Check if token is blacklisted
 	if (tokenBlacklist.has(token)) {
-		return res.status(401).json({
-			success: false,
-			message: 'Token has been invalidated'
-		});
+		return apiError(res, 401, 'Token has been invalidated');
 	}
 
 	jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
 		if (err) {
-			return res.status(403).json({
-				success: false,
-				message: 'Invalid or expired token'
-			});
+			return apiError(res, 403, 'Invalid or expired token');
 		}
 
 		try {
 			const user = await User.findById(decoded.userId);
 			if (!user) {
-				return res.status(401).json({
-					success: false,
-					message: 'User not found'
-				});
+				return apiError(res, 401, 'User not found');
 			}
 
 			if (!user.isVerified) {
-				return res.status(403).json({
-					success: false,
-					message: 'Access denied. Please verify your email.'
-				});
+				return apiError(res, 403, 'Access denied. Please verify your email.');
 			}
 
 			req.user = decoded;
@@ -94,15 +92,19 @@ const authenticateToken = async (req, res, next) => {
 			if (process.env.NODE_ENV !== 'test') {
 				console.error('Authentication error:', error);
 			}
-			return res.status(500).json({
-				success: false,
-				message: 'Authentication failed'
-			});
+			return apiError(res, 500, 'Authentication failed');
 		}
 	});
 };
 
-// Add token to blacklist (for logout)
+// -----------------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------------
+
+/**
+ * Blacklist a JWT until its natural expiration. No-op on decode failure.
+ * @param {string} token Raw JWT string
+ */
 function blacklistToken(token) {
 	try {
 		const decoded = jwt.decode(token);
@@ -116,26 +118,27 @@ function blacklistToken(token) {
 	}
 }
 
-// User Registration
+// -----------------------------------------------------------------------------
+// Routes: Registration
+// -----------------------------------------------------------------------------
+/**
+ * POST /register
+ * Registers a new user, hashes password, issues verification email.
+ * Body: { name, email, password, salt }
+ * Success: 201 { userId }
+ */
 router.post('/register', async (req, res) => {
 	try {
 		const { name, email, password, salt } = req.body;
 
 		const validation = validateRegistrationInput({ name, email, password, salt });
 		if (!validation.isValid) {
-			return res.status(400).json({
-				success: false,
-				message: 'Invalid input data',
-				errors: validation.errors
-			});
+			return apiError(res, 400, 'Invalid input data', validation.errors);
 		}
 
 		const existingUser = await User.findOne({ email: email.toLowerCase() });
 		if (existingUser) {
-			return res.status(400).json({
-				success: false,
-				message: 'User with this email already exists'
-			});
+			return apiError(res, 400, 'User with this email already exists');
 		}
 
 		const saltRounds = 12;
@@ -155,63 +158,53 @@ router.post('/register', async (req, res) => {
 
 		try {
 			await sendVerificationEmail(newUser.email, newUser.emailVerificationToken);
-			res.status(201).json({
-				success: true,
-				message: 'Registration successful. Please check your email to verify your account.'
-			});
+			return apiSuccess(
+				res,
+				201,
+				'Registration successful. Please check your email to verify your account.',
+				{ userId: newUser._id }
+			);
 		} catch (error) {
 			console.error('Failed to send verification email:', error);
-			return res.status(500).json({
-				success: false,
-				message: 'User registered, but failed to send verification email.'
-			});
+			return apiError(res, 500, 'User registered, but failed to send verification email.');
 		}
 	} catch (error) {
 		if (process.env.NODE_ENV !== 'test') {
 			console.error('Registration error:', error);
 		}
-		res.status(500).json({
-			success: false,
-			message: 'Registration failed'
-		});
+		return apiError(res, 500, 'Registration failed');
 	}
 });
 
-// User Login
+// -----------------------------------------------------------------------------
+// Routes: Login
+// -----------------------------------------------------------------------------
+/**
+ * POST /login
+ * Authenticates user credentials and returns JWT + user profile subset.
+ * Body: { email, password }
+ */
 router.post('/login', async (req, res) => {
 	try {
 		const { email, password } = req.body;
 
 		const validation = validateLoginInput({ email, password });
 		if (!validation.isValid) {
-			return res.status(400).json({
-				success: false,
-				message: 'Invalid email or password',
-				errors: validation.errors
-			});
+			return apiError(res, 400, 'Invalid email or password', validation.errors);
 		}
 
 		const user = await User.findOne({ email: email.toLowerCase() });
 		if (!user) {
-			return res.status(400).json({
-				success: false,
-				message: 'Invalid email or password'
-			});
+			return apiError(res, 400, 'Invalid email or password');
 		}
 
 		const isPasswordValid = await bcrypt.compare(password, user.password);
 		if (!isPasswordValid) {
-			return res.status(400).json({
-				success: false,
-				message: 'Invalid email or password'
-			});
+			return apiError(res, 400, 'Invalid email or password');
 		}
 
 		if (!user.isVerified) {
-			return res.status(403).json({
-				success: false,
-				message: 'Please verify your email before logging in.'
-			});
+			return apiError(res, 403, 'Please verify your email before logging in.');
 		}
 
 		const token = jwt.sign(
@@ -222,35 +215,28 @@ router.post('/login', async (req, res) => {
 				iat: Math.floor(Date.now() / 1000)
 			},
 			process.env.JWT_SECRET,
-			{
-				expiresIn: '24h',
-				issuer: 'yourcloud-api',
-				audience: 'yourcloud-users'
-			}
+			{ expiresIn: '24h', issuer: 'yourcloud-api', audience: 'yourcloud-users' }
 		);
 
-		res.json({
-			success: true,
-			message: 'Login successful',
+		return apiSuccess(res, 200, 'Login successful', {
 			token,
-			user: {
-				id: user._id,
-				name: user.name,
-				email: user.email,
-				salt: user.salt
-			}
+			user: { id: user._id, name: user.name, email: user.email, salt: user.salt }
 		});
 	} catch (error) {
 		if (process.env.NODE_ENV !== 'test') {
 			console.error('Login error:', error);
 		}
-		res.status(500).json({
-			success: false,
-			message: 'Login failed'
-		});
+		return apiError(res, 500, 'Login failed');
 	}
 });
 
+// -----------------------------------------------------------------------------
+// Routes: Email Verification
+// -----------------------------------------------------------------------------
+/**
+ * GET /verify-email
+ * Validates email verification token (query param: token) and activates user.
+ */
 router.get('/verify-email', async (req, res) => {
 	console.log('Email verification endpoint hit');
 	try {
@@ -283,27 +269,30 @@ router.get('/verify-email', async (req, res) => {
 	}
 });
 
-// User Logout
+// -----------------------------------------------------------------------------
+// Routes: Logout
+// -----------------------------------------------------------------------------
+/**
+ * POST /logout
+ * Blacklists active JWT to invalidate further use.
+ */
 router.post('/logout', authenticateToken, (req, res) => {
 	try {
 		const token = req.token;
 		blacklistToken(token);
 
-		res.json({
-			success: true,
-			message: 'Logged out successfully'
-		});
+		return apiSuccess(res, 200, 'Logged out successfully');
 	} catch (error) {
 		if (process.env.NODE_ENV !== 'test') {
 			console.error('Logout error:', error);
 		}
-		res.status(500).json({
-			success: false,
-			message: 'Logout failed'
-		});
+		return apiError(res, 500, 'Logout failed');
 	}
 });
 
+// -----------------------------------------------------------------------------
+// Exports
+// -----------------------------------------------------------------------------
 module.exports = {
 	router,
 	authenticateToken,

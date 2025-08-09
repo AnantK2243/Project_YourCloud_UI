@@ -1,3 +1,4 @@
+// File: src/app/utils/node-utils.spec.ts - Tests node utility helpers (status, storage, validation)
 import {
 	getNodeStatusColor,
 	getNodeStatusText,
@@ -15,6 +16,7 @@ import {
 } from './node-utils';
 
 describe('node-utils', () => {
+	// Suite: ensures mapping/format/calculation helpers behave
 	it('maps status to color and text', () => {
 		expect(getNodeStatusColor('online')).toMatch(/green/);
 		expect(getNodeStatusColor('offline')).toMatch(/red/);

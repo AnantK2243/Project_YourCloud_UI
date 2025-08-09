@@ -1,4 +1,4 @@
-// src/app/login/login.component.ts
+// File: src/app/login/login.component.ts - Login form with validation and auth flow.
 
 import { Component, Inject, PLATFORM_ID, OnInit, OnDestroy } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -15,6 +15,7 @@ import { getFieldErrors, hasFieldError, isFormValid } from '../utils/component-u
 	imports: [FormsModule],
 	templateUrl: './login.component.html'
 })
+/** Login form component with real-time validation and auth flow. */
 export class LoginComponent implements OnInit, OnDestroy {
 	email: string = '';
 	password: string = '';
@@ -72,12 +73,13 @@ export class LoginComponent implements OnInit, OnDestroy {
 		});
 	}
 
-	// Field event handlers
+	/** Debounced field change handler for validation. */
 	onFieldChange(field: string, value: string) {
 		this.touched[field] = true;
 		this.validationSubject.next({ field, value });
 	}
 
+	/** Mark field as touched. */
 	onFieldBlur(field: string) {
 		this.touched[field] = true;
 	}
@@ -110,7 +112,7 @@ export class LoginComponent implements OnInit, OnDestroy {
 		}
 	}
 
-	// Get CSS class for field validation
+	/** CSS class for field validity. */
 	getFieldClass(field: string): string {
 		return this.validationService.getFieldValidationClass(
 			field,
@@ -119,17 +121,17 @@ export class LoginComponent implements OnInit, OnDestroy {
 		);
 	}
 
-	// Get field errors for display
+	/** Errors for a field. */
 	getFieldErrors(field: string): string[] {
 		return getFieldErrors(field, this.errors);
 	}
 
-	// Check if field has errors
+	/** True if field has an error. */
 	hasFieldError(field: string): boolean {
 		return hasFieldError(field, this.errors, this.touched, this.submitAttempted);
 	}
 
-	// Check if form is valid
+	/** True if overall form valid. */
 	isFormValid(): boolean {
 		return isFormValid(this.errors, ['email', 'password'], {
 			email: this.email,
@@ -137,6 +139,7 @@ export class LoginComponent implements OnInit, OnDestroy {
 		});
 	}
 
+	/** Attempt login submission. */
 	onLogin() {
 		this.submitAttempted = true;
 
@@ -176,8 +179,6 @@ export class LoginComponent implements OnInit, OnDestroy {
 				next: response => {
 					this.isSubmitting = false;
 					if (response.success) {
-						// Use auth service to store token
-						this.authService.setToken(response.token);
 						this.successMessage = 'Login successful! Redirecting...';
 						this.errorMessage = '';
 
@@ -227,6 +228,7 @@ export class LoginComponent implements OnInit, OnDestroy {
 			});
 	}
 
+	/** Navigate to register route. */
 	goToRegister() {
 		this.router.navigate(['/register']);
 	}

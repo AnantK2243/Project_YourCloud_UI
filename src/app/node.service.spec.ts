@@ -1,3 +1,4 @@
+// File: src/app/node.service.spec.ts - Tests NodeService HTTP CRUD & listing logic
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
@@ -15,6 +16,7 @@ class AuthServiceStub {
 }
 
 describe('NodeService', () => {
+	// Suite: exercises basic GET/POST/DELETE flows & error shaping
 	let service: NodeService;
 	let httpMock: HttpTestingController;
 	const apiUrl = 'https://api.test.com';

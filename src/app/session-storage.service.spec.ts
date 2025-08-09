@@ -1,7 +1,9 @@
+// File: src/app/session-storage.service.spec.ts - Tests SessionStorageService credential storage/clear logic
 import { TestBed } from '@angular/core/testing';
 import { SessionStorageService } from './session-storage.service';
 
 describe('SessionStorageService', () => {
+	// Suite: verifies store/retrieve/clear credential flows
 	let service: SessionStorageService;
 
 	beforeEach(() => {

@@ -1,3 +1,4 @@
+// File: src/app/utils/auth-utils.spec.ts - Tests token storage and auth header helpers
 import {
 	setToken,
 	getToken,
@@ -9,6 +10,7 @@ import {
 } from './auth-utils';
 
 describe('auth-utils', () => {
+	// Suite: token lifecycle + header assembly
 	beforeEach(() => {
 		localStorage.clear();
 	});

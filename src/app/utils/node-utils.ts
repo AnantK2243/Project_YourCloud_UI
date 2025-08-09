@@ -1,9 +1,10 @@
-// src/app/utils/node-utils.ts
+// File: src/app/utils/node-utils.ts - Storage node status, formatting, validation and stats helpers
 
 import { StorageNode } from '../node.service';
 
 // Node status utilities
 export function getNodeStatusColor(status: string): string {
+	// Return tailwind classes representing node status color
 	switch (status) {
 		case 'online':
 			return 'text-green-600 bg-green-100/50';
@@ -17,6 +18,7 @@ export function getNodeStatusColor(status: string): string {
 }
 
 export function getNodeStatusText(status: string): string {
+	// Human readable status label
 	switch (status) {
 		case 'online':
 			return 'Online';
@@ -31,91 +33,84 @@ export function getNodeStatusText(status: string): string {
 
 // Storage calculation utilities
 export function calculateStoragePercentage(used: number, total: number): number {
+	// Percentage (0-100) of used storage
 	if (total <= 0) return 0;
 	return Math.min(Math.round((used / total) * 100), 100);
 }
 
 export function formatStorageInfo(used: number, total: number): string {
+	// Format storage usage with percentage
 	if (total <= 0) return 'No storage info';
-
 	const percentage = calculateStoragePercentage(used, total);
 	return `${formatBytes(used)} / ${formatBytes(total)} (${percentage}%)`;
 }
 
-// Storage formatting (enhanced version of existing formatFileSize)
+// Storage formatting
 export function formatBytes(bytes: number | undefined): string {
+	// Convert bytes to largest suitable unit
 	if (bytes === undefined || bytes === null) return '0 B';
 	if (bytes === 0) return '0 B';
-
 	const k = 1024;
 	const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
 	const i = Math.floor(Math.log(bytes) / Math.log(k));
-
 	if (i >= sizes.length) {
 		return `${parseFloat((bytes / Math.pow(k, sizes.length - 1)).toFixed(2))} ${sizes[sizes.length - 1]}`;
 	}
-
 	return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
 
 // Node validation utilities
 export function validateNodeName(name: string): { isValid: boolean; message?: string } {
+	// Validate node name length and characters
 	if (!name || name.trim() === '') {
 		return { isValid: false, message: 'Node name is required' };
 	}
-
 	const trimmedName = name.trim();
-
 	if (trimmedName.length < 3) {
 		return { isValid: false, message: 'Node name must be at least 3 characters long' };
 	}
-
 	if (trimmedName.length > 50) {
 		return { isValid: false, message: 'Node name must be 50 characters or less' };
 	}
-
-	// Allow alphanumeric characters, spaces, hyphens, and underscores
 	if (!/^[a-zA-Z0-9\s\-_]+$/.test(trimmedName)) {
 		return {
 			isValid: false,
 			message: 'Node name can only contain letters, numbers, spaces, hyphens, and underscores'
 		};
 	}
-
 	return { isValid: true };
 }
 
 // Node filtering and sorting utilities
 export function sortNodesByStatus(nodes: StorageNode[]): StorageNode[] {
+	// Sort nodes by status priority then name
 	const statusOrder = { online: 0, pending: 1, offline: 2 };
-
 	return [...nodes].sort((a, b) => {
 		const aOrder = statusOrder[a.status as keyof typeof statusOrder] ?? 3;
 		const bOrder = statusOrder[b.status as keyof typeof statusOrder] ?? 3;
-
-		if (aOrder !== bOrder) {
-			return aOrder - bOrder;
-		}
-
-		// If status is the same, sort by name
+		if (aOrder !== bOrder) return aOrder - bOrder;
 		return a.node_name.localeCompare(b.node_name);
 	});
 }
 
 export function filterNodesByStatus(nodes: StorageNode[], status: string): StorageNode[] {
+	// Return nodes matching a given status
 	return nodes.filter(node => node.status === status);
 }
 
 export function getOnlineNodes(nodes: StorageNode[]): StorageNode[] {
+	// Convenience to get online nodes
 	return filterNodesByStatus(nodes, 'online');
 }
 
 export function getOfflineNodes(nodes: StorageNode[]): StorageNode[] {
+	// Convenience to get offline nodes
 	return filterNodesByStatus(nodes, 'offline');
 }
 
 // Node statistics utilities
 export interface NodeStatistics {
+	// Aggregate node/stat storage metrics
 	totalNodes: number;
 	onlineNodes: number;
 	offlineNodes: number;
@@ -126,6 +121,7 @@ export interface NodeStatistics {
 }
 
 export function calculateNodeStatistics(nodes: StorageNode[]): NodeStatistics {
+	// Build aggregate node metrics
 	const stats: NodeStatistics = {
 		totalNodes: nodes.length,
 		onlineNodes: 0,
@@ -164,6 +160,7 @@ export function calculateNodeStatistics(nodes: StorageNode[]): NodeStatistics {
 
 // Time utilities for node management
 export function formatLastSeen(lastSeen: string | undefined): string {
+	// Human friendly relative last seen time
 	if (!lastSeen) return 'Never';
 
 	const date = new Date(lastSeen);
@@ -190,6 +187,7 @@ export function isNodeStale(
 	lastSeen: string | undefined,
 	staleThresholdMinutes: number = 60
 ): boolean {
+	// Determine if last seen exceeds staleness threshold
 	if (!lastSeen) return true;
 
 	const date = new Date(lastSeen);

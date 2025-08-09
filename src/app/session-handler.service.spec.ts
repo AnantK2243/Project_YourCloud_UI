@@ -1,3 +1,4 @@
+// File: src/app/session-handler.service.spec.ts - Tests SessionHandlerService session error handling & logout redirect
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SessionHandlerService } from './session-handler.service';
 
@@ -16,6 +17,7 @@ class AuthServiceStub {
 }
 
 describe('SessionHandlerService', () => {
+	// Suite: covers detection (isSessionError) and handling (handleSessionError)
 	let service: SessionHandlerService;
 	let router: RouterStub;
 	let auth: AuthServiceStub;

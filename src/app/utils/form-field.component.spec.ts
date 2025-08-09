@@ -1,7 +1,9 @@
+// File: src/app/utils/form-field.component.spec.ts - Tests FormFieldComponent value binding and change emission
 import { TestBed } from '@angular/core/testing';
 import { FormFieldComponent } from './form-field.component';
 
 describe('FormFieldComponent', () => {
+	// Suite: ensures input change updates component value
 	beforeEach(async () => {
 		await TestBed.configureTestingModule({
 			imports: [FormFieldComponent]

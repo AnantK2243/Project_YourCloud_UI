@@ -1,4 +1,4 @@
-// src/app/utils/index.ts
+// File: src/app/utils/index.ts - Barrel exporting all utility modules
 
 // Re-export all utility functions for easy importing
 export * from './auth-utils';

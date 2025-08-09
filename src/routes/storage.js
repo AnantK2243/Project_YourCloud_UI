@@ -1,4 +1,11 @@
+// File: src/routes/storage.js - Storage & node routes: node status, chunk lifecycle, presigned sessions, cache & WS dispatch
+
 // Storage and Node management routes
+/**
+ * Storage & Node Routes: manage storage nodes, chunk lifecycle, upload/download sessions.
+ * Includes caching, ownership validation, and WebSocket command dispatch.
+ */
+
 const express = require('express');
 const {
 	S3Client,
@@ -10,6 +17,7 @@ const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const bcrypt = require('bcryptjs');
 const { authenticateToken } = require('./auth');
 const { StorageNode, User } = require('../models/User');
+const { apiSuccess, apiError } = require('./apiResponse');
 
 const router = express.Router();
 
@@ -33,7 +41,10 @@ const nodeStatusCacheOfflineTTL = 30 * 60 * 1000; // 30 minutes
 const userOwnershipCache = new Map(); // userId -> { nodeIds: Set, timestamp }
 const userOwnershipCacheTTL = 60 * 60 * 1000; // 1 hour
 
-// Clean up expired cache entries
+// -----------------------------------------------------------------------------
+// Cache Maintenance
+// -----------------------------------------------------------------------------
+/** Purge expired node status cache entries based on TTL. */
 function cleanupNodeStatusCache() {
 	const now = Date.now();
 	for (const [nodeId, entry] of nodeStatusCache) {
@@ -46,7 +57,7 @@ function cleanupNodeStatusCache() {
 	}
 }
 
-// Clean up expired user ownership cache entries
+/** Purge expired user ownership cache entries. */
 function cleanupUserOwnershipCache() {
 	const now = Date.now();
 	for (const [userId, entry] of userOwnershipCache) {
@@ -55,7 +66,6 @@ function cleanupUserOwnershipCache() {
 		}
 	}
 }
-
 
 // Clean up caches every 30 minutes
 let cacheCleanupInterval;
@@ -66,7 +76,9 @@ if (process.env.NODE_ENV !== 'test') {
 	}, 30 * 60 * 1000);
 }
 
-// Helper functions to get WebSocket manager instances
+// -----------------------------------------------------------------------------
+// WebSocket Accessors
+// -----------------------------------------------------------------------------
 function getWSManager(req) {
 	return req.app.locals.wsManager;
 }
@@ -79,7 +91,9 @@ function getPendingCommands(req) {
 	return getWSManager(req).getPendingCommands();
 }
 
-// Generate unique command IDs
+// -----------------------------------------------------------------------------
+// Command ID Generation
+// -----------------------------------------------------------------------------
 function generateCommandId(req) {
 	const pendingCommands = getPendingCommands(req);
 	let attempts = 0;
@@ -99,7 +113,18 @@ function generateCommandId(req) {
 	throw new Error('Unable to generate unique command ID');
 }
 
-// Validates user owns the storage node
+// -----------------------------------------------------------------------------
+// Ownership Validation
+// -----------------------------------------------------------------------------
+/**
+ * Validate requesting user owns target node and (optionally) connection status.
+ * @param {import('express').Request} req
+ * @param {string} userId
+ * @param {string} nodeId
+ * @param {boolean} [requireConnection=true]
+ * @throws {Error}
+ * @returns {Promise<boolean>}
+ */
 async function validateUserOwnsNode(req, userId, nodeId, requireConnection = true) {
 	try {
 		// Check ownership cache first
@@ -155,6 +180,14 @@ async function validateUserOwnsNode(req, userId, nodeId, requireConnection = tru
 }
 
 // Updates storage node status
+/**
+ * Refresh (and cache) node status via WebSocket STATUS_REQUEST (if connected)
+ * falling back to DB snapshot; applies dual TTL for online/offline states.
+ * @param {import('express').Request} req
+ * @param {string} nodeId
+ * @param {boolean} [forceUpdate=false]
+ * @returns {Promise<object|null>} Normalized status or null on failure
+ */
 async function updateNodeStatus(req, nodeId, forceUpdate = false) {
 	try {
 		const nodeConnections = getNodeConnections(req);
@@ -248,6 +281,15 @@ async function updateNodeStatus(req, nodeId, forceUpdate = false) {
 }
 
 // Send command to storage node and wait for response
+/**
+ * Dispatch a command expecting a single JSON (or binary) response.
+ * @param {import('express').Request} req
+ * @param {string} nodeId
+ * @param {object} command
+ * @param {boolean} [timeout=true]
+ * @param {string|null} [command_id=null]
+ * @returns {Promise<any>}
+ */
 async function sendStorageNodeCommand(req, nodeId, command, timeout = true, command_id = null) {
 	return new Promise((resolve, reject) => {
 		const nodeConnections = getNodeConnections(req);
@@ -310,6 +352,14 @@ async function sendStorageNodeCommand(req, nodeId, command, timeout = true, comm
 }
 
 // Send store command with data
+/**
+ * Send STORE_CHUNK with binary payload (framed) and await result.
+ * @param {import('express').Request} req
+ * @param {string} nodeId
+ * @param {object} command
+ * @param {Buffer} binaryData
+ * @returns {Promise<any>}
+ */
 async function sendStoreCommand(req, nodeId, command, binaryData) {
 	return new Promise((resolve, reject) => {
 		(async () => {
@@ -389,15 +439,14 @@ async function sendStoreCommand(req, nodeId, command, binaryData) {
 }
 
 // POST /api/nodes - Register a new storage node
+/**
+ * POST /nodes - Register new storage node (ownership bound to auth user).
+ */
 router.post('/nodes', authenticateToken, async (req, res) => {
 	try {
 		const { node_name } = req.body;
-
 		if (!node_name || !node_name.trim()) {
-			return res.status(400).json({
-				success: false,
-				error: 'node_name is required'
-			});
+			return apiError(res, 400, 'node_name is required');
 		}
 
 		// Generate a random unused node_id
@@ -475,32 +524,21 @@ router.post('/nodes', authenticateToken, async (req, res) => {
 			userOwnershipCache.delete(req.user.userId);
 		}
 
-		res.status(201).json({
-			success: true,
-			data: {
-				nodeId: node_id,
-				authToken: auth_token,
-				nodeName: node_name.trim()
-			}
-		});
+		return apiSuccess(res, 201, 'Node registered', { nodeId: node_id, authToken: auth_token, nodeName: node_name.trim() });
 	} catch (error) {
-		res.status(500).json({
-			success: false,
-			error: 'Failed to register node: ' + error.message
-		});
+		return apiError(res, 500, 'Failed to register node: ' + error.message);
 	}
 });
 
 // GET /api/nodes - Get user's storage nodes
+/**
+ * GET /nodes - List authenticated user's nodes (sanitized fields).
+ */
 router.get('/nodes', authenticateToken, async (req, res) => {
 	try {
 		const user = await User.findById(req.user.userId);
-
 		if (!user) {
-			return res.status(404).json({
-				success: false,
-				message: 'User not found'
-			});
+			return apiError(res, 404, 'User not found');
 		}
 
 		// Get detailed information about each storage node
@@ -510,69 +548,55 @@ router.get('/nodes', authenticateToken, async (req, res) => {
 			.select('-auth_token')
 			.select('-owner_user_id'); // Exclude auth_token and owner_user_id for security
 
-		res.json({
-			success: true,
-			data: storageNodes
-		});
+		return apiSuccess(res, 200, undefined, storageNodes);
 	} catch (error) {
-		res.status(500).json({
-			success: false,
-			message: 'Failed to fetch storage nodes: ' + error.message
-		});
+		return apiError(res, 500, 'Failed to fetch storage nodes: ' + error.message);
 	}
 });
 
 // GET /api/nodes/:nodeId/status - Check storage node status
+/**
+ * GET /nodes/:nodeId/status - Resolve cached or live status.
+ */
 router.get('/nodes/:nodeId/status', authenticateToken, async (req, res) => {
 	try {
 		const { nodeId } = req.params;
 		if (!nodeId) {
-			throw new Error('nodeId is required');
+			return apiError(res, 400, 'nodeId is required');
 		}
 
 		const nodeStatus = await updateNodeStatus(req, nodeId);
 		if (!nodeStatus) {
-			throw new Error(`Failed to update status for node ${nodeId}`);
+			return apiError(res, 500, `Failed to update status for node ${nodeId}`);
 		}
-		res.json({
-			success: true,
-			data: nodeStatus
-		});
+
+		return apiSuccess(res, 200, undefined, nodeStatus);
 	} catch (error) {
 		if (error.message.includes('required')) {
-			res.status(400).json({
-				success: false,
-				error: error.message
-			});
-		} else if (error.message.includes('Failed to update status')) {
-			res.status(500).json({
-				success: false,
-				error: error.message
-			});
-		} else {
-			res.status(500).json({
-				success: false,
-				error: 'Failed to check node status: ' + error.message
-			});
+			return apiError(res, 400, error.message);
 		}
+		if (error.message.includes('Failed to update status')) {
+			return apiError(res, 500, error.message);
+		}
+		return apiError(res, 500, 'Failed to check node status: ' + error.message);
 	}
 });
 
 // DELETE /api/nodes/:nodeId - Delete storage node
+/**
+ * DELETE /nodes/:nodeId - Remove node definition & caches.
+ */
 router.delete('/nodes/:nodeId', authenticateToken, async (req, res) => {
 	try {
 		const { nodeId } = req.params;
 		if (!nodeId) {
-			throw new Error('nodeId is required');
+			return apiError(res, 400, 'nodeId is required');
 		}
 
 		// Find the node in the database first
 		const node = await StorageNode.findOne({ node_id: nodeId });
 		if (!node) {
-			return res.status(404).json({
-				success: false,
-				error: 'Node not found'
-			});
+			return res.status(404).json({ success: false, message: 'Node not found' });
 		}
 
 		// Validate user owns the node (don't require connection for deletion)
@@ -594,34 +618,22 @@ router.delete('/nodes/:nodeId', authenticateToken, async (req, res) => {
 			nodeStatusCache.delete(nodeId);
 		}
 
-		res.json({
-			success: true,
-			data: {
-				nodeId,
-				status: 'deleted'
-			}
-		});
+		return apiSuccess(res, 200, 'Node deleted', { nodeId, status: 'deleted' });
 	} catch (error) {
 		if (error.message.includes('required')) {
-			res.status(400).json({
-				success: false,
-				error: error.message
-			});
-		} else if (error.message.includes('does not own')) {
-			res.status(403).json({
-				success: false,
-				error: 'Access denied'
-			});
-		} else {
-			res.status(500).json({
-				success: false,
-				error: 'Failed to delete node: ' + error.message
-			});
+			return apiError(res, 400, error.message);
 		}
+		if (error.message.includes('does not own')) {
+			return apiError(res, 403, 'Access denied');
+		}
+		return apiError(res, 500, 'Failed to delete node: ' + error.message);
 	}
 });
 
 // POST /api/nodes/:nodeId/chunks/upload-sessions - Create upload session
+/**
+ * POST /nodes/:nodeId/chunks/upload-sessions - Create presigned upload session.
+ */
 router.post('/nodes/:nodeId/chunks/upload-sessions', authenticateToken, async (req, res) => {
 	const { nodeId } = req.params;
 	const { data_size } = req.body;
@@ -633,10 +645,7 @@ router.post('/nodes/:nodeId/chunks/upload-sessions', authenticateToken, async (r
 		const chunkIdResponse = await sendStorageNodeCommand(
 			req,
 			nodeId,
-			{
-				command_type: 'PREP_UPLOAD',
-				data_size
-			},
+			{ command_type: 'PREP_UPLOAD', data_size },
 			true,
 			commandId
 		);
@@ -645,7 +654,6 @@ router.post('/nodes/:nodeId/chunks/upload-sessions', authenticateToken, async (r
 			throw new Error('Failed to get a valid chunkId from the storage node.');
 		}
 		const { chunk_id: chunkId } = chunkIdResponse;
-
 		const temporaryObjectName = `temp-${commandId}-${chunkId}`;
 
 		const putCommand = new PutObjectCommand({
@@ -654,26 +662,25 @@ router.post('/nodes/:nodeId/chunks/upload-sessions', authenticateToken, async (r
 		});
 		const uploadUrl = await getSignedUrl(s3Client, putCommand, { expiresIn: 300 });
 
-		res.status(201).json({
-			success: true,
-			data: {
-				sessionId: commandId,
-				chunkId,
-				uploadUrl,
-				temporaryObjectName,
-				expiresIn: 300
-			}
+		return apiSuccess(res, 201, undefined, {
+			sessionId: commandId,
+			chunkId,
+			uploadUrl,
+			temporaryObjectName,
+			expiresIn: 300
 		});
 	} catch (error) {
 		if (process.env.NODE_ENV !== 'test') {
 			console.error('[ERROR] Upload session creation failed:', error);
-			console.error('[ERROR] Error stack:', error.stack);
 		}
-		res.status(500).json({ success: false, error: error.message });
+		return apiError(res, 500, error.message);
 	}
 });
 
 // POST /api/nodes/:nodeId/chunks/:chunkId - Store chunk (direct binary upload)
+/**
+ * POST /nodes/:nodeId/chunks/:chunkId - Direct binary chunk upload.
+ */
 router.post(
 	'/nodes/:nodeId/chunks/:chunkId',
 	authenticateToken,
@@ -682,7 +689,7 @@ router.post(
 		try {
 			const { nodeId, chunkId } = req.params;
 			if (!nodeId || !chunkId) {
-				throw new Error('Node ID and Chunk ID are required');
+				return apiError(res, 400, 'Node ID and Chunk ID are required');
 			}
 
 			await validateUserOwnsNode(req, req.user.userId, nodeId);
@@ -705,58 +712,39 @@ router.post(
 			);
 
 			if (result.success && result.chunk_id) {
-				res.status(201).json({
-					success: true,
-					data: {
-						chunkId: result.chunk_id,
-						status: 'stored'
-					}
-				});
-			} else {
-				throw new Error(result.error || 'Failed to store chunk');
+				return apiSuccess(res, 201, undefined, { chunkId: result.chunk_id, status: 'stored' });
 			}
+			throw new Error(result.error || 'Failed to store chunk');
 		} catch (error) {
 			if (error.message.includes('required')) {
-				res.status(400).json({
-					success: false,
-					error: error.message
-				});
-			} else if (error.message.includes('not connected')) {
-				res.status(503).json({
-					success: false,
-					error: 'Storage node is not available'
-				});
-			} else if (error.message.includes('does not own')) {
-				res.status(403).json({
-					success: false,
-					error: 'Access denied'
-				});
-			} else if (error.message.includes('Chunk ID already exists')) {
-				res.status(409).json({
-					success: false,
-					error: 'Chunk ID already exists'
-				});
-			} else if (error.message.includes('Insufficient disk space.')) {
-				res.status(507).json({
-					success: false,
-					error: error.message
-				});
-			} else {
-				res.status(500).json({
-					success: false,
-					error: error.message || 'Internal Server Error'
-				});
+				return apiError(res, 400, error.message);
 			}
+			if (error.message.includes('not connected')) {
+				return apiError(res, 503, 'Storage node is not available');
+			}
+			if (error.message.includes('does not own')) {
+				return apiError(res, 403, 'Access denied');
+			}
+			if (error.message.includes('Chunk ID already exists')) {
+				return apiError(res, 409, 'Chunk ID already exists');
+			}
+			if (error.message.includes('Insufficient disk space.')) {
+				return apiError(res, 507, error.message);
+			}
+			return apiError(res, 500, error.message || 'Internal Server Error');
 		}
 	}
 );
 
 // GET /api/nodes/:nodeId/chunks/:chunkId - Get chunk data
+/**
+ * GET /nodes/:nodeId/chunks/:chunkId - Retrieve raw encrypted chunk data.
+ */
 router.get('/nodes/:nodeId/chunks/:chunkId', authenticateToken, async (req, res) => {
 	try {
 		const { nodeId, chunkId } = req.params;
 		if (!nodeId || !chunkId) {
-			throw new Error('Node ID and Chunk ID are required');
+			return apiError(res, 400, 'Node ID and Chunk ID are required');
 		}
 
 		await validateUserOwnsNode(req, req.user.userId, nodeId);
@@ -770,46 +758,35 @@ router.get('/nodes/:nodeId/chunks/:chunkId', authenticateToken, async (req, res)
 		if (result.success && result.data) {
 			res.set('Content-Type', 'application/octet-stream');
 			res.set('Content-Length', result.data.length.toString());
-			res.send(result.data);
-		} else {
-			throw new Error(result.error || 'Chunk not found');
+			return res.send(result.data);
 		}
+		throw new Error(result.error || 'Chunk not found');
 	} catch (error) {
 		if (error.message.includes('required')) {
-			res.status(400).json({
-				success: false,
-				error: error.message
-			});
-		} else if (error.message.includes('not connected')) {
-			res.status(503).json({
-				success: false,
-				error: 'Storage node is not available'
-			});
-		} else if (error.message.includes('does not own')) {
-			res.status(403).json({
-				success: false,
-				error: 'Access denied'
-			});
-		} else if (error.message.includes('not found')) {
-			res.status(404).json({
-				success: false,
-				error: error.message
-			});
-		} else {
-			res.status(500).json({
-				success: false,
-				error: error.message || 'Internal Server Error'
-			});
+			return apiError(res, 400, error.message);
 		}
+		if (error.message.includes('not connected')) {
+			return apiError(res, 503, 'Storage node is not available');
+		}
+		if (error.message.includes('does not own')) {
+			return apiError(res, 403, 'Access denied');
+		}
+		if (error.message.includes('not found')) {
+			return apiError(res, 404, error.message);
+		}
+		return apiError(res, 500, error.message || 'Internal Server Error');
 	}
 });
 
 // DELETE /api/nodes/:nodeId/chunks/:chunkId - Delete chunk
+/**
+ * DELETE /nodes/:nodeId/chunks/:chunkId - Remove chunk from node storage.
+ */
 router.delete('/nodes/:nodeId/chunks/:chunkId', authenticateToken, async (req, res) => {
 	try {
 		const { nodeId, chunkId } = req.params;
 		if (!nodeId || !chunkId) {
-			throw new Error('Node ID and Chunk ID are required');
+			return apiError(res, 400, 'Node ID and Chunk ID are required');
 		}
 
 		await validateUserOwnsNode(req, req.user.userId, nodeId);
@@ -821,47 +798,30 @@ router.delete('/nodes/:nodeId/chunks/:chunkId', authenticateToken, async (req, r
 		});
 
 		if (result.success) {
-			res.json({
-				success: true,
-				data: {
-					chunkId,
-					status: 'deleted'
-				}
-			});
-		} else {
-			throw new Error(result.error || 'Failed to delete chunk');
+			return apiSuccess(res, 200, undefined, { chunkId, status: 'deleted' });
 		}
+		throw new Error(result.error || 'Failed to delete chunk');
 	} catch (error) {
 		if (error.message.includes('required')) {
-			res.status(400).json({
-				success: false,
-				error: error.message
-			});
-		} else if (error.message.includes('not connected')) {
-			res.status(503).json({
-				success: false,
-				error: 'Storage node is not available'
-			});
-		} else if (error.message.includes('does not own')) {
-			res.status(403).json({
-				success: false,
-				error: 'Access denied'
-			});
-		} else if (error.message.includes('not found')) {
-			res.status(404).json({
-				success: false,
-				error: error.message
-			});
-		} else {
-			res.status(500).json({
-				success: false,
-				error: error.message || 'Internal Server Error'
-			});
+			return apiError(res, 400, error.message);
 		}
+		if (error.message.includes('not connected')) {
+			return apiError(res, 503, 'Storage node is not available');
+		}
+		if (error.message.includes('does not own')) {
+			return apiError(res, 403, 'Access denied');
+		}
+		if (error.message.includes('not found')) {
+			return apiError(res, 404, error.message);
+		}
+		return apiError(res, 500, error.message || 'Internal Server Error');
 	}
 });
 
 // PUT /api/nodes/:nodeId/chunks/:chunkId - Complete upload and store chunk
+/**
+ * PUT /nodes/:nodeId/chunks/:chunkId - Finalize presigned upload to node.
+ */
 router.put('/nodes/:nodeId/chunks/:chunkId', authenticateToken, async (req, res) => {
 	const { nodeId, chunkId } = req.params;
 	const { temporaryObjectName } = req.body;
@@ -869,7 +829,7 @@ router.put('/nodes/:nodeId/chunks/:chunkId', authenticateToken, async (req, res)
 	if (!chunkId || !temporaryObjectName) {
 		return res.status(400).json({
 			success: false,
-			error: 'chunkId and temporaryObjectName are required.'
+			message: 'chunkId and temporaryObjectName are required.'
 		});
 	}
 
@@ -903,19 +863,16 @@ router.put('/nodes/:nodeId/chunks/:chunkId', authenticateToken, async (req, res)
 		});
 		await s3Client.send(deleteCommand);
 
-		res.json({
-			success: true,
-			data: {
-				chunkId,
-				status: 'stored'
-			}
-		});
+		return apiSuccess(res, 200, undefined, { chunkId, status: 'stored' });
 	} catch (error) {
-		res.status(500).json({ success: false, error: error.message });
+		return apiError(res, 500, error.message);
 	}
 });
 
 // POST /api/nodes/:nodeId/chunks/:chunkId/download-sessions - Create download session
+/**
+ * POST /nodes/:nodeId/chunks/:chunkId/download-sessions - Prepare presigned download.
+ */
 router.post(
 	'/nodes/:nodeId/chunks/:chunkId/download-sessions',
 	authenticateToken,
@@ -934,69 +891,61 @@ router.post(
 			});
 			const uploadUrl = await getSignedUrl(s3Client, putCommand, { expiresIn: 300 });
 
-			// Tell the storage node to fetch the chunk from its disk and upload it to R2
 			const uploadConfirmation = await sendStorageNodeCommand(
 				req,
 				nodeId,
-				{
-					command_type: 'RETRIEVE_AND_UPLOAD_CHUNK',
-					chunk_id: chunkId,
-					upload_url: uploadUrl
-				},
+				{ command_type: 'RETRIEVE_AND_UPLOAD_CHUNK', chunk_id: chunkId, upload_url: uploadUrl },
 				false,
 				commandId
 			); // No timeout for this command
 
 			if (!uploadConfirmation || !uploadConfirmation.success) {
-				throw new Error(
-					uploadConfirmation.error || 'Storage node failed to upload the chunk.'
-				);
+				throw new Error(uploadConfirmation.error || 'Storage node failed to upload the chunk.');
 			}
 
-			// Once the storage node confirms the upload, create a pre-signed GET URL for the frontend
 			const getCommand = new GetObjectCommand({
 				Bucket: R2_BUCKET_NAME,
 				Key: temporaryObjectName
 			});
 			const downloadUrl = await getSignedUrl(s3Client, getCommand, { expiresIn: 300 });
 
-			// Respond to the frontend with the download link
-			res.status(201).json({
-				success: true,
-				data: {
-					sessionId: commandId,
-					downloadUrl,
-					temporaryObjectName,
-					expiresIn: 300
-				}
-			});
-
-			// Schedule cleanup after 10 minutes
-			setTimeout(
-				async () => {
-					try {
-						const deleteCommand = new DeleteObjectCommand({
-							Bucket: R2_BUCKET_NAME,
-							Key: temporaryObjectName
-						});
-						await s3Client.send(deleteCommand);
-						console.log(`Cleaned up temporary download object: ${temporaryObjectName}`);
-					} catch (error) {
-						console.error(
-							`Failed to cleanup temporary download object ${temporaryObjectName}:`,
-							error
+			// Schedule cleanup BEFORE returning (was previously unreachable after return)
+			setTimeout(async () => {
+				try {
+					const deleteCommand = new DeleteObjectCommand({
+						Bucket: R2_BUCKET_NAME,
+						Key: temporaryObjectName
+					});
+					await s3Client.send(deleteCommand);
+					if (process.env.NODE_ENV !== 'test') {
+						console.log(
+							`Cleaned up temporary download object: ${temporaryObjectName}`
 						);
 					}
-				},
-				10 * 60 * 1000
-			); // 10 minute cleanup
+				} catch (error) {
+					console.error(
+						`Failed to cleanup temporary download object ${temporaryObjectName}:`,
+						error
+					);
+				}
+			}, 10 * 60 * 1000); // 10 minute cleanup
+
+			return apiSuccess(res, 201, undefined, {
+				sessionId: commandId,
+				downloadUrl,
+				temporaryObjectName,
+				expiresIn: 300
+			});
 		} catch (error) {
-			res.status(500).json({ success: false, error: error.message });
+			return apiError(res, 500, error.message);
 		}
 	}
 );
 
 // DELETE /api/nodes/:nodeId/chunks/:chunkId/download-sessions - Complete download and cleanup
+/**
+ * DELETE /nodes/:nodeId/chunks/:chunkId/download-sessions - Finalize download session cleanup.
+ */
 router.delete(
 	'/nodes/:nodeId/chunks/:chunkId/download-sessions',
 	authenticateToken,
@@ -1007,7 +956,7 @@ router.delete(
 		if (!temporaryObjectName) {
 			return res.status(400).json({
 				success: false,
-				error: 'temporaryObjectName is required.'
+				message: 'temporaryObjectName is required.'
 			});
 		}
 
@@ -1022,24 +971,17 @@ router.delete(
 
 			await s3Client.send(deleteCommand);
 
-			res.json({
-				success: true,
-				data: {
-					chunkId,
-					status: 'download_session_completed'
-				}
-			});
+			return apiSuccess(res, 200, undefined, { chunkId, status: 'download_session_completed' });
 		} catch (error) {
-			// Cleanup is non-critical as it will automatically be cleaned up later
-			res.status(500).json({
-				success: false,
-				error: `Failed to cleanup temporary object: ${error.message}`
-			});
+			return apiError(res, 500, `Failed to cleanup temporary object: ${error.message}`);
 		}
 	}
 );
 
 // Function to clear the interval
+/**
+ * Clear cache cleanup interval (for graceful shutdown / tests).
+ */
 function clearCacheCleanupInterval() {
 	if (cacheCleanupInterval) {
 		clearInterval(cacheCleanupInterval);

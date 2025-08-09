@@ -1,4 +1,4 @@
-// src/app/register/register.component.ts
+// File: src/app/register/register.component.ts - User registration with validation & strength meter.
 
 import { Component, OnDestroy } from '@angular/core';
 import { Router } from '@angular/router';
@@ -22,6 +22,7 @@ import {
 	imports: [FormsModule],
 	templateUrl: './register.component.html'
 })
+/** User registration component with validation + password strength UI. */
 export class RegisterComponent implements OnDestroy {
 	name: string = '';
 	email: string = '';
@@ -67,7 +68,7 @@ export class RegisterComponent implements OnDestroy {
 		this.validationSubject.complete();
 	}
 
-	// Field event handlers
+	/** Debounced field change handler. */
 	onFieldChange(field: string, value: string) {
 		this.touched[field] = true;
 		if (field === 'password') {
@@ -80,12 +81,14 @@ export class RegisterComponent implements OnDestroy {
 		this.validationSubject.next({ field, value });
 	}
 
+	/** Track field focus for password requirements. */
 	onFieldFocus(field: string) {
 		if (field === 'password') {
 			this.showPasswordRequirements = true;
 		}
 	}
 
+	/** Mark field blur and maybe hide requirements. */
 	onFieldBlur(field: string) {
 		this.touched[field] = true;
 		if (field === 'password' && !this.password) {
@@ -138,7 +141,7 @@ export class RegisterComponent implements OnDestroy {
 		}
 	}
 
-	// Get CSS class for field validation
+	/** CSS class for field validity. */
 	getFieldClass(field: string): string {
 		return this.validationService.getFieldValidationClass(
 			field,
@@ -147,17 +150,17 @@ export class RegisterComponent implements OnDestroy {
 		);
 	}
 
-	// Get field errors for display
+	/** Field errors. */
 	getFieldErrors(field: string): string[] {
 		return getFieldErrors(field, this.errors);
 	}
 
-	// Check if field has errors
+	/** True if field invalid. */
 	hasFieldError(field: string): boolean {
 		return hasFieldError(field, this.errors, this.touched, this.submitAttempted);
 	}
 
-	// Check if form is valid
+	/** True if form valid. */
 	isFormValid(): boolean {
 		return isFormValid(this.errors, ['name', 'email', 'password', 'confirmPassword'], {
 			name: this.name,
@@ -167,6 +170,7 @@ export class RegisterComponent implements OnDestroy {
 		});
 	}
 
+	/** Attempt user registration. */
 	onRegister() {
 		this.submitAttempted = true;
 
@@ -220,7 +224,8 @@ export class RegisterComponent implements OnDestroy {
 				next: response => {
 					this.isSubmitting = false;
 					if (response.success) {
-						this.successMessage = 'Registration successful! Redirecting to login...';
+						this.successMessage =
+							response.message || 'Registration successful! Redirecting to login...';
 						this.errorMessage = '';
 
 						// Clear form
@@ -246,43 +251,46 @@ export class RegisterComponent implements OnDestroy {
 				},
 				error: error => {
 					this.isSubmitting = false;
-
-					// Handle specific error cases
-					if (error.status === 400) {
-						this.errorMessage =
-							error.error?.message ||
-							'Invalid registration data. Please check your information.';
-					} else if (error.status === 409) {
-						this.errorMessage =
-							'An account with this email already exists. Please use a different email or try logging in.';
-					} else if (error.status === 429) {
-						this.errorMessage =
-							'Too many registration attempts. Please try again later.';
-					} else {
-						this.errorMessage =
-							'Registration failed. Please check your connection and try again.';
+					let errorMessage = '';
+					if (error.error && error.error.message) {
+						errorMessage = error.error.message;
 					}
-
+					if (!errorMessage && error.message) errorMessage = error.message;
+					if (!errorMessage) {
+						if (error.status === 409)
+							errorMessage =
+								'An account with this email already exists. Please use a different email or try logging in.';
+						else if (error.status === 429)
+							errorMessage =
+								'Too many registration attempts. Please try again later.';
+						else
+							errorMessage =
+								'Registration failed. Please check your connection and try again.';
+					}
+					this.errorMessage = errorMessage;
 					this.successMessage = '';
 				}
 			});
 	}
 
+	/** Navigate to login page. */
 	goToLogin() {
 		this.router.navigate(['/login']);
 	}
 
-	// Password strength helper methods
+	/** Password strength CSS class. */
 	getPasswordStrengthClass(): string {
 		const result = calculatePasswordStrength(this.password);
 		return getPasswordStrengthClass(result.strength);
 	}
 
+	/** Password strength text. */
 	getPasswordStrengthText(): string {
 		const result = calculatePasswordStrength(this.password);
 		return getPasswordStrengthText(result.strength);
 	}
 
+	/** Password requirement list. */
 	getPasswordRequirements(): { text: string; met: boolean }[] {
 		const result = calculatePasswordStrength(this.password);
 		return result.requirements;

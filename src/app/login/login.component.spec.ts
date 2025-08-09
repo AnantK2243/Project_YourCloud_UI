@@ -1,3 +1,4 @@
+// File: src/app/login/login.component.spec.ts - Tests LoginComponent form validation and submission flow
 import { LoginComponent } from './login.component';
 import { ValidationService } from '../validation.service';
 
@@ -18,6 +19,7 @@ class ActivatedRouteStub {
 }
 
 describe('LoginComponent (unit)', () => {
+	// Suite: ensures form validation and login navigation
 	it('creates component', () => {
 		const comp = new LoginComponent(
 			new AuthServiceStub() as any,

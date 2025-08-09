@@ -1,4 +1,4 @@
-// src/app/session-storage.service.ts
+// File: src/app/session-storage.service.ts - Encrypted in-session credential cache with timeout.
 
 import { Injectable, Inject, PLATFORM_ID } from '@angular/core';
 import { isPlatformBrowser } from '@angular/common';
@@ -13,6 +13,7 @@ interface SessionData {
 @Injectable({
 	providedIn: 'root'
 })
+/** Session credential encryption & retrieval. */
 export class SessionStorageService {
 	private readonly SESSION_DATA_KEY = 'user_session_data';
 	private readonly SESSION_TIMEOUT = 4 * 60 * 60 * 1000; // 4 hours
@@ -66,6 +67,7 @@ export class SessionStorageService {
 		);
 	}
 
+	/** Store encrypted credentials for active session. */
 	async storeCredentials(password: string, salt: string): Promise<void> {
 		if (!this.isBrowser()) return;
 
@@ -82,6 +84,7 @@ export class SessionStorageService {
 		this.setSessionData(sessionData);
 	}
 
+	/** Retrieve decrypted credentials if session valid; null otherwise. */
 	async retrieveCredentials(): Promise<{
 		password: string;
 		salt: string;
@@ -111,6 +114,7 @@ export class SessionStorageService {
 		}
 	}
 
+	/** Remove stored credentials and reset state. */
 	clearCredentials(): void {
 		if (!this.isBrowser()) return;
 		sessionStorage.removeItem(this.SESSION_DATA_KEY);
@@ -118,6 +122,7 @@ export class SessionStorageService {
 		this.currentSessionId = null;
 	}
 
+	/** True if session still active. */
 	async isSessionActive(): Promise<boolean> {
 		if (!this.isBrowser()) return false;
 
@@ -127,6 +132,7 @@ export class SessionStorageService {
 		return data ? this.isSessionValid(data) : false;
 	}
 
+	/** Internal encryption helper (AES-GCM). */
 	private async encryptData(data: string): Promise<string> {
 		if (!this.sessionKey) throw new Error('No session key available');
 
@@ -146,6 +152,7 @@ export class SessionStorageService {
 		return btoa(String.fromCharCode(...combined));
 	}
 
+	/** Internal decryption helper (AES-GCM). */
 	private async decryptData(encryptedData: string): Promise<string> {
 		if (!this.sessionKey) throw new Error('No session key available');
 
@@ -184,6 +191,7 @@ export class SessionStorageService {
 		);
 	}
 
+	/** Free ephemeral key material. */
 	async cleanup(): Promise<void> {
 		this.sessionKey = null;
 		this.currentSessionId = null;

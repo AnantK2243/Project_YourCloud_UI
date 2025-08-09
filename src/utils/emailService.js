@@ -1,8 +1,7 @@
-// src/utils/emailService.js
+// File: src/utils/emailService.js - Nodemailer verification email sender utility
 
 const nodemailer = require('nodemailer');
 
-// Create a "transporter" object that knows how to send emails
 const transporter = nodemailer.createTransport({
 	service: 'gmail',
 	auth: {
@@ -11,7 +10,12 @@ const transporter = nodemailer.createTransport({
 	}
 });
 
-// Function to send the verification email
+/**
+ * Send account verification email unless running in test environment.
+ * @param {string} userEmail Target recipient address.
+ * @param {string} token One-time verification token (included in link).
+ * @returns {Promise<void>} Resolves when email dispatched (or skipped in test).
+ */
 async function sendVerificationEmail(userEmail, token) {
 	// Skip email sending in test environment
 	if (process.env.NODE_ENV === 'test') {

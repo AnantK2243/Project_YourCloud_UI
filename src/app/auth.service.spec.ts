@@ -1,3 +1,5 @@
+// File: src/app/auth.service.spec.ts - Tests AuthService auth flow, headers, token and session handling
+
 import { TestBed } from '@angular/core/testing';
 import { PLATFORM_ID } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
@@ -8,6 +10,7 @@ import { CryptoService } from './crypto.service';
 import { vi, afterEach, describe, it, expect, beforeEach } from 'vitest';
 
 describe('AuthService', () => {
+	// Suite: validate creation, header logic, login/logout side effects and credential helpers
 	let service: AuthService;
 	let httpMock: HttpTestingController;
 	let crypto: CryptoService;
@@ -91,10 +94,13 @@ describe('AuthService', () => {
 				.spyOn(session, 'storeCredentials')
 				.mockResolvedValue(undefined as any);
 
+			// Updated mock to reflect standardized API shape { success, data: { token, user } }
 			const resp = {
 				success: true,
-				token: 'tok-123',
-				user: { name: 'Alice', salt: btoa('salt-bytes') }
+				data: {
+					token: 'tok-123',
+					user: { name: 'Alice', salt: btoa('salt-bytes') }
+				}
 			};
 
 			let completed = false;

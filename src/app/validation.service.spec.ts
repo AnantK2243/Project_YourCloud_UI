@@ -1,6 +1,8 @@
+// File: src/app/validation.service.spec.ts - Tests ValidationService input validation helpers
 import { ValidationService } from './validation.service';
 
 describe('ValidationService', () => {
+	// Suite: basic validity, strength & name rules
 	let service: ValidationService;
 
 	beforeEach(() => {

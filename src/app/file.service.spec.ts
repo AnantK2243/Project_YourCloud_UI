@@ -1,3 +1,4 @@
+// File: src/app/file.service.spec.ts - Tests FileService directory, upload/download & progress logic
 import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
@@ -22,6 +23,7 @@ function buildIvPrefixedBuffer(payloadBytes: Uint8Array): ArrayBuffer {
 }
 
 describe('FileService', () => {
+	// Suite: initialization, CRUD, encryption error paths & progress state
 	let service: FileService;
 	let httpMock: HttpTestingController;
 

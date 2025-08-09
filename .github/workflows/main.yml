@@ -43,6 +43,8 @@ jobs:
         permissions:
             contents: read
             packages: write
+        env:
+            IMAGE_REPO: ghcr.io/anantk2243/project_yourcloud_ui
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
@@ -61,5 +63,5 @@ jobs:
                   file: ./Project_YourCloud_UI/Dockerfile
                   push: true
                   tags: |
-                      ghcr.io/${{ github.repository }}:latest
-                      ghcr.io/${{ github.repository }}:${{ github.sha }}
+                      ${{ env.IMAGE_REPO }}:latest
+                      ${{ env.IMAGE_REPO }}:${{ github.sha }}

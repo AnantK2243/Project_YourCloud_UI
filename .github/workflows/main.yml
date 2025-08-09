@@ -5,40 +5,39 @@ on:
         branches: [prod, main]
 
 jobs:
-    # quality-check:
-    #     runs-on: ubuntu-latest
-    #     steps:
-    #         - name: Checkout code
-    #           uses: actions/checkout@v4
-    #         - name: Set up Node.js
-    #           uses: actions/setup-node@v4
-    #           with:
-    #               node-version: 22.12.0
-    #               cache: 'npm'
-    #         - name: Install dependencies
-    #           run: npm ci --no-audit --no-fund
-    #         - name: Run quality checks
-    #           run: npm run quality:check
+    quality-check:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22.12.0
+                  cache: 'npm'
+            - name: Install dependencies
+              run: npm ci --no-audit --no-fund
+            - name: Run quality checks
+              run: npm run quality:check
 
-    # build:
-    #     if: github.ref == 'refs/heads/prod'
-    #     runs-on: ubuntu-latest
-    #     steps:
-    #         - name: Checkout code
-    #           uses: actions/checkout@v4
-    #         - name: Set up Node.js
-    #           uses: actions/setup-node@v4
-    #           with:
-    #               node-version: 22.12.0
-    #               cache: 'npm'
-    #         - name: Install dependencies
-    #           run: npm ci --no-audit --no-fund
-    #         - name: Build application
-    #           run: npm run build:prod
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22.12.0
+                  cache: 'npm'
+            - name: Install dependencies
+              run: npm ci --no-audit --no-fund
+            - name: Build application
+              run: npm run build:prod
 
     deploy:
         if: github.ref == 'refs/heads/prod'
-        # needs: build
+        needs: build
         runs-on: ubuntu-latest
         permissions:
             contents: read

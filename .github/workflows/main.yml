@@ -47,6 +47,9 @@ jobs:
         steps:
             - name: Checkout code
               uses: actions/checkout@v4
+            - name: Generate version tag
+              id: genver
+              run: echo "version_tag=$(date -u +%Y%m%d-%H%M)-${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
             - name: Set up Docker Buildx
               uses: docker/setup-buildx-action@v3
             - name: Log in to GitHub Container Registry
@@ -61,6 +64,9 @@ jobs:
                   context: .
                   file: ./Dockerfile
                   push: true
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
                   tags: |
                       ${{ env.IMAGE_REPO }}:latest
                       ${{ env.IMAGE_REPO }}:${{ github.sha }}
+                      ${{ env.IMAGE_REPO }}:${{ steps.genver.outputs.version_tag }}

@@ -9,7 +9,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout code
-              uses: actions/checkout@v4
+              uses: actions/checkout@v5
             - name: Set up Node.js
               uses: actions/setup-node@v4
               with:
@@ -24,7 +24,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - name: Checkout code
-              uses: actions/checkout@v4
+              uses: actions/checkout@v5
             - name: Set up Node.js
               uses: actions/setup-node@v4
               with:
@@ -46,7 +46,7 @@ jobs:
             IMAGE_REPO: ghcr.io/anantk2243/project_yourcloud_ui
         steps:
             - name: Checkout code
-              uses: actions/checkout@v4
+              uses: actions/checkout@v5
             - name: Generate version tag
               id: genver
               run: echo "version_tag=$(date -u +%Y%m%d-%H%M)-${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
